@@ -26,14 +26,18 @@ Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qu
 
 ## Comptes
 
-- Pseudo + mot de passe (protégé par PBKDF2-SHA-256, jamais stocké en clair), photo de profil.
+- Pseudo + mot de passe (protégé par PBKDF2-SHA-256, jamais stocké en clair), avatar emoji.
 - XP et niveaux (de Mousse à Amiral), statistiques de carrière : temps joué, victoires, défaites, taux, précision, séries…
 - Les comptes sont enregistrés **dans le navigateur de l'appareil** : ils ne se synchronisent pas entre PC et téléphone, et effacer les données du site efface le compte. Le mot de passe protège le compte sur un appareil partagé, pas contre quelqu'un qui a accès au navigateur.
 - Contre le bot, l'XP gagnée est divisée par deux.
 
 ## Paramètres
 
-Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), pseudo, mot de passe, photo.
+Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème de couleurs** (Océan, Nuit, Forêt, Crépuscule, Clair), pseudo, mot de passe, avatar.
+
+**Avatar** : uniquement un emoji choisi dans une liste fermée d'une cinquantaine d'emojis adaptés à partir de 12 ans (animaux, mer, espace, sport, smileys…). L'emoji reçu d'un adversaire est vérifié contre cette même liste.
+
+**Responsive** : interface adaptée du petit téléphone (320 px) au grand écran, en portrait comme en paysage, avec prise en charge des zones sûres (encoche).
 
 ## Technique
 
