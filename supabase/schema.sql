@@ -211,3 +211,9 @@ grant execute on function public.create_profile(text, text), public.update_profi
   public.import_local(jsonb), public.delete_account() to authenticated;
 grant execute on function public.matchmake(text, text), public.leave_queue(text) to anon, authenticated;
 grant select on public.profiles to authenticated;
+
+-- Supabase accorde par défaut les fonctions à « anon » : on le retire pour tout ce qui exige un compte.
+revoke execute on function public.create_profile(text, text), public.update_profile(text, text),
+  public.record_game(boolean, integer, integer, integer, integer, integer, boolean, boolean),
+  public.import_local(jsonb), public.delete_account() from anon;
+alter function public.c02_emojis() set search_path = public;

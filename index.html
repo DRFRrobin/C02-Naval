@@ -62,8 +62,10 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
   border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .av-up{width:64px;height:64px;flex:0 0 64px;border:2px dashed var(--sky);border-radius:14px;display:flex;align-items:center;
   justify-content:center;color:var(--dim);font-size:18px;cursor:pointer;overflow:hidden;background:rgba(0,0,0,.2);position:relative}
-.oauth{font-size:16px;min-height:50px;border:1px solid var(--border2);background:var(--card2)}
-.oauth i{font-size:19px}.oauth.discord i{color:#7c8af5}
+.oauth{font-size:16px;font-weight:600;min-height:54px;border:1px solid var(--border2);background:transparent;border-radius:12px;gap:12px;margin-top:14px}
+.oauth:hover{background:var(--card2);border-color:var(--accent,var(--border2))}
+.oauth i{font-size:21px}.oauth.discord i{color:#7c8af5}.oauth svg{width:20px;height:20px;flex:none}
+.welcome{margin:22px 0 4px;font-size:28px;line-height:1.15}.welcome-sub{margin:0 0 10px;color:var(--muted,#9aa4b2);font-size:15px}
 .av-up{font-size:34px;line-height:1;padding:0;font-family:inherit}
 .av-up i{font-size:18px}
 .av-up.has{border-style:solid;border-color:var(--border2)}
@@ -391,8 +393,10 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
       </div>
       </div>
       <div id="cloudPane" style="display:none">
-        <button id="btnGoogle" class="btn wide oauth" style="margin-top:22px"><i class="fa-brands fa-google"></i><span data-i18n="signGoogle"></span></button>
-        <button id="btnDiscord" class="btn wide oauth discord" style="margin-top:10px"><i class="fa-brands fa-discord"></i><span data-i18n="signDiscord"></span></button>
+        <h2 class="welcome" data-i18n="signTitle"></h2>
+        <p class="welcome-sub" data-i18n="signSub"></p>
+        <button id="btnGoogle" class="btn wide oauth google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg><span data-i18n="signGoogle"></span></button>
+        <button id="btnDiscord" class="btn wide oauth discord"><i class="fa-brands fa-discord"></i><span data-i18n="signDiscord"></span></button>
         <p class="msg" style="font-size:12.5px;margin:14px 0 4px" data-i18n="cloudNote"></p>
       </div>
       <p id="authMsg" class="msg"></p>
@@ -734,6 +738,7 @@ const I18N = {
     rulesInfo: p => `Règles : grille ${p.size} × ${p.size}, ${pl(p.n, 'bateau', 'bateaux')}${p.up ? '' : ', sans améliorations'}.`,
     botOff: "Le bot est désactivé dans les règles.", noBotMsg: "Personne n'a été trouvé et le bot est désactivé. Retour au menu…",
     customXp: 'XP réduite de moitié : règles personnalisées.',
+    signTitle: 'Bon retour', signSub: 'Connecte-toi à ton compte',
     signGoogle: 'Continuer avec Google', signDiscord: 'Continuer avec Discord',
     cloudNote: "Pas de mot de passe : tu te connectes avec ton compte. Seuls ton pseudo, ton emoji et tes statistiques sont enregistrés (ni ton nom, ni ta photo, ni ton e-mail).",
     obTitle: 'Crée ton profil', obSub: 'Choisis ton pseudo et ton avatar.', obEmoji: 'Avatar', obImportT: 'Importer les stats d\'un ancien compte local',
@@ -850,6 +855,7 @@ const I18N = {
     rulesInfo: p => `Rules: ${p.size} × ${p.size} grid, ${pl(p.n, 'ship', 'ships')}${p.up ? '' : ', no upgrades'}.`,
     botOff: 'The bot is disabled in the rules.', noBotMsg: 'No one was found and the bot is disabled. Back to the menu…',
     customXp: 'XP halved: custom rules.',
+    signTitle: 'Welcome back', signSub: 'Sign in to your account',
     signGoogle: 'Continue with Google', signDiscord: 'Continue with Discord',
     cloudNote: 'No password: you sign in with your account. Only your nickname, emoji and statistics are stored (not your name, photo or e-mail).',
     obTitle: 'Create your profile', obSub: 'Pick your nickname and avatar.', obEmoji: 'Avatar', obImportT: 'Import stats from an old local account',
@@ -954,7 +960,7 @@ function peerOpts() {
 }
 // Comptes et relais en ligne (Supabase). Laisser vide = mode local (comptes dans le navigateur, connexion directe PeerJS).
 // Voir docs/SUPABASE.md. La clé « anon » est publique par conception.
-const CLOUD_CFG = Object.assign({ url: '', key: '' }, window.C02_CONFIG || {});
+const CLOUD_CFG = Object.assign({ url: 'https://clburoslawbdzqcjrknz.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYnVyb3NsYXdiZHpxY2pya256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2OTEzNDYsImV4cCI6MjExMDI2NzM0Nn0.5WIJypeiogAlknZRSAhrfQEDXwQwN6d3iGsfd1fGSOU' }, window.C02_CONFIG || {});
 const sb = (CLOUD_CFG.url && CLOUD_CFG.key && window.supabase)
   ? window.supabase.createClient(CLOUD_CFG.url, CLOUD_CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }, realtime: { params: { eventsPerSecond: 10 } } })
   : null;
