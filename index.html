@@ -954,7 +954,7 @@ function peerOpts() {
 }
 // Comptes et relais en ligne (Supabase). Laisser vide = mode local (comptes dans le navigateur, connexion directe PeerJS).
 // Voir docs/SUPABASE.md. La clé « anon » est publique par conception.
-const CLOUD_CFG = Object.assign({ url: '', key: '' }, window.C02_CONFIG || {});
+const CLOUD_CFG = Object.assign({ url: 'https://clburoslawbdzqcjrknz.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYnVyb3NsYXdiZHpxY2pya256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2OTEzNDYsImV4cCI6MjExMDI2NzM0Nn0.5WIJypeiogAlknZRSAhrfQEDXwQwN6d3iGsfd1fGSOU' }, window.C02_CONFIG || {});
 const sb = (CLOUD_CFG.url && CLOUD_CFG.key && window.supabase)
   ? window.supabase.createClient(CLOUD_CFG.url, CLOUD_CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }, realtime: { params: { eventsPerSecond: 10 } } })
   : null;

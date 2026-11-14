@@ -38,6 +38,7 @@ async function newPage(ctx, viewport) {
 async function newContext() {
   const ctx = await browser.newContext();
   await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());   // aucun accès réseau : PeerJS est simulé
+  await ctx.addInitScript(() => { window.C02_CONFIG = { url: '', key: '' }; });   // ces tests couvrent le mode sans Supabase
   await ctx.addInitScript({ path: path.join(__dirname, 'fake-peer.js') });
   return ctx;
 }
