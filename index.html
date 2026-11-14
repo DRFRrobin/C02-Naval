@@ -460,6 +460,13 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
           <b><i class="fa-solid fa-palette"></i><span data-i18n="themeT"></span></b><small data-i18n="themeD"></small>
           <div id="themeBox" class="themes"></div>
         </div>
+        <div class="set-block">
+          <b><i class="fa-solid fa-network-wired"></i><span data-i18n="advT"></span></b><small data-i18n="advD"></small>
+          <input id="turnUrl" autocomplete="off" spellcheck="false" data-ph="turnUrlPh">
+          <input id="turnUser" autocomplete="off" spellcheck="false" data-ph="turnUserPh">
+          <input id="turnCred" type="password" autocomplete="off" data-ph="turnCredPh">
+          <p id="turnMsg" class="msg"></p>
+        </div>
         <div id="acctSettings">
           <div class="set-block">
             <b><i class="fa-solid fa-face-smile"></i><span data-i18n="photoT"></span></b><small data-i18n="photoD"></small>
@@ -693,6 +700,11 @@ const I18N = {
     rulesInfo: p => `Règles : grille ${p.size} × ${p.size}, ${pl(p.n, 'bateau', 'bateaux')}${p.up ? '' : ', sans améliorations'}.`,
     botOff: "Le bot est désactivé dans les règles.", noBotMsg: "Personne n'a été trouvé et le bot est désactivé. Retour au menu…",
     customXp: 'XP réduite de moitié : règles personnalisées.',
+    stReconnecting: 'Reconnexion…', reconnecting: "Connexion perdue : tentative de reconnexion (45 s max)…",
+    rTimerT: 'Chronomètre de tour', rTimerD: "Temps limite par tour ; passé ce délai, un tir au hasard est joué. Limite aussi le placement à 90 s.",
+    timerOff: 'Désactivé', timerN: '{n} s', autoShot: 'Temps écoulé : tir automatique.', placeLimit: 'Placement limité à {s} s.',
+    advT: 'Avancé : relais TURN', advD: "Facultatif. Aide à se connecter sur les réseaux très fermés. Les identifiants restent dans ce navigateur.",
+    turnUrlPh: 'turn:serveur:3478  ou  turns:serveur:443?transport=tcp', turnUserPh: 'Identifiant', turnCredPh: 'Mot de passe', turnSaved: 'Relais enregistré.',
     stMyTurn: 'À toi de jouer', stOppTurn: "Tour de l'adversaire", stFiring: 'Tir en cours', stOver: 'Partie terminée', stLost: 'Connexion perdue',
     enemyGrid: 'Grille de {name}', myFleet: 'Ta flotte',
     modeShot: 'Tir', modeRadar: 'Radar', modeCross: 'Croix', modeShield: 'Bouclier',
@@ -798,6 +810,11 @@ const I18N = {
     rulesInfo: p => `Rules: ${p.size} × ${p.size} grid, ${pl(p.n, 'ship', 'ships')}${p.up ? '' : ', no upgrades'}.`,
     botOff: 'The bot is disabled in the rules.', noBotMsg: 'No one was found and the bot is disabled. Back to the menu…',
     customXp: 'XP halved: custom rules.',
+    stReconnecting: 'Reconnecting…', reconnecting: 'Connection lost: trying to reconnect (45 s max)…',
+    rTimerT: 'Turn timer', rTimerD: 'Time limit per turn; when it runs out, a random shot is fired. Also limits placement to 90 s.',
+    timerOff: 'Off', timerN: '{n} s', autoShot: 'Time is up: automatic shot.', placeLimit: 'Placement limited to {s} s.',
+    advT: 'Advanced: TURN relay', advD: 'Optional. Helps connecting on very restrictive networks. Credentials stay in this browser.',
+    turnUrlPh: 'turn:server:3478  or  turns:server:443?transport=tcp', turnUserPh: 'Username', turnCredPh: 'Password', turnSaved: 'Relay saved.',
     stMyTurn: 'Your turn', stOppTurn: "Opponent's turn", stFiring: 'Firing…', stOver: 'Game over', stLost: 'Connection lost',
     enemyGrid: "{name}'s grid", myFleet: 'Your fleet',
     modeShot: 'Shot', modeRadar: 'Radar', modeCross: 'Cross', modeShield: 'Shield',
@@ -846,6 +863,7 @@ function applyLang() {
   document.documentElement.lang = settings.lang;
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $('langSel').value = $('langMini').value = settings.lang;
+  document.querySelectorAll('[data-ph]').forEach(el => { el.placeholder = t(el.dataset.ph); });
 }
 
 /* =========================================================
@@ -878,7 +896,18 @@ const ICE_SERVERS = [
   { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
   ...(MY_TURN ? [MY_TURN] : []),
 ];
-const PEER_OPTS = { debug: 0, config: { iceServers: ICE_SERVERS, sdpSemantics: 'unified-plan' } };
+// Relais TURN personnel saisi dans Paramètres → Avancé (enregistré uniquement dans ce navigateur).
+function userTurn() {
+  const u = String(settings.turnUrl || '').trim();
+  if (!/^turns?:[\w.\-]+(:\d+)?(\?transport=(tcp|udp))?$/i.test(u)) return null;
+  return { urls: [u], username: String(settings.turnUser || ''), credential: String(settings.turnCred || '') };
+}
+function peerOpts() {
+  const extra = userTurn();
+  return { debug: 0, config: { iceServers: extra ? [...ICE_SERVERS, extra] : ICE_SERVERS, sdpSemantics: 'unified-plan' } };
+}
+const RECONNECT_MS = 45000, PLACE_LIMIT_MS = 90000, TIMER_CHOICES = [0, 15, 30, 60, 90];
+const SEQ = new Set(['ready', 'act', 'res', 'pass', 'quit']);   // messages numérotés (renvoyés après une coupure)
 
 const $ = id => document.getElementById(id);
 const S = {
@@ -892,6 +921,8 @@ const S = {
   enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
   lastSeen: 0, hb: null, joinTimer: null, pendingAct: null, oppAway: false, wakeLock: null,
   mmTimer: null, mmStopped: false, onReject: null,
+  sid: null, rid: null, hostId: null, txn: 0, rxn: 0, outbox: [], reconnecting: false, reconDeadline: 0, reconTimer: null,
+  rpeer: null, gpeer: null, attempting: false, turnStart: 0, placeDeadline: 0, turnTimer: null,
   oppUsed: 0, opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
 };
 
@@ -963,7 +994,7 @@ function fmtTime(sec) {
    Règles personnalisables (taille de grille, flotte, améliorations)
    ========================================================= */
 const MIN_SIZE = 6, MAX_SIZE = 15, MAX_LEN = 6, MAX_SHIPS = 10;
-const DEFAULT_RULES = { size: 10, fleet: [5, 4, 3, 3, 2], radar: true, cross: true, shield: true };
+const DEFAULT_RULES = { size: 10, fleet: [5, 4, 3, 3, 2], radar: true, cross: true, shield: true, timer: 0 };
 const maxCells = size => Math.floor(size * size * 0.4);
 const sumOf = a => a.reduce((x, y) => x + y, 0);
 // Valide et normalise des règles (venant du stockage ou du réseau). Renvoie null si invalides.
@@ -975,10 +1006,10 @@ function sanitizeRules(c) {
   if (!c.fleet.every(l => Number.isInteger(l) && l >= 1 && l <= MAX_LEN)) return null;
   const fleet = c.fleet.slice().sort((a, b) => b - a);
   if (sumOf(fleet) > maxCells(size)) return null;
-  return { size, fleet, radar: c.radar !== false, cross: c.cross !== false, shield: c.shield !== false };
+  return { size, fleet, radar: c.radar !== false, cross: c.cross !== false, shield: c.shield !== false, timer: TIMER_CHOICES.includes(c.timer) ? c.timer : 0 };
 }
 const cloneRules = r => ({ ...r, fleet: r.fleet.slice() });
-const sameRules = (a, b) => a.size === b.size && a.fleet.join() === b.fleet.join() && a.radar === b.radar && a.cross === b.cross && a.shield === b.shield;
+const sameRules = (a, b) => a.size === b.size && a.fleet.join() === b.fleet.join() && a.radar === b.radar && a.cross === b.cross && a.shield === b.shield && a.timer === b.timer;
 const isStdRules = r => sameRules(r, DEFAULT_RULES);
 let RULES = sanitizeRules(settings.rules) || cloneRules(DEFAULT_RULES);   // règles choisies par le joueur (hôte / bot)
 let CFG = cloneRules(RULES);                                              // règles de la partie en cours
@@ -1255,6 +1286,8 @@ function renderRules() {
     h += `<div class="set-row" style="margin-top:10px"><i class="fa-solid ${UPG[k][0]}"></i><div><b>${esc(t(UPG[k][1]))}</b><small>${esc(t(UPG[k][2]))}</small></div>${tog(k, R[k])}</div>`;
   }
   h += '</div>';
+  h += `<div class="set-row"><i class="fa-solid fa-stopwatch"></i><div><b>${esc(t('rTimerT'))}</b><small>${esc(t('rTimerD'))}</small></div>`
+    + step('timer', R.timer ? t('timerN', { n: R.timer }) : t('timerOff'), TIMER_CHOICES.indexOf(R.timer) > 0, TIMER_CHOICES.indexOf(R.timer) < TIMER_CHOICES.length - 1) + '</div>';
   h += `<div class="set-row"><i class="fa-solid fa-robot"></i><div><b>${esc(t('rBotT'))}</b><small>${esc(t('rBotD'))}</small></div>${tog('bot', settings.bot)}</div>`;
   h += `<div class="set-block"><b>${esc(t('rSkillT'))}</b><select id="skillSel" ${settings.bot ? '' : 'disabled'}>`
     + [0, 1, 2].map(i => `<option value="${i}" ${settings.skill === i ? 'selected' : ''}>${esc(t('skill' + i))}</option>`).join('') + '</select></div>';
@@ -1268,6 +1301,7 @@ $('rulesBox').addEventListener('click', e => {
   if (a === 'reset') return setRules(c => Object.assign(c, cloneRules(DEFAULT_RULES)));
   if (a === 't-bot') { settings.bot = !settings.bot; saveSettings(); return renderDash(); }
   if (a.startsWith('t-')) return setRules(c => { c[a.slice(2)] = !c[a.slice(2)]; });
+  if (a.startsWith('timer')) return setRules(c => { const i = TIMER_CHOICES.indexOf(c.timer) + (a.endsWith('+') ? 1 : -1); c.timer = TIMER_CHOICES[Math.max(0, Math.min(TIMER_CHOICES.length - 1, i))]; });
   if (a.startsWith('size')) return setRules(c => {
     c.size += a.endsWith('+') ? 1 : -1;
     c.fleet.sort((x, y) => y - x);
@@ -1318,6 +1352,7 @@ function renderSettings() {
     $('btnPhotoDel').disabled = !validEmoji(a.emoji);
   }
   renderThemes();
+  if (document.activeElement !== $('turnUrl')) { $('turnUrl').value = settings.turnUrl || ''; $('turnUser').value = settings.turnUser || ''; $('turnCred').value = settings.turnCred || ''; }
 }
 async function saveProfile() {
   loadAccounts();
@@ -1433,6 +1468,7 @@ function setupLobby(kind) {
   showView('lobby');
 }
 function acceptConn(conn) {
+  if (S.connected && S.sid) return acceptResume(conn);   // partie en cours : seule une reprise de CETTE partie est acceptée
   if (S.conn || S.connected) {          // déjà un adversaire : on refuse poliment
     conn.on('open', () => { try { conn.send({ t: 'busy' }); } catch (e) {} setTimeout(() => conn.close(), 300); });
     return;
@@ -1447,7 +1483,7 @@ function hostGame() {
   applyConfig(RULES);
   setupLobby('host');
   $('codeBox').textContent = S.code;
-  const peer = new Peer(PREFIX + S.code, PEER_OPTS);
+  const peer = new Peer(PREFIX + S.code, peerOpts());
   S.peer = peer;
   peer.on('open', () => msg('lobbyMsg', t('waitingOpp')));
   peer.on('disconnected', () => keepPeerAlive(peer));
@@ -1477,7 +1513,7 @@ function joinGame() {
   $('btnJoin').disabled = true;
   S.kind = 'join'; S.isHost = false;
   applyConfig(DEFAULT_RULES);
-  const peer = new Peer(PEER_OPTS);
+  const peer = new Peer(peerOpts());
   S.peer = peer; S.code = code;
   let failed = false;
   const fail = text => {
@@ -1532,7 +1568,7 @@ function stopSearch() {
 function trySlot(k) {
   if (S.connected || S.mmStopped) return;
   if (k >= MM_SLOTS) { setTimeout(() => trySlot(0), 1500); return; }
-  const peer = new Peer(MM_PREFIX + k, PEER_OPTS);
+  const peer = new Peer(MM_PREFIX + k, peerOpts());
   S.peer = peer;
   peer.on('open', () => { if (S.mmStopped) return peer.destroy(); S.isHost = true; msg('lobbyMsg', t('waitingOpp')); });
   peer.on('connection', conn => { if (!S.mmStopped) acceptConn(conn); });
@@ -1545,7 +1581,7 @@ function trySlot(k) {
 }
 function joinSlot(k) {
   if (S.connected || S.mmStopped) return;
-  const peer = new Peer(PEER_OPTS);
+  const peer = new Peer(peerOpts());
   S.peer = peer; S.isHost = false;
   let done = false, tm = null;
   const next = () => {
@@ -1566,11 +1602,21 @@ function joinSlot(k) {
 // Connexion de données commune. La partie démarre quand chacun a reçu le « hello » de l'autre.
 function setupConn(conn, onFail) {
   S.conn = conn; S.onReject = onFail || null;
-  conn.on('open', () => { if (S.conn === conn) send({ t: 'hello', ...myIdentity(), ...(S.kind === 'host' ? { rules: CFG } : {}) }); });
+  conn.on('open', () => {
+    if (S.conn !== conn) return;
+    const extra = {};
+    if (S.isHost && S.kind !== 'join') {       // l'hôte annonce la partie : règles, identifiant de partie et point de reprise
+      S.sid = S.sid || genCode() + genCode();
+      S.rid = S.rid || (S.kind === 'host' ? PREFIX + S.code : PREFIX + genCode());
+      Object.assign(extra, { sid: S.sid, rid: S.rid });
+      if (S.kind === 'host') extra.rules = CFG;
+    }
+    send({ t: 'hello', ...myIdentity(), ...extra });
+  });
   conn.on('data', m => { if (S.conn === conn) onData(m); });
   const closed = () => {
     if (S.conn !== conn) return;
-    if (S.connected) lost();
+    if (S.connected) connDown();
     else if (S.onReject) S.onReject(false);
   };
   conn.on('close', closed);
@@ -1582,28 +1628,106 @@ function onConnected() {
   $('joinModal').classList.remove('show');
   S.lastSeen = Date.now();
   S.hb = setInterval(() => {
-    send({ t: 'ping' });
+    send({ t: 'ping', a: S.rxn });
+    if (S.reconnecting) { if (Date.now() > S.reconDeadline) lost(); return; }
     // Adversaire parti dans une autre appli ou écran éteint : on lui laisse plus de temps.
-    if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) lost();
+    if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) connDown();
   }, HEARTBEAT_MS);
   // Créneau aléatoire : on le libère pour le prochain joueur (la liaison directe reste ouverte).
+  // L'hôte ouvre en plus un point de rendez-vous privé pour une éventuelle reprise après coupure.
   if (S.kind === 'random' && S.peer) try { S.peer.disconnect(); } catch (e) {}
+  if (S.kind === 'random' && S.isHost && S.rid && typeof Peer !== 'undefined') {
+    try {
+      const rp = new Peer(S.rid, peerOpts());
+      S.rpeer = rp;
+      rp.on('connection', acceptResume);
+      rp.on('disconnected', () => { if (!rp.destroyed) setTimeout(() => { try { rp.reconnect(); } catch (e) {} }, 1000); });
+      rp.on('error', () => {});
+    } catch (e) {}
+  }
   keepAwake();
   enterPlacement();
 }
 
+/* ---------- Envoi fiable : messages numérotés, renvoyés après une coupure ---------- */
 function send(m) {
   try {
     if (S.vsBot) { if (S.bot) S.bot.receive(m); return; }
-    if (S.conn && S.conn.open) S.conn.send(m);
+    if (SEQ.has(m.t)) { m.n = ++S.txn; S.outbox.push(m); }
+    if (S.conn && S.conn.open && !S.reconnecting) S.conn.send(m);
   } catch (e) {}
+}
+function flushOutbox(theirRx) {
+  S.outbox = S.outbox.filter(x => x.n > theirRx);
+  for (const m of S.outbox) { try { S.conn.send(m); } catch (e) {} }
+}
+
+/* ---------- Reprise après coupure (45 s) ---------- */
+function connDown() {
+  if (!S.connected || S.lost || S.phase === 'over' || S.vsBot || S.reconnecting) return;
+  if (!S.sid || (!S.isHost && !S.hostId)) return lost();   // adversaire sans reprise possible
+  S.reconnecting = true; S.reconDeadline = Date.now() + RECONNECT_MS;
+  try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
+  clearInterval(S.reconTimer); S.reconTimer = setInterval(reconTick, 3000);
+  renderConn(); reconTick();
+}
+function reconTick() {
+  if (!S.reconnecting) return;
+  if (Date.now() > S.reconDeadline) return lost();
+  if (S.isHost) {   // l'hôte reste joignable : on s'assure que son point de rendez-vous est bien enregistré
+    const pr = S.rpeer || S.peer;
+    try { if (pr && pr.disconnected && !pr.destroyed) pr.reconnect(); } catch (e) {}
+  } else guestAttempt();
+}
+function guestAttempt() {
+  if (S.attempting || typeof Peer === 'undefined') return;
+  S.attempting = true;
+  try { if (S.gpeer) S.gpeer.destroy(); } catch (e) {}
+  let peer; try { peer = new Peer(peerOpts()); } catch (e) { S.attempting = false; return; }
+  S.gpeer = peer;
+  let iv = null;
+  const end = () => { clearTimeout(to); clearInterval(iv); S.attempting = false; };
+  const to = setTimeout(() => { try { peer.destroy(); } catch (e) {} end(); }, 8000);
+  peer.on('error', end);
+  peer.on('open', () => {
+    const c = peer.connect(S.hostId, { reliable: true });
+    const ask = () => { try { if (c.open) c.send({ t: 'resume', sid: S.sid, rx: S.rxn }); } catch (e) {} };
+    c.on('open', () => { ask(); iv = setInterval(ask, 1500); });   // la demande est répétée tant qu'aucune réponse n'arrive
+    c.on('data', m => { if (m && m.t === 'resume' && m.sid === S.sid && S.reconnecting) { end(); adoptConn(c, m.rx); } });
+    c.on('close', end); c.on('error', end);
+  });
+}
+function acceptResume(conn) {   // côté hôte : un invité demande à reprendre la partie
+  let adopted = false;
+  conn.on('data', m => {
+    if (adopted) return;   // une fois adoptée, la connexion est gérée par adoptConn
+    if (!m || m.t !== 'resume' || !S.sid || m.sid !== S.sid || !S.connected || S.lost || S.phase === 'over') { try { conn.close(); } catch (e) {} return; }
+    adopted = true;
+    try { conn.send({ t: 'resume', sid: S.sid, rx: S.rxn }); } catch (e) {}
+    adoptConn(conn, m.rx);
+  });
+}
+function adoptConn(conn, theirRx) {
+  const old = S.conn; S.conn = conn;
+  if (old && old !== conn) try { old.close(); } catch (e) {}
+  conn.on('data', m => { if (S.conn === conn) onData(m); });
+  const closed = () => { if (S.conn === conn) connDown(); };
+  conn.on('close', closed); conn.on('error', closed);
+  S.reconnecting = false; clearInterval(S.reconTimer);
+  S.lastSeen = Date.now(); S.oppAway = false;
+  flushOutbox(Number.isInteger(theirRx) ? theirRx : 0);
+  renderConn();
+}
+function renderConn() {
+  if (S.phase === 'game') renderGame();
+  else if (S.phase === 'place') { if (S.reconnecting) msg('placeMsg', t('reconnecting')); else { msg('placeMsg', ''); renderPlace(); } }
 }
 
 function lost() {
   if (!S.connected || S.lost || S.phase === 'over') return;
   recordInterrupted();
-  S.lost = true; S.phase = 'over';
-  clearInterval(S.hb);
+  S.lost = true; S.phase = 'over'; S.reconnecting = false;
+  clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
   $('choice').classList.remove('show');
   $('endIcon').textContent = '📴';
   $('endTitle').textContent = t('lostTitle');
@@ -1616,7 +1740,7 @@ function quitGame() {
   if (!confirm(t('quitConfirm'))) return;
   recordInterrupted();
   S.phase = 'over';
-  if (!S.vsBot) send({ t: 'quit' });
+  if (!S.vsBot) { send({ t: 'quit' }); S.reconnecting = false; }
   if (S.bot) S.bot.stop();
   // Petit délai pour que le message d'abandon parte avant la fermeture du lien.
   setTimeout(() => {
@@ -1653,7 +1777,12 @@ function showAway() {
 function onData(m) {
   S.lastSeen = Date.now();
   if (!m || typeof m !== 'object' || S.lost) return;
+  if (Number.isInteger(m.n)) {            // message numéroté : on ignore les doublons (renvoi après coupure)
+    if (m.n <= S.rxn) return;
+    S.rxn = m.n;
+  }
   switch (m.t) {
+    case 'ping': if (Number.isInteger(m.a)) S.outbox = S.outbox.filter(x => x.n > m.a); break;
     case 'hello':
       S.opp = {
         name: String(m.name || '?').slice(0, 16),
@@ -1661,6 +1790,7 @@ function onData(m) {
         level: Math.max(0, Math.min(999, parseInt(m.level, 10) || 0)),
         bot: !!m.bot && S.vsBot,
       };
+      if (!S.connected && !S.isHost && !S.vsBot && typeof m.sid === 'string' && typeof m.rid === 'string' && m.sid.length <= 40 && m.rid.length <= 60) { S.sid = m.sid; S.hostId = m.rid; }
       if (!S.connected && S.kind === 'join') applyConfig(sanitizeRules(m.rules) || DEFAULT_RULES);
       if (!S.connected) onConnected(); else renderVs();
       break;
@@ -1683,6 +1813,7 @@ function onData(m) {
    de bateaux restants y passent (et privilégie celles qui prolongent
    un coup au but), puis tire sur la case la plus probable.
    ========================================================= */
+let BOT_SPEED = 1;   // 1 = délais naturels ; réduit par les tests automatiques
 class Bot {
   constructor() {
     this.ships = randomCells(LENS).map((cells, i) => ({ i, len: LENS[i], cells, shield: 'none' }));
@@ -1692,7 +1823,7 @@ class Bot {
     this.timers = [];
     this.skill = settings.skill;
   }
-  later(fn, ms) { this.timers.push(setTimeout(() => { if (S.vsBot && S.phase !== 'over') fn(); }, ms)); }
+  later(fn, ms) { this.timers.push(setTimeout(() => { if (S.vsBot && S.phase !== 'over') fn(); }, ms * BOT_SPEED)); }
   emit(m, ms) { this.later(() => onData(m), ms); }
   start() {
     this.emit({ t: 'hello', name: t('botName'), emoji: '🤖', level: myIdentity().level || 1, bot: true }, 10);
@@ -1786,12 +1917,47 @@ function startBot(fromRandom) {
    ========================================================= */
 function enterPlacement() {
   S.phase = 'place';
-  $('rulesInfo').textContent = t('rulesInfo', { size: N, n: LENS.length, up: anyUpgrade() });
+  $('rulesInfo').textContent = t('rulesInfo', { size: N, n: LENS.length, up: anyUpgrade() }) + (CFG.timer ? ' ' + t('placeLimit', { s: PLACE_LIMIT_MS / 1000 }) : '');
+  S.placeDeadline = CFG.timer ? Date.now() + PLACE_LIMIT_MS : 0;
+  if (S.placeDeadline) {
+    clearInterval(S.turnTimer);
+    S.turnTimer = setInterval(() => {
+      if (S.phase !== 'place') return clearInterval(S.turnTimer);
+      if (!S.meReady && !S.reconnecting && Date.now() > S.placeDeadline) {   // temps écoulé : les bateaux restants sont posés au hasard
+        settleLifted();
+        fillMissingShips();
+        setReady();
+      }
+    }, 1000);
+  }
   S.sel = 0; S.preview = null;
   renderVs();
   showView('place');
   renderPlace();
   Snd.play('start');
+}
+// Pose au hasard les bateaux manquants autour de ceux déjà placés (sinon, flotte entièrement aléatoire).
+function fillMissingShips() {
+  for (let a = 0; a < 100; a++) {
+    const ships = S.ships.map(sh => ({ len: sh.len, cells: sh.cells }));
+    let ok = true;
+    for (const sh of ships) {
+      if (sh.cells) continue;
+      const occ = occOf(ships);
+      for (let tr = 0; tr < 200 && !sh.cells; tr++) {
+        const h = Math.random() < 0.5, r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N), cells = [];
+        for (let i = 0; i < sh.len; i++) {
+          const rr = r + (h ? 0 : i), cc = c + (h ? i : 0);
+          if (!inside(rr, cc) || occ[rr * N + cc] !== -1) break;
+          cells.push([rr, cc]);
+        }
+        if (cells.length === sh.len) sh.cells = cells;
+      }
+      if (!sh.cells) { ok = false; break; }
+    }
+    if (ok) { S.ships.forEach((sh, i) => { sh.cells = ships[i].cells; }); return; }
+  }
+  randomCells(LENS).forEach((cells, i) => { S.ships[i].cells = cells; });
 }
 const nextUnplaced = () => S.ships.findIndex(s => !s.cells);
 const shipHoriz = cells => cells.length < 2 || cells[0][0] === cells[1][0];
@@ -1994,8 +2160,9 @@ function renderPlace() {
 function maybeStart() {
   if (S.phase !== 'place' || !S.meReady || !S.oppReady) return;
   S.phase = 'game';
-  S.myTurn = S.isHost;
+  S.myTurn = S.isHost; S.turnStart = Date.now();
   S.match.start = Date.now();
+  startTurnTimer();
   showView('game');
   setLog(t(S.isHost ? 'startHost' : 'startGuest'));
   Snd.play(S.myTurn ? 'turn' : 'start');
@@ -2041,6 +2208,31 @@ function resolveOn(ships, incoming, kind, cells) {
     results.push(sunkOf(s, incoming) ? { r, c, v: 'sunk', ship: s.cells, si: i } : { r, c, v: 'hit' });
   }
   return { results, over: ships.every(s => sunkOf(s, incoming)) };
+}
+
+/* ---------- Chronomètre de tour (règle facultative) ---------- */
+function startTurnTimer() {
+  clearInterval(S.turnTimer);
+  if (!CFG.timer) return;
+  S.turnTimer = setInterval(() => {
+    if (S.phase !== 'game') return clearInterval(S.turnTimer);
+    if (!S.myTurn || S.waiting || S.reconnecting || $('choice').classList.contains('show')) { if (S.myTurn) S.turnStart = Date.now(); return renderTimer(); }
+    if (Date.now() - S.turnStart >= CFG.timer * 1000) return autoShot();
+    renderTimer();
+  }, 500);
+}
+function renderTimer() {
+  if (S.phase !== 'game' || !CFG.timer || !S.myTurn || S.waiting || S.reconnecting) return;
+  const left = Math.max(0, Math.ceil(CFG.timer - (Date.now() - S.turnStart) / 1000));
+  $('status').textContent = t('stMyTurn') + ' · ' + left + ' s';
+}
+function autoShot() {   // temps écoulé : tir au hasard sur une case encore inconnue
+  const free = []; for (let k = 0; k < N * N; k++) if (S.enemy[k] === null) free.push(k);
+  if (!free.length) return;
+  const k = free[Math.floor(Math.random() * free.length)];
+  S.mode = 'shot';
+  flashHint(t('autoShot'));
+  onEnemyTap(Math.floor(k / N), k % N);
 }
 
 /* ---------- Mes actions ---------- */
@@ -2125,7 +2317,7 @@ function onAct(m) {
   setLog(t('oppPrefix', { name: S.opp ? S.opp.name : '?' }) + summarize(kind, at, results), true);
   if (kind === 'radar') Snd.play('radar'); else playResultSound(results);
   if (over) return endGame(false);
-  S.myTurn = true; S.waiting = false;
+  S.myTurn = true; S.waiting = false; S.turnStart = Date.now();
   setTimeout(() => { if (S.myTurn && S.phase === 'game') Snd.play('turn'); }, 500);
   renderGame();
 }
@@ -2164,7 +2356,7 @@ function onPass() {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;
   if (!CFG.shield || S.oppUsed >= S.ships.filter(isSunk).length) return;   // bouclier non gagné ou désactivé : ignoré
   S.oppUsed++;
-  S.myTurn = true;
+  S.myTurn = true; S.turnStart = Date.now();
   S.lastIn = [];
   setLog(t('oppShield', { name: S.opp ? S.opp.name : '?' }), true);
   Snd.play('turn');
@@ -2189,8 +2381,8 @@ function openChoice() {
 
 /* ---------- Fin de partie ---------- */
 function endGame(win, forfeit) {
-  S.phase = 'over';
-  clearInterval(S.hb);
+  S.phase = 'over'; S.reconnecting = false;
+  clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
   S.myTurn = false; S.waiting = false;
   if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
@@ -2231,6 +2423,7 @@ function renderGame() {
   const live = S.phase === 'game' && S.myTurn && !S.waiting;
   const st = $('status');
   if (S.lost) { st.textContent = t('stLost'); st.className = 'status'; }
+  else if (S.reconnecting) { st.textContent = t('stReconnecting'); st.className = 'status wait'; }
   else if (S.phase === 'over') { st.textContent = t('stOver'); st.className = 'status'; }
   else if (S.waiting) { st.textContent = t('stFiring'); st.className = 'status wait'; }
   else if (S.myTurn) { st.textContent = t('stMyTurn'); st.className = 'status me'; }
@@ -2300,6 +2493,10 @@ $('btnGuest').onclick = () => { setSession(null); openDash('play'); };
 document.querySelectorAll('.tabsnav [data-pane]').forEach(b => { b.onclick = () => { pane = b.dataset.pane; msg('setMsg', ''); Snd.play('click'); renderDash(); }; });
 $('btnLogout').onclick = () => { clearSession(); msg('authMsg', ''); openAuth('login'); };
 $('avUp').addEventListener('click', e => { e.preventDefault(); pickPhoto(); });
+['turnUrl', 'turnUser', 'turnCred'].forEach(id => $(id).addEventListener('change', () => {
+  settings.turnUrl = $('turnUrl').value.trim(); settings.turnUser = $('turnUser').value.trim(); settings.turnCred = $('turnCred').value;
+  saveSettings(); msg('turnMsg', userTurn() || !settings.turnUrl ? t('turnSaved') : t('errNetOther', { type: 'TURN' }), userTurn() || !settings.turnUrl ? 'ok' : true);
+}));
 $('btnEmojiCancel').onclick = () => $('emojiModal').classList.remove('show');
 $('emojiModal').addEventListener('click', e => { if (e.target === $('emojiModal')) $('emojiModal').classList.remove('show'); });
 $('themeBox').addEventListener('click', e => { const b = e.target.closest('[data-th]'); if (!b) return; settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderThemes(); Snd.play('click'); });
@@ -2367,6 +2564,8 @@ window.addEventListener('pagehide', e => {
   if (e.persisted) return;
   try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
   try { if (S.peer) S.peer.destroy(); } catch (e) {}
+  try { if (S.rpeer) S.rpeer.destroy(); } catch (e) {}
+  try { if (S.gpeer) S.gpeer.destroy(); } catch (e) {}
 });
 
 // Lien d'invitation (?code=…) : la fenêtre « Rejoindre » s'ouvre dès qu'on arrive au tableau de bord.
