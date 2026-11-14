@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b2239">
+<meta name="description" content="C02 Naval : bataille navale à deux joueurs dans le navigateur, sur PC et téléphone.">
+<title>C02 Naval</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+<style>
+:root{
+  --bg:#0b2239; --panel:#13304e; --panel2:#1a3d61; --line:#081a2c;
+  --water:#1d4e7a; --water-hi:#2a6aa3; --ship:#8ea4bb; --hit:#e5483b; --sunk:#6e1a14;
+  --miss:#cfe0f0; --accent:#f5b83d; --ok:#3fb87f; --text:#eef4fa; --muted:#9fb6cc; --err:#ff8a7e;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;touch-action:manipulation}
+body{min-height:100vh;display:flex;justify-content:center}
+main{width:100%;max-width:420px;padding:16px 12px 40px}
+.screen{display:none}.screen.active{display:block}
+h1{font-size:1.8rem;text-align:center;margin:18px 0 4px;letter-spacing:.02em}
+h2{font-size:1.25rem;margin:4px 0 8px;text-align:center}
+.sub{color:var(--muted);text-align:center;margin:0 0 16px;font-size:.95rem;line-height:1.4}
+button{font:inherit;color:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--panel2);
+  min-height:44px;cursor:pointer;user-select:none}
+button:active:not(:disabled){filter:brightness(1.2)}
+button.primary{background:var(--accent);color:#1d1400;font-weight:700}
+button.ghost{background:transparent;color:var(--muted);text-decoration:underline}
+button.danger{background:transparent;color:var(--err);text-decoration:underline}
+button:disabled{opacity:.4;cursor:default}
+.wide{display:block;width:100%;margin:8px 0}
+.row{display:flex;gap:8px;margin:8px 0}.row>*{flex:1}
+input{font:inherit;border:2px solid var(--panel2);background:var(--line);color:var(--text);border-radius:10px;padding:10px;min-width:0}
+input:focus{outline:none;border-color:var(--accent)}
+#codeInput{font-size:1.3rem;letter-spacing:.3em;text-transform:uppercase;text-align:center}
+.sep{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:22px 0 8px}
+.sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--panel2)}
+.msg{min-height:1.4em;text-align:center;margin:10px 0;font-size:.95rem}
+.msg.err{color:var(--err)}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:2.6rem;font-weight:700;letter-spacing:.25em;
+  text-align:center;background:var(--line);border-radius:12px;padding:14px 0 14px .25em;margin:8px 0 12px;user-select:all}
+.logo{display:block;font-size:2.6rem;margin-bottom:2px}
+
+/* Profil */
+.profile{display:flex;align-items:center;gap:12px;background:var(--panel);border-radius:14px;padding:12px;margin:14px 0}
+.avatar{font-size:2rem;width:52px;height:52px;flex:0 0 52px;display:flex;align-items:center;justify-content:center;background:var(--line);border-radius:50%}
+.pinfo{flex:1;min-width:0}
+.pname{font-weight:700;font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prank{color:var(--muted);font-size:.85rem;margin:2px 0 6px}
+.xpbar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.xpbar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .6s}
+.xptxt{font-size:.75rem;color:var(--muted);margin-top:3px}
+.profile-actions{display:flex;gap:8px}.profile-actions button{flex:1;font-size:.9rem;min-height:40px;padding:8px}
+.avatars{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:8px 0 4px}
+.avatars button{font-size:1.4rem;padding:0;aspect-ratio:1;min-height:0;border:2px solid transparent}
+.avatars button.on{border-color:var(--accent)}
+.acclist button{display:flex;align-items:center;gap:10px;width:100%;margin:6px 0;text-align:left}
+.acclist .avatar{width:36px;height:36px;flex-basis:36px;font-size:1.3rem}
+.acclist small{display:block;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+.stat{background:var(--panel);border-radius:12px;padding:10px 12px}
+.stat b{display:block;font-size:1.4rem}
+.stat span{color:var(--muted);font-size:.8rem}
+label.f{display:block;font-size:.85rem;color:var(--muted);margin:12px 0 4px}
+
+/* Grilles */
+.grid{display:grid;grid-template-columns:.7fr repeat(10,1fr);gap:2px;width:min(380px,100%);margin:0 auto;user-select:none}
+.grid.small{width:min(260px,76%)}
+#placeGrid{touch-action:none}
+.lbl{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:clamp(9px,2.6vw,12px);font-weight:600}
+.grid.small .lbl{font-size:9px}
+.cell{aspect-ratio:1;border-radius:3px;background:var(--water);display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:clamp(11px,3.6vw,17px);line-height:1;cursor:default}
+.grid.small .cell{font-size:clamp(9px,2.6vw,12px)}
+.cell.ship{background:var(--ship)}
+#placeGrid .cell{cursor:pointer}
+#placeGrid .cell.ship{cursor:grab}
+.cell.pv-ok{background:var(--ok);box-shadow:inset 0 0 0 2px #b6f0d3}
+.cell.pv-bad{background:var(--hit);opacity:.85}
+.cell.shielded{box-shadow:inset 0 0 0 2px var(--accent)}
+.cell.miss{color:var(--miss)}
+.cell.hit{background:var(--hit);color:#fff}
+.cell.sunk{background:var(--sunk);color:#ffb3ab}
+.cell.blocked{background:#5a4a1c;color:var(--accent)}
+.cell.scanOcc{background:#3b5f84;color:var(--accent)}
+.cell.scanEmpty{color:var(--miss)}
+.cell.target{cursor:pointer}
+.grid.live .cell.target{background:var(--water-hi)}
+.grid.live .cell.target.scanOcc{background:#4a77a5}
+.grid.pick{outline:3px solid var(--accent);outline-offset:3px;border-radius:4px}
+.grid.pick .cell.ship{cursor:pointer}
+
+/* Placement */
+.ships{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px}
+.shipbtn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 8px;min-height:44px;font-size:.8rem;
+  border:2px solid transparent}
+.shipbtn.sel{border-color:var(--accent)}
+.shipbtn.placed{opacity:.45}
+.shipbtn.placed.sel{opacity:1}
+.blocks{display:flex;gap:2px}.blocks i{width:9px;height:9px;background:var(--ship);border-radius:2px}
+.shipbtn.placed .blocks i{background:var(--ok)}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+.tools button{font-size:.9rem;padding:8px 4px}
+.ok-btn{background:var(--ok);color:#04210f;font-weight:700}
+
+/* Partie */
+.status{text-align:center;font-weight:700;font-size:1.15rem;padding:10px;border-radius:10px;margin-bottom:8px;background:var(--panel)}
+.status.me{background:var(--ok);color:#04210f}
+.status.wait{background:var(--accent);color:#1d1400}
+.versus{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:4px}
+.label{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;
+  width:min(380px,100%);margin:12px auto 6px;font-size:.9rem;color:var(--muted)}
+.fleet{display:flex;gap:4px;flex-wrap:wrap}
+.fleet span{font-size:.7rem;padding:2px 6px;border-radius:6px;background:var(--panel2);color:var(--text)}
+.fleet span.down{text-decoration:line-through;opacity:.45}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:min(380px,100%);margin:10px auto 0}
+.modes button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;
+  border:2px solid transparent;position:relative}
+.modes button .ic{font-size:1.15rem;line-height:1.2}
+.modes button.on{border-color:var(--accent)}
+.modes button b{position:absolute;top:3px;right:5px;font-size:.7rem;color:var(--accent)}
+.hint{text-align:center;color:var(--muted);font-size:.85rem;min-height:1.2em;margin:8px 0 0}
+.log{text-align:center;font-size:.9rem;min-height:1.3em;margin:6px 0 0}
+.log.opp{color:var(--muted)}
+
+/* Fenêtres */
+.overlay{position:fixed;inset:0;background:rgba(3,12,22,.78);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.overlay.show{display:flex}
+.modal{background:var(--panel);border-radius:14px;padding:20px 16px;width:100%;max-width:360px}
+.modal.center{text-align:center}
+.big{font-size:3rem}
+.xpgain{font-size:1.4rem;font-weight:700;color:var(--accent);margin:4px 0}
+.lvlup{color:var(--ok);font-weight:700;margin:4px 0 8px}
+.opt{display:block;width:100%;text-align:left;margin:8px 0;padding:12px}
+.opt strong{display:block;font-size:1rem}
+.opt span{display:block;color:var(--muted);font-size:.85rem;margin-top:2px}
+</style>
+</head>
+<body>
+<main>
+  <!-- Menu -->
+  <section id="menu" class="screen active">
+    <h1><span class="logo">⚓</span>C02 Naval</h1>
+    <p class="sub">Bataille navale à deux, sur PC ou téléphone.</p>
+    <div id="profileBox"></div>
+    <button id="btnHost" class="primary wide">Créer une partie</button>
+    <div class="sep">ou rejoindre une partie</div>
+    <div class="row">
+      <input id="codeInput" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Code de la partie">
+      <button id="btnJoin" style="flex:0 0 auto">Rejoindre</button>
+    </div>
+    <p id="menuMsg" class="msg"></p>
+  </section>
+
+  <!-- Comptes -->
+  <section id="account" class="screen">
+    <h2>Compte</h2>
+    <p class="sub">Ton compte est enregistré dans ce navigateur, sur cet appareil.</p>
+    <div id="accList" class="acclist"></div>
+    <div class="sep">nouveau compte</div>
+    <label class="f" for="nameInput">Pseudo (2 à 16 caractères)</label>
+    <input id="nameInput" maxlength="16" autocomplete="off" style="width:100%" placeholder="Ton pseudo">
+    <label class="f">Avatar</label>
+    <div id="avatarPick" class="avatars"></div>
+    <button id="btnCreate" class="primary wide">Créer le compte</button>
+    <p id="accMsg" class="msg"></p>
+    <button id="btnGuest" class="ghost wide">Jouer en invité (sans XP)</button>
+    <button class="ghost wide" data-back>Retour</button>
+  </section>
+
+  <!-- Statistiques -->
+  <section id="stats" class="screen">
+    <div id="statsProfile"></div>
+    <div id="statsGrid" class="stats"></div>
+    <button class="primary wide" data-back>Retour</button>
+    <button id="btnDelete" class="danger wide">Supprimer ce compte</button>
+  </section>
+
+  <!-- Salon -->
+  <section id="lobby" class="screen">
+    <h2>Salon d'attente</h2>
+    <p class="sub">Donne ce code à ton adversaire :</p>
+    <div id="codeBox" class="code">······</div>
+    <button id="btnCopy" class="wide">Copier le code</button>
+    <p id="lobbyMsg" class="msg"></p>
+    <button class="ghost wide" onclick="location.reload()">Annuler</button>
+  </section>
+
+  <!-- Placement -->
+  <section id="place" class="screen">
+    <h2>Place ta flotte</h2>
+    <p id="placeVs" class="versus"></p>
+    <p class="sub">Touche une case pour voir le bateau, touche-le à nouveau pour le poser.<br>Fais glisser un bateau posé pour le déplacer.</p>
+    <div id="shipList" class="ships"></div>
+    <div class="tools">
+      <button id="btnRotate">⟳ Pivoter</button>
+      <button id="btnRandom">🎲 Aléatoire</button>
+      <button id="btnClear">🧹 Effacer</button>
+    </div>
+    <div id="placeGrid" class="grid"></div>
+    <div class="row">
+      <button id="btnConfirm" class="ok-btn">✓ Poser</button>
+      <button id="btnRemove">✕ Retirer</button>
+    </div>
+    <p id="placeMsg" class="msg"></p>
+    <button id="btnReady" class="primary wide" disabled>Prêt</button>
+  </section>
+
+  <!-- Partie -->
+  <section id="game" class="screen">
+    <div id="status" class="status"></div>
+    <p id="gameVs" class="versus"></p>
+    <div class="label"><span id="enemyLabel">Grille adverse</span><span id="enemyFleet" class="fleet"></span></div>
+    <div id="enemyGrid" class="grid"></div>
+    <div id="modes" class="modes">
+      <button data-mode="shot"><span class="ic">🎯</span>Tir</button>
+      <button data-mode="radar"><span class="ic">📡</span>Radar<b></b></button>
+      <button data-mode="cross"><span class="ic">✚</span>Croix<b></b></button>
+      <button data-mode="shield"><span class="ic">🛡️</span>Bouclier<b></b></button>
+    </div>
+    <p id="hint" class="hint"></p>
+    <p id="log" class="log"></p>
+    <div class="label"><span>Ta flotte</span></div>
+    <div id="myGrid" class="grid small"></div>
+  </section>
+</main>
+
+<div id="choice" class="overlay">
+  <div class="modal">
+    <h2>Bateau ennemi coulé !</h2>
+    <p id="choiceSub" class="sub"></p>
+    <div id="choiceList"></div>
+  </div>
+</div>
+
+<div id="end" class="overlay">
+  <div class="modal center">
+    <div id="endIcon" class="big"></div>
+    <h2 id="endTitle"></h2>
+    <p id="endText" class="sub"></p>
+    <div id="endXp"></div>
+    <button class="primary wide" onclick="location.reload()">Nouvelle partie</button>
+    <button id="btnSeeGrids" class="ghost wide">Voir les grilles</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+'use strict';
+const N = 10;
+const ROWS = 'ABCDEFGHIJ';
+const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const PREFIX = 'c02-naval-v1-';
+const FLEET = [['Porte-avions', 5], ['Croiseur', 4], ['Contre-torpilleur', 3], ['Sous-marin', 3], ['Torpilleur', 2]];
+const UPG = {
+  radar:  { name: 'Radar',           icon: '📡', desc: 'Scanne une zone 2 × 2 à partir de la case visée. Coûte le tour.' },
+  cross:  { name: 'Frappe en croix', icon: '✚',  desc: 'Tire sur la case visée et ses 4 voisines. Coûte le tour.' },
+  shield: { name: 'Bouclier',        icon: '🛡️', desc: 'Le premier coup sur un de tes bateaux est annulé. Coûte le tour, sans tir.' },
+};
+const HINTS = {
+  shot: 'Touche une case de la grille adverse pour tirer.',
+  radar: 'Radar : touche le coin haut-gauche de la zone 2 × 2 à scanner.',
+  cross: 'Frappe en croix : touche la case centrale.',
+  shield: 'Bouclier : touche un de tes bateaux dans la grille du bas.',
+};
+const HEARTBEAT_MS = 2000, TIMEOUT_MS = 20000, AWAY_TIMEOUT_MS = 120000, JOIN_TIMEOUT_MS = 15000;
+
+/* Serveurs utilisés pour établir la liaison entre les deux appareils.
+   - STUN + relais public de PeerJS (port 3478) : déjà inclus, sans compte, mais sans garantie.
+   - Relais personnel (TURN) : facultatif. Sur les réseaux très fermés (entreprise, certains
+     opérateurs 4G), seul un relais joignable en TLS sur le port 443 passe. Crée un compte gratuit
+     chez un fournisseur TURN (ExpressTURN, Metered…) et recopie ses informations ci-dessous, par ex. :
+     { urls: ['turn:xxx:3478', 'turns:xxx:443?transport=tcp'], username: '…', credential: '…' } */
+const MY_TURN = null;
+const ICE_SERVERS = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  ...(MY_TURN ? [MY_TURN] : []),
+];
+const PEER_OPTS = { debug: 0, config: { iceServers: ICE_SERVERS, sdpSemantics: 'unified-plan' } };
+
+const $ = id => document.getElementById(id);
+const S = {
+  peer: null, conn: null, connected: false, isHost: false, code: '', phase: 'menu', lost: false,
+  ships: FLEET.map(([name, len]) => ({ name, len, cells: null, shield: 'none' })),
+  sel: 0, horiz: true, preview: null, lifted: null, drag: null,
+  meReady: false, oppReady: false, myTurn: false, waiting: false, mode: 'shot',
+  enemy: Array(N * N).fill(null),     // null | miss | hit | sunk | blocked | scanOcc | scanEmpty
+  incoming: Array(N * N).fill(null),  // null | miss | hit | blocked
+  enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0,
+  lastSeen: 0, hb: null, joinTimer: null, pendingAct: null, oppAway: false, wakeLock: null,
+  opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0 },
+};
+
+/* ---------- Outils ---------- */
+const cellName = (r, c) => ROWS[r] + (c + 1);
+const inside = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+function show(id) { document.querySelectorAll('.screen').forEach(e => e.classList.toggle('active', e.id === id)); window.scrollTo(0, 0); }
+function msg(el, text, err) { const e = $(el); e.textContent = text || ''; e.classList.toggle('err', !!err); }
+function genCode() {
+  const a = new Uint32Array(6); crypto.getRandomValues(a);
+  return Array.from(a, x => ALPHA[x % ALPHA.length]).join('');
+}
+function occupancy() {
+  const m = Array(N * N).fill(-1);
+  S.ships.forEach((s, i) => s.cells && s.cells.forEach(([r, c]) => { m[r * N + c] = i; }));
+  return m;
+}
+const isSunk = s => s.cells && s.cells.every(([r, c]) => S.incoming[r * N + c] === 'hit');
+const targetable = k => S.enemy[k] === null || S.enemy[k] === 'scanOcc' || S.enemy[k] === 'scanEmpty' || S.enemy[k] === 'blocked';
+
+function buildGrid(el, onTap) {
+  // Repères : chiffres 1–10 en haut, lettres A–J à gauche (comme dans les messages « C5 »).
+  const lbl = t => { const s = document.createElement('div'); s.className = 'lbl'; s.textContent = t; el.appendChild(s); };
+  el.cells = [];
+  lbl('');
+  for (let c = 0; c < N; c++) lbl(c + 1);
+  for (let r = 0; r < N; r++) {
+    lbl(ROWS[r]);
+    for (let c = 0; c < N; c++) {
+      const d = document.createElement('div');
+      d.className = 'cell'; d.dataset.r = r; d.dataset.c = c;
+      el.appendChild(d); el.cells.push(d);
+    }
+  }
+  if (onTap) el.addEventListener('click', e => {
+    const d = e.target.closest('.cell');
+    if (d && el.contains(d)) onTap(+d.dataset.r, +d.dataset.c);
+  });
+}
+
+/* =========================================================
+   Comptes locaux : pseudo, avatar, XP, niveau, statistiques
+   (enregistrés dans le navigateur de cet appareil)
+   ========================================================= */
+const STORE_KEY = 'c02naval.v1';
+const AVATARS = ['⚓', '🚢', '🦈', '🐙', '🐳', '🦑', '🧭', '🏴‍☠️'];
+const RANKS = ['Mousse', 'Matelot', 'Quartier-maître', 'Second-maître', 'Maître', 'Enseigne', 'Lieutenant',
+  'Capitaine de corvette', 'Capitaine de frégate', 'Capitaine de vaisseau', 'Amiral'];
+const xpFor = l => 50 * l * (l - 1);               // XP total pour atteindre le niveau l : 0, 100, 300, 600, 1000…
+function levelOf(xp) { let l = 1; while (xp >= xpFor(l + 1)) l++; return l; }
+const rankOf = l => RANKS[Math.min(l - 1, RANKS.length - 1)];
+const emptyStats = () => ({ games: 0, wins: 0, losses: 0, interrupted: 0, streak: 0, bestStreak: 0,
+  shots: 0, hits: 0, sunk: 0, upgrades: 0, fastestWin: null });
+
+// Chaque compte est rangé sous sa propre clé : deux onglets qui jouent l'un contre l'autre
+// dans le même navigateur ne peuvent pas écraser l'XP de l'autre en enregistrant en même temps.
+// store.current = dernier compte utilisé sur l'appareil ; curId = compte de CET onglet.
+const ACC_PREFIX = STORE_KEY + '.acc.', CUR_KEY = STORE_KEY + '.current';
+let store = { accounts: {}, current: null };
+let storageOk = true;
+let curId = null;
+function loadStore() {
+  try {
+    const accounts = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(ACC_PREFIX)) continue;
+      try { const a = JSON.parse(localStorage.getItem(k)); if (a && a.id && a.name) accounts[a.id] = a; } catch (e) {}
+    }
+    store = { accounts, current: localStorage.getItem(CUR_KEY) };
+    storageOk = true;
+  } catch (e) { storageOk = false; return; }   // stockage bloqué : on garde ce qui est en mémoire
+  if (store.current && !store.accounts[store.current]) store.current = null;
+  if (curId && !store.accounts[curId]) setCur(null);
+}
+function saveAccount(a) {
+  try { localStorage.setItem(ACC_PREFIX + a.id, JSON.stringify(a)); storageOk = true; }
+  catch (e) { storageOk = false; }
+}
+function saveCurrent() {
+  try { if (store.current) localStorage.setItem(CUR_KEY, store.current); else localStorage.removeItem(CUR_KEY); } catch (e) {}
+}
+function setCur(id) {
+  curId = id;
+  try { if (id) sessionStorage.setItem(STORE_KEY + '.tab', id); else sessionStorage.removeItem(STORE_KEY + '.tab'); } catch (e) {}
+}
+function initCur() {
+  let id = null;
+  try { id = sessionStorage.getItem(STORE_KEY + '.tab'); } catch (e) {}
+  setCur(id && store.accounts[id] ? id : store.current);
+}
+const me = () => (curId ? store.accounts[curId] || null : null);
+function useAccount(id) { loadStore(); setCur(id); store.current = id; saveCurrent(); }
+
+function profileHTML(a, actions) {
+  if (!a) return `<div class="profile"><div class="avatar">👤</div><div class="pinfo">
+      <div class="pname">Invité</div><div class="prank">Crée un compte pour gagner de l'XP et suivre tes statistiques.</div></div></div>
+    ${actions ? '<button class="wide" id="btnAccount">Créer ou choisir un compte</button>' : ''}`;
+  const l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
+  const pct = Math.round((a.xp - lo) / (hi - lo) * 100);
+  return `<div class="profile"><div class="avatar">${esc(a.avatar)}</div><div class="pinfo">
+      <div class="pname">${esc(a.name)}</div>
+      <div class="prank">Niveau ${l} · ${rankOf(l)}</div>
+      <div class="xpbar"><i style="width:${pct}%"></i></div>
+      <div class="xptxt">${a.xp - lo} / ${hi - lo} XP vers le niveau ${l + 1}</div></div></div>
+    ${actions ? '<div class="profile-actions"><button id="btnStats">📊 Statistiques</button><button id="btnAccount">👥 Changer de compte</button></div>' : ''}`;
+}
+function renderMenu() {
+  $('profileBox').innerHTML = profileHTML(me(), true);
+  const bs = $('btnStats'); if (bs) bs.onclick = openStats;
+  $('btnAccount').onclick = openAccount;
+  if (!storageOk) msg('menuMsg', 'Ce navigateur bloque l\'enregistrement : le compte ne sera pas sauvegardé.', true);
+}
+
+let pickedAvatar = AVATARS[0];
+function openAccount() {
+  loadStore();
+  const list = $('accList'); list.innerHTML = '';
+  const accs = Object.values(store.accounts).sort((a, b) => b.xp - a.xp);
+  if (accs.length) {
+    const t = document.createElement('p'); t.className = 'sub'; t.style.margin = '0 0 4px'; t.textContent = 'Choisir un compte :';
+    list.appendChild(t);
+  }
+  accs.forEach(a => {
+    const b = document.createElement('button');
+    const l = levelOf(a.xp);
+    b.innerHTML = `<span class="avatar">${esc(a.avatar)}</span><span><strong>${esc(a.name)}</strong>${a.id === curId ? ' ✓' : ''}<small>Niveau ${l} · ${a.xp} XP</small></span>`;
+    b.onclick = () => { useAccount(a.id); renderMenu(); show('menu'); };
+    list.appendChild(b);
+  });
+  $('avatarPick').innerHTML = '';
+  AVATARS.forEach(av => {
+    const b = document.createElement('button');
+    b.textContent = av; b.className = av === pickedAvatar ? 'on' : '';
+    b.onclick = () => { pickedAvatar = av; openAccount(); };
+    $('avatarPick').appendChild(b);
+  });
+  msg('accMsg', '');
+  show('account');
+}
+function createAccount() {
+  loadStore();
+  const name = $('nameInput').value.trim().replace(/\s+/g, ' ');
+  if (name.length < 2 || name.length > 16) return msg('accMsg', 'Le pseudo doit faire entre 2 et 16 caractères.', true);
+  if (Object.values(store.accounts).some(a => a.name.toLowerCase() === name.toLowerCase()))
+    return msg('accMsg', 'Ce pseudo existe déjà sur cet appareil.', true);
+  const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const acc = { id, name, avatar: pickedAvatar, xp: 0, created: new Date().toISOString(), stats: emptyStats() };
+  store.accounts[id] = acc;
+  saveAccount(acc);
+  if (storageOk) useAccount(id); else setCur(id);   // sans stockage : compte gardé pour cette visite seulement
+  $('nameInput').value = '';
+  renderMenu(); show('menu');
+  msg('menuMsg', storageOk ? `Compte « ${name} » créé. Bonne chasse !` : 'Compte créé, mais ce navigateur bloque l\'enregistrement.', !storageOk);
+}
+function openStats() {
+  loadStore();
+  const a = me(); if (!a) return;
+  const s = { ...emptyStats(), ...a.stats };
+  const pct = (x, y) => y ? Math.round(x / y * 100) + ' %' : '—';
+  $('statsProfile').innerHTML = profileHTML(a, false);
+  const tiles = [
+    [s.games, 'Parties jouées'], [pct(s.wins, s.games), 'Victoires'],
+    [s.wins, 'Gagnées'], [s.losses, 'Perdues'],
+    [s.streak, 'Série en cours'], [s.bestStreak, 'Meilleure série'],
+    [s.shots, 'Tirs'], [pct(s.hits, s.shots), 'Précision'],
+    [s.sunk, 'Bateaux coulés'], [s.upgrades, 'Améliorations utilisées'],
+    [s.fastestWin ? s.fastestWin + ' tirs' : '—', 'Victoire la plus rapide'], [s.interrupted, 'Parties interrompues'],
+  ];
+  $('statsGrid').innerHTML = tiles.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
+  show('stats');
+}
+function deleteAccount() {
+  const a = me(); if (!a) return;
+  if (!confirm(`Supprimer définitivement le compte « ${a.name} », son XP et ses statistiques ?`)) return;
+  try { localStorage.removeItem(ACC_PREFIX + a.id); } catch (e) {}
+  loadStore();
+  delete store.accounts[a.id];
+  if (store.current === a.id) { store.current = null; saveCurrent(); }
+  setCur(null);
+  renderMenu(); show('menu');
+}
+
+// Fin de partie : XP gagnée et statistiques. Renvoie le détail pour l'affichage.
+function recordGame(win) {
+  loadStore();
+  const a = me(); if (!a) return null;
+  const m = S.match, s = a.stats = { ...emptyStats(), ...a.stats };
+  const acc = m.shots ? m.hits / m.shots : 0;
+  const gain = (win ? 100 : 30) + m.hits * 5 + m.sunk * 20 + (win ? Math.round(acc * 50) : 0);
+  const before = levelOf(a.xp);
+  a.xp += gain;
+  s.games++; s.shots += m.shots; s.hits += m.hits; s.sunk += m.sunk; s.upgrades += m.upgrades;
+  if (win) {
+    s.wins++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak);
+    if (!s.fastestWin || m.shots < s.fastestWin) s.fastestWin = m.shots;
+  } else { s.losses++; s.streak = 0; }
+  saveAccount(a);
+  return { gain, level: levelOf(a.xp), up: levelOf(a.xp) > before };
+}
+function recordInterrupted() {
+  loadStore();
+  const a = me(); if (!a || S.phase !== 'game') return;
+  a.stats = { ...emptyStats(), ...a.stats };
+  a.stats.interrupted++; saveAccount(a);
+}
+function myIdentity() {
+  const a = me();
+  return a ? { name: a.name, avatar: a.avatar, level: levelOf(a.xp) } : { name: 'Invité', avatar: '👤', level: 0 };
+}
+function vsText() {
+  if (!S.opp) return '';
+  const o = S.opp, i = myIdentity();
+  const tag = p => `${p.avatar} ${p.name}${p.level ? ' (niv. ' + p.level + ')' : ''}`;
+  return `${tag(i)}  contre  ${tag(o)}`;
+}
+
+/* ---------- Réseau ---------- */
+function netErrorText(err) {
+  switch (err && err.type) {
+    case 'browser-incompatible': return 'Ce navigateur ne permet pas le jeu en réseau (WebRTC).';
+    case 'network': case 'server-error': case 'socket-error': case 'socket-closed':
+      return 'Impossible de joindre le service de mise en relation. Vérifie ta connexion.';
+    default: return 'Erreur réseau' + (err && err.type ? ' (' + err.type + ')' : '') + '.';
+  }
+}
+function checkPeerLib() {
+  if (typeof Peer === 'undefined') { msg('menuMsg', 'Impossible de charger PeerJS. Vérifie ta connexion Internet.', true); return false; }
+  return true;
+}
+
+function hostGame() {
+  if (!checkPeerLib()) return;
+  S.isHost = true; S.code = genCode();
+  show('lobby'); S.phase = 'lobby';
+  $('codeBox').textContent = S.code;
+  msg('lobbyMsg', 'Création de la partie…');
+  const peer = new Peer(PREFIX + S.code, PEER_OPTS);
+  S.peer = peer;
+  peer.on('open', () => msg('lobbyMsg', 'En attente d\'un adversaire…'));
+  // Lien perdu avec le service de mise en relation (veille, réseau) : on se réenregistre
+  // pour que le code reste valable tant que l'adversaire n'est pas arrivé.
+  peer.on('disconnected', () => {
+    if (S.connected || peer.destroyed) return;
+    msg('lobbyMsg', 'Reconnexion au service de mise en relation…');
+    setTimeout(() => { if (!S.connected && !peer.destroyed && peer.disconnected) peer.reconnect(); }, 1000);
+  });
+  peer.on('connection', conn => {
+    if (S.conn) { conn.on('open', () => conn.close()); return; }
+    setupConn(conn);
+  });
+  peer.on('error', err => {
+    if (err.type === 'unavailable-id') { peer.destroy(); hostGame(); return; }  // code déjà pris : on en tire un autre
+    if (S.connected) return;
+    msg('lobbyMsg', netErrorText(err), true);
+  });
+}
+
+function joinGame() {
+  if (S.peer) return;
+  const code = $('codeInput').value.toUpperCase().replace(/\s+/g, '');
+  if (code.length !== 6) return msg('menuMsg', 'Le code doit contenir 6 caractères.', true);
+  if ([...code].some(ch => !ALPHA.includes(ch))) return msg('menuMsg', 'Code invalide : lettres A–Z (sauf I et O) et chiffres 2–9.', true);
+  if (!checkPeerLib()) return;
+  msg('menuMsg', 'Connexion…');
+  $('btnJoin').disabled = $('btnHost').disabled = true;
+  const peer = new Peer(PEER_OPTS);
+  S.peer = peer; S.code = code;
+  const fail = text => {
+    clearTimeout(S.joinTimer);
+    if (S.connected) return;
+    try { peer.destroy(); } catch (e) {}
+    S.peer = null; S.conn = null;
+    $('btnJoin').disabled = $('btnHost').disabled = false;
+    msg('menuMsg', text, true);
+  };
+  peer.on('open', () => {
+    setupConn(peer.connect(PREFIX + code, { reliable: true }));
+    S.joinTimer = setTimeout(() => fail('Connexion impossible. Le réseau bloque peut-être la liaison directe.'), JOIN_TIMEOUT_MS);
+  });
+  peer.on('error', err => {
+    if (S.connected) return;
+    fail(err.type === 'peer-unavailable' ? 'Aucune partie avec ce code' : netErrorText(err));
+  });
+}
+
+function setupConn(conn) {
+  S.conn = conn;
+  conn.on('open', () => {
+    S.connected = true;
+    clearTimeout(S.joinTimer);
+    S.lastSeen = Date.now();
+    S.hb = setInterval(() => {
+      send({ t: 'ping' });
+      // Adversaire parti dans une autre appli ou écran éteint : on lui laisse plus de temps.
+      if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) lost();
+    }, HEARTBEAT_MS);
+    send({ t: 'hello', ...myIdentity() });
+    keepAwake();
+    enterPlacement();
+  });
+  conn.on('data', onData);
+  conn.on('close', lost);
+  conn.on('error', lost);
+}
+
+function send(m) { try { if (S.conn && S.conn.open) S.conn.send(m); } catch (e) {} }
+
+function lost() {
+  if (!S.connected || S.lost || S.phase === 'over') return;
+  recordInterrupted();
+  S.lost = true; S.phase = 'over';
+  clearInterval(S.hb);
+  $('choice').classList.remove('show');
+  $('endIcon').textContent = '📴';
+  $('endTitle').textContent = 'Connexion perdue';
+  $('endText').textContent = 'La liaison avec l\'adversaire est coupée. La partie est arrêtée.';
+  $('endXp').innerHTML = '';
+  $('end').classList.add('show');
+  if ($('game').classList.contains('active')) renderGame();
+}
+
+/* Veille et arrière-plan */
+async function keepAwake() {
+  // Empêche l'écran de s'éteindre pendant la partie (navigateurs récents, en HTTPS ou localhost).
+  try {
+    if (!('wakeLock' in navigator) || S.wakeLock || document.visibilityState !== 'visible') return;
+    S.wakeLock = await navigator.wakeLock.request('screen');
+    S.wakeLock.addEventListener('release', () => { S.wakeLock = null; });
+  } catch (e) { S.wakeLock = null; }
+}
+function onVisibility() {
+  if (!S.connected || S.lost || S.phase === 'over') return;
+  if (document.visibilityState === 'hidden') { send({ t: 'away' }); return; }
+  // De retour : nos minuteurs ont pu être ralentis, on repart d'un délai neuf avant de juger la liaison.
+  S.lastSeen = Date.now();
+  send({ t: 'back' });
+  keepAwake();
+}
+function showAway() {
+  if (S.phase === 'game') return renderHint();
+  if (S.phase === 'place') {
+    if (S.oppAway) msg('placeMsg', 'L\'adversaire a quitté l\'écran du jeu… (2 min max)');
+    else renderPlace();
+  }
+}
+
+function onData(m) {
+  S.lastSeen = Date.now();
+  if (!m || typeof m !== 'object' || S.lost) return;
+  switch (m.t) {
+    case 'hello':
+      S.opp = {
+        name: String(m.name || 'Adversaire').slice(0, 16),
+        avatar: AVATARS.includes(m.avatar) || m.avatar === '👤' ? m.avatar : '⚓',
+        level: Math.max(0, Math.min(999, parseInt(m.level, 10) || 0)),
+      };
+      $('placeVs').textContent = $('gameVs').textContent = vsText();
+      $('enemyLabel').textContent = 'Grille de ' + S.opp.name;
+      break;
+    case 'away': S.oppAway = true; showAway(); break;
+    case 'back': S.oppAway = false; showAway(); break;
+    case 'ready': S.oppReady = true; renderPlace(); maybeStart(); break;
+    case 'act': onAct(m); break;
+    case 'res': onRes(m); break;
+    case 'pass': onPass(); break;
+  }
+}
+
+/* =========================================================
+   Placement : aperçu, confirmation, glisser-déposer, pivoter
+   ========================================================= */
+function enterPlacement() {
+  S.phase = 'place';
+  S.sel = 0; S.preview = null;
+  show('place');
+  renderPlace();
+}
+const nextUnplaced = () => S.ships.findIndex(s => !s.cells);
+const shipHoriz = cells => cells.length < 2 || cells[0][0] === cells[1][0];
+
+// Cases de l'aperçu (fantôme) du bateau sélectionné, et validité de la position.
+function previewInfo() {
+  if (!S.preview || S.sel < 0) return null;
+  const s = S.ships[S.sel], { r, c, h } = S.preview, occ = occupancy();
+  const cells = [];
+  let valid = true;
+  for (let i = 0; i < s.len; i++) {
+    const rr = r + (h ? 0 : i), cc = c + (h ? i : 0);
+    if (!inside(rr, cc)) { valid = false; continue; }
+    if (occ[rr * N + cc] !== -1) valid = false;
+    cells.push([rr, cc]);
+  }
+  return { cells, valid };
+}
+function placeHint(text, err) { msg('placeMsg', text, err); }
+
+// Termine le déplacement d'un bateau soulevé : on le pose à l'aperçu si possible, sinon on le remet.
+function settleLifted() {
+  if (!S.lifted) return;
+  const s = S.ships[S.lifted.idx];
+  if (!s.cells) {
+    const pv = S.sel === S.lifted.idx ? previewInfo() : null;
+    s.cells = pv && pv.valid ? pv.cells : S.lifted.cells;
+  }
+  S.lifted = null; S.preview = null;
+}
+function selectShip(i) {
+  if (S.meReady) return;
+  if (S.lifted && S.lifted.idx === i) return;
+  settleLifted();
+  S.sel = i;
+  const s = S.ships[i];
+  if (s.cells) {
+    // Bateau déjà posé : on le soulève pour pouvoir le déplacer, le pivoter ou le retirer.
+    S.lifted = { idx: i, cells: s.cells };
+    S.preview = { r: s.cells[0][0], c: s.cells[0][1], h: shipHoriz(s.cells) };
+    S.horiz = S.preview.h;
+    s.cells = null;
+    placeHint(`${s.name} sélectionné : fais-le glisser, pivote-le ou retire-le.`);
+  } else {
+    S.preview = null;
+    placeHint(`${s.name} : touche une case de départ.`);
+  }
+  renderPlace();
+}
+function confirmPlacement() {
+  const pv = previewInfo();
+  if (!pv) return;
+  if (!pv.valid) return placeHint('Placement impossible : le bateau dépasse de la grille ou chevauche un autre bateau.', true);
+  const s = S.ships[S.sel];
+  s.cells = pv.cells;
+  S.lifted = null; S.preview = null;
+  S.sel = nextUnplaced();
+  placeHint(S.sel >= 0 ? `${s.name} posé. Au tour du ${S.ships[S.sel].name}.` : 'Flotte complète ! Appuie sur Prêt.');
+  renderPlace();
+}
+function tapPlaceCell(r, c) {
+  if (S.meReady) return;
+  const pv = previewInfo();
+  // Toucher le fantôme le pose.
+  if (pv && pv.cells.some(([a, b]) => a === r && b === c)) return confirmPlacement();
+  const idx = occupancy()[r * N + c];
+  if (idx >= 0) return selectShip(idx);
+  if (S.sel < 0 || (S.ships[S.sel].cells && !(S.lifted && S.lifted.idx === S.sel))) {
+    S.sel = nextUnplaced();
+    if (S.sel < 0) return placeHint('Toute la flotte est posée. Touche un bateau pour le modifier.');
+  }
+  S.preview = { r, c, h: S.preview ? S.preview.h : S.horiz };
+  const np = previewInfo();
+  placeHint(np.valid ? 'Touche le bateau vert (ou « Poser ») pour le valider.' : 'Ici le bateau ne rentre pas : pivote-le ou choisis une autre case.', !np.valid);
+  renderPlace();
+}
+function rotateShip() {
+  if (S.meReady) return;
+  if (S.preview) {
+    S.preview.h = !S.preview.h;
+    const pv = previewInfo();
+    // Si le bateau sort de la grille en pivotant, on le recale à l'intérieur.
+    if (!pv.valid) {
+      const s = S.ships[S.sel];
+      if (S.preview.h) S.preview.c = Math.min(S.preview.c, N - s.len); else S.preview.r = Math.min(S.preview.r, N - s.len);
+    }
+    const p2 = previewInfo();
+    placeHint(p2.valid ? '' : 'Position bloquée par un autre bateau.', !p2.valid);
+  }
+  S.horiz = S.preview ? S.preview.h : !S.horiz;
+  renderPlace();
+}
+function removeShip() {
+  if (S.meReady || !S.lifted) return;
+  const s = S.ships[S.lifted.idx];
+  S.lifted = null; S.preview = null;
+  placeHint(s.name + ' retiré.');
+  renderPlace();
+}
+function clearFleet() {
+  if (S.meReady) return;
+  S.ships.forEach(s => { s.cells = null; });
+  S.lifted = null; S.preview = null; S.sel = 0;
+  placeHint('Grille vidée.');
+  renderPlace();
+}
+function randomFleet() {
+  if (S.meReady) return;
+  S.lifted = null; S.preview = null;
+  S.ships.forEach(s => { s.cells = null; });
+  for (const s of S.ships) {
+    for (let tries = 0; tries < 2000 && !s.cells; tries++) {
+      const occ = occupancy(), h = Math.random() < 0.5;
+      const r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N), cells = [];
+      for (let i = 0; i < s.len; i++) {
+        const rr = r + (h ? 0 : i), cc = c + (h ? i : 0);
+        if (!inside(rr, cc) || occ[rr * N + cc] !== -1) break;
+        cells.push([rr, cc]);
+      }
+      if (cells.length === s.len) s.cells = cells;
+    }
+  }
+  S.sel = -1;
+  placeHint('Flotte placée au hasard. Tu peux encore déplacer les bateaux.');
+  renderPlace();
+}
+function setReady() {
+  if (S.meReady || nextUnplaced() !== -1 || S.lifted) return;
+  S.meReady = true; S.sel = -1; S.preview = null;
+  send({ t: 'ready' });
+  renderPlace();
+  maybeStart();
+}
+
+// Glisser-déposer (souris et doigt) sur la grille de placement.
+function placeCellAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const d = el && el.closest && el.closest('#placeGrid .cell');
+  return d ? [+d.dataset.r, +d.dataset.c] : null;
+}
+function onPlaceDown(e) {
+  if (S.meReady || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const p = placeCellAt(e.clientX, e.clientY); if (!p) return;
+  const [r, c] = p;
+  const pv = previewInfo();
+  const onPreview = pv && pv.cells.some(([a, b]) => a === r && b === c);
+  const idx = occupancy()[r * N + c];
+  S.drag = { r, c, moved: false, ship: false, wasSelected: onPreview };
+  if (idx >= 0 && !onPreview) {
+    selectShip(idx);                               // soulève le bateau touché
+    S.drag.ship = true;
+  } else if (onPreview) S.drag.ship = true;
+  if (S.drag.ship) S.drag.off = [r - S.preview.r, c - S.preview.c];
+  try { $('placeGrid').setPointerCapture(e.pointerId); } catch (_) {}
+  e.preventDefault();
+}
+function onPlaceMove(e) {
+  const d = S.drag; if (!d || !d.ship || !S.preview) return;
+  const p = placeCellAt(e.clientX, e.clientY); if (!p) return;
+  if (p[0] === d.r && p[1] === d.c && !d.moved) return;
+  d.moved = true;
+  S.preview.r = p[0] - d.off[0]; S.preview.c = p[1] - d.off[1];
+  const pv = previewInfo();
+  placeHint(pv.valid ? 'Relâche pour poser.' : 'Impossible ici.', !pv.valid);
+  renderPlace();
+}
+function onPlaceUp() {
+  const d = S.drag; S.drag = null;
+  if (!d) return;
+  if (d.ship && d.moved) {
+    const pv = previewInfo();
+    if (pv && pv.valid) return confirmPlacement();
+    // Position refusée : on remet le bateau à sa place d'origine.
+    const name = S.sel >= 0 ? S.ships[S.sel].name : 'Bateau';
+    if (S.lifted) { S.ships[S.lifted.idx].cells = S.lifted.cells; S.lifted = null; S.preview = null; }
+    placeHint(`Placement impossible : ${name} remis à sa place.`, true);
+    return renderPlace();
+  }
+  if (d.ship && !d.wasSelected) return;           // simple appui sur un bateau posé : il reste sélectionné
+  tapPlaceCell(d.r, d.c);
+}
+
+function renderPlace() {
+  if (S.phase !== 'place') return;
+  const occ = occupancy(), pv = previewInfo();
+  const pvSet = new Set(pv ? pv.cells.map(([r, c]) => r * N + c) : []);
+  $('placeGrid').cells.forEach((d, k) => {
+    let cls = 'cell';
+    if (pvSet.has(k)) cls += pv.valid ? ' pv-ok' : ' pv-bad';
+    else if (occ[k] >= 0) cls += ' ship';
+    d.className = cls;
+  });
+  $('shipList').innerHTML = '';
+  S.ships.forEach((s, i) => {
+    const b = document.createElement('button');
+    const placed = !!s.cells || (S.lifted && S.lifted.idx === i);
+    b.className = 'shipbtn' + (i === S.sel && !S.meReady ? ' sel' : '') + (placed ? ' placed' : '');
+    b.innerHTML = `<span>${s.name}</span><span class="blocks">${'<i></i>'.repeat(s.len)}</span>`;
+    b.disabled = S.meReady;
+    b.onclick = () => selectShip(i);
+    $('shipList').appendChild(b);
+  });
+  const complete = nextUnplaced() === -1 && !S.lifted;
+  $('btnReady').disabled = !complete || S.meReady;
+  $('btnRandom').disabled = $('btnRotate').disabled = $('btnClear').disabled = S.meReady;
+  $('btnConfirm').disabled = S.meReady || !pv || !pv.valid;
+  $('btnRemove').disabled = S.meReady || !S.lifted;
+  $('btnRotate').textContent = (S.preview ? S.preview.h : S.horiz) ? '⟳ Pivoter ↔' : '⟳ Pivoter ↕';
+  if (S.meReady) msg('placeMsg', S.oppReady ? '' : 'Flotte prête. En attente de l\'adversaire…');
+  else if (S.oppReady && !$('placeMsg').textContent) msg('placeMsg', 'L\'adversaire est prêt.');
+}
+function maybeStart() {
+  if (S.phase !== 'place' || !S.meReady || !S.oppReady) return;
+  S.phase = 'game';
+  S.myTurn = S.isHost;
+  show('game');
+  setLog(S.isHost ? 'La partie commence : tu joues en premier.' : 'La partie commence : l\'hôte joue en premier.');
+  renderGame();
+}
+
+/* ---------- Partie : mes actions ---------- */
+function onEnemyTap(r, c) {
+  if (S.phase !== 'game') return;
+  if (!S.myTurn || S.waiting) return flashHint(S.waiting ? 'Tir en cours…' : 'Attends ton tour.');
+  if (S.mode === 'shield') return flashHint('Pour le bouclier, touche un bateau de ta flotte (grille du bas).');
+  let cells;
+  if (S.mode === 'shot') {
+    if (!targetable(r * N + c)) return flashHint('Case déjà visée.');
+    cells = [[r, c]];
+  } else if (S.mode === 'radar') {
+    cells = [[r, c], [r, c + 1], [r + 1, c], [r + 1, c + 1]].filter(([a, b]) => inside(a, b) && S.enemy[a * N + b] === null);
+    if (!cells.length) return flashHint('Aucune case inconnue dans cette zone.');
+    S.inv.radar--; S.match.upgrades++;
+  } else if (S.mode === 'cross') {
+    cells = [[r, c], [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].filter(([a, b]) => inside(a, b) && targetable(a * N + b));
+    if (!cells.length) return flashHint('Toutes ces cases sont déjà connues.');
+    S.inv.cross--; S.match.upgrades++;
+  }
+  S.pendingAct = { kind: S.mode, at: [r, c] };
+  send({ t: 'act', kind: S.mode, at: [r, c], cells });
+  S.waiting = true; S.mode = 'shot';
+  renderGame();
+}
+function onMyTap(r, c) {
+  if (S.phase !== 'game' || S.mode !== 'shield' || !S.myTurn || S.waiting) return;
+  const idx = occupancy()[r * N + c];
+  if (idx < 0) return flashHint('Touche une case occupée par un de tes bateaux.');
+  const s = S.ships[idx];
+  if (isSunk(s)) return flashHint('Ce bateau est déjà coulé.');
+  if (s.shield !== 'none') return flashHint('Ce bateau a déjà reçu un bouclier.');
+  s.shield = 'active';
+  S.inv.shield--; S.match.upgrades++;
+  S.mode = 'shot'; S.myTurn = false;
+  send({ t: 'pass' });
+  setLog(`Bouclier posé sur ton ${s.name}.`);
+  renderGame();
+}
+function setMode(m) {
+  if (S.phase !== 'game' || !S.myTurn || S.waiting) return;
+  if (m !== 'shot' && !S.inv[m]) return;
+  S.mode = S.mode === m ? 'shot' : m;
+  renderGame();
+}
+
+/* ---------- Partie : réponses ---------- */
+function summarize(kind, at, results) {
+  if (kind === 'radar') {
+    const n = results.filter(x => x.v === 'occ').length;
+    return `Radar en ${cellName(...at)} : ${plural(n, 'case')} occupée${n > 1 ? 's' : ''} sur ${results.length}.`;
+  }
+  const sunk = results.filter(x => x.v === 'sunk').map(x => x.name);
+  const sunkTxt = sunk.length ? ` ${sunk.join(' et ')} coulé${sunk.length > 1 ? 's' : ''} !` : '';
+  if (kind === 'shot') {
+    const v = results[0] && results[0].v;
+    const word = { miss: 'raté.', hit: 'touché !', blocked: 'bloqué par un bouclier.', sunk: 'coulé !' }[v] || '';
+    return `Tir en ${cellName(...at)} : ${word}${sunk.length ? ' (' + sunk[0] + ')' : ''}`;
+  }
+  const hits = results.filter(x => x.v === 'hit' || x.v === 'sunk').length;
+  const miss = results.filter(x => x.v === 'miss').length;
+  const blk = results.filter(x => x.v === 'blocked').length;
+  const parts = [plural(hits, 'touché'), plural(miss, 'raté')];
+  if (blk) parts.push(plural(blk, 'bloqué'));
+  return `Frappe en croix sur ${cellName(...at)} : ${parts.join(', ')}.${sunkTxt}`;
+}
+
+// Le défenseur calcule le résultat sur sa propre grille.
+function onAct(m) {
+  if (S.phase !== 'game' || S.myTurn || S.waiting) return;  // ce n'est pas le tour de l'adversaire
+  const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
+  const cells = (Array.isArray(m.cells) ? m.cells : [])
+    .filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && inside(p[0], p[1]))
+    .slice(0, 5);
+  const occ = occupancy(), results = [];
+  for (const [r, c] of cells) {
+    const k = r * N + c, i = occ[k];
+    if (kind === 'radar') { results.push({ r, c, v: i >= 0 ? 'occ' : 'empty' }); continue; }
+    if (S.incoming[k] === 'miss' || S.incoming[k] === 'hit') { results.push({ r, c, v: S.incoming[k] }); continue; }
+    if (i < 0) { S.incoming[k] = 'miss'; results.push({ r, c, v: 'miss' }); continue; }
+    const s = S.ships[i];
+    if (s.shield === 'active') { s.shield = 'used'; S.incoming[k] = 'blocked'; results.push({ r, c, v: 'blocked' }); continue; }
+    S.incoming[k] = 'hit';
+    results.push(isSunk(s) ? { r, c, v: 'sunk', ship: s.cells, name: s.name } : { r, c, v: 'hit' });
+  }
+  const over = S.ships.every(isSunk);
+  send({ t: 'res', kind, at: m.at, results, over });
+  const at = Array.isArray(m.at) && inside(m.at[0], m.at[1]) ? m.at : (cells[0] || [0, 0]);
+  setLog((S.opp ? S.opp.name : 'Adversaire') + ' — ' + summarize(kind, at, results), true);
+  if (over) return endGame(false);
+  S.myTurn = true; S.waiting = false;
+  renderGame();
+}
+
+// L'attaquant reçoit le résultat.
+function onRes(m) {
+  if (S.phase !== 'game' || !S.waiting) return;
+  const results = Array.isArray(m.results) ? m.results : [];
+  const act = S.pendingAct || { kind: m.kind, at: m.at };
+  let sunk = 0;
+  for (const x of results) {
+    if (!inside(x.r, x.c)) continue;
+    if (x.v === 'sunk') {
+      (Array.isArray(x.ship) ? x.ship : [[x.r, x.c]]).forEach(([r, c]) => { if (inside(r, c)) S.enemy[r * N + c] = 'sunk'; });
+      S.enemySunk.push(x.name); sunk++;
+    } else {
+      const st = { miss: 'miss', hit: 'hit', blocked: 'blocked', occ: 'scanOcc', empty: 'scanEmpty' }[x.v];
+      if (st) S.enemy[x.r * N + x.c] = st;
+    }
+  }
+  if (act.kind !== 'radar') {
+    S.match.shots += results.length;
+    S.match.hits += results.filter(x => x.v === 'hit' || x.v === 'sunk').length;
+    S.match.sunk += sunk;
+  }
+  setLog(summarize(act.kind, act.at, results));
+  S.waiting = false; S.pendingAct = null;
+  if (m.over) return endGame(true);
+  S.myTurn = false;
+  S.choices += sunk;
+  renderGame();
+  if (S.choices > 0) openChoice();
+}
+function onPass() {
+  if (S.phase !== 'game' || S.myTurn || S.waiting) return;
+  S.myTurn = true;
+  setLog((S.opp ? S.opp.name : 'Adversaire') + ' — bouclier posé sur un de ses bateaux.', true);
+  renderGame();
+}
+
+/* ---------- Améliorations ---------- */
+function openChoice() {
+  if (S.phase !== 'game' || S.choices <= 0) { $('choice').classList.remove('show'); return; }
+  $('choiceSub').textContent = 'Choisis une amélioration' + (S.choices > 1 ? ` (${S.choices} à choisir)` : '') + ' :';
+  const list = $('choiceList'); list.innerHTML = '';
+  for (const [k, u] of Object.entries(UPG)) {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.innerHTML = `<strong>${u.icon} ${u.name}</strong><span>${u.desc}</span>`;
+    b.onclick = () => { S.inv[k]++; S.choices--; renderGame(); openChoice(); };
+    list.appendChild(b);
+  }
+  $('choice').classList.add('show');
+}
+
+/* ---------- Fin de partie ---------- */
+function endGame(win) {
+  S.phase = 'over';
+  S.myTurn = false; S.waiting = false;
+  $('choice').classList.remove('show');
+  $('endIcon').textContent = win ? '🏆' : '🌊';
+  $('endTitle').textContent = win ? 'Victoire !' : 'Défaite…';
+  const acc = S.match.shots ? Math.round(S.match.hits / S.match.shots * 100) : 0;
+  $('endText').textContent = (win ? 'Tu as coulé toute la flotte adverse.' : 'Toute ta flotte a été coulée.')
+    + ` ${plural(S.match.shots, 'tir')}, ${acc} % de précision.`;
+  const r = recordGame(win);
+  $('endXp').innerHTML = r
+    ? `<div class="xpgain">+${r.gain} XP</div>${r.up ? `<div class="lvlup">⬆ Niveau ${r.level} : ${rankOf(r.level)} !</div>` : ''}${profileHTML(me(), false)}`
+    : '<p class="sub">Joue avec un compte pour gagner de l\'XP.</p>';
+  $('end').classList.add('show');
+  renderGame();
+}
+
+/* ---------- Affichage de la partie ---------- */
+let hintTimer = null;
+function flashHint(t) {
+  const h = $('hint'); h.textContent = t; h.style.color = 'var(--err)';
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { h.style.color = ''; renderHint(); }, 1800);
+}
+function renderHint() {
+  if (S.phase === 'game' && S.oppAway) { $('hint').textContent = 'L\'adversaire a quitté l\'écran du jeu… (2 min max)'; return; }
+  $('hint').textContent = (S.phase === 'game' && S.myTurn && !S.waiting) ? HINTS[S.mode] : '';
+}
+function setLog(text, fromOpp) {
+  const l = $('log'); l.textContent = text; l.className = 'log' + (fromOpp ? ' opp' : '');
+}
+function renderGame() {
+  const live = S.phase === 'game' && S.myTurn && !S.waiting;
+  const st = $('status');
+  if (S.lost) { st.textContent = 'Connexion perdue'; st.className = 'status'; }
+  else if (S.phase === 'over') { st.textContent = 'Partie terminée'; st.className = 'status'; }
+  else if (S.waiting) { st.textContent = 'Tir en cours'; st.className = 'status wait'; }
+  else if (S.myTurn) { st.textContent = 'À toi de jouer'; st.className = 'status me'; }
+  else { st.textContent = 'Tour de l\'adversaire'; st.className = 'status'; }
+
+  const SYM = { miss: '•', hit: '✕', sunk: '✕', blocked: '🛡', scanOcc: '?', scanEmpty: '·' };
+  const eg = $('enemyGrid');
+  eg.classList.toggle('live', live && S.mode !== 'shield');
+  eg.cells.forEach((d, k) => {
+    const v = S.enemy[k];
+    d.className = 'cell' + (v ? ' ' + v : '') + (targetable(k) ? ' target' : '');
+    d.textContent = v ? SYM[v] : '';
+  });
+
+  const occ = occupancy(), mg = $('myGrid');
+  mg.classList.toggle('pick', live && S.mode === 'shield');
+  mg.cells.forEach((d, k) => {
+    const i = occ[k], v = S.incoming[k];
+    let cls = 'cell';
+    if (i >= 0) cls += isSunk(S.ships[i]) ? ' sunk' : ' ship';
+    if (i >= 0 && S.ships[i].shield === 'active') cls += ' shielded';
+    if (v === 'hit' && !(i >= 0 && isSunk(S.ships[i]))) cls += ' hit';
+    if (v === 'miss') cls += ' miss';
+    if (v === 'blocked') cls += ' blocked';
+    d.className = cls;
+    d.textContent = v ? SYM[v] : '';
+  });
+
+  $('enemyFleet').innerHTML = FLEET.map(([n]) => `<span class="${S.enemySunk.includes(n) ? 'down' : ''}">${n}</span>`).join('');
+
+  document.querySelectorAll('#modes button').forEach(b => {
+    const m = b.dataset.mode;
+    if (m !== 'shot') b.querySelector('b').textContent = S.inv[m] || '';
+    b.disabled = !live || (m !== 'shot' && !S.inv[m]);
+    b.classList.toggle('on', live && S.mode === m);
+  });
+  renderHint();
+}
+
+/* ---------- Démarrage ---------- */
+loadStore();
+initCur();
+buildGrid($('placeGrid'), null);
+buildGrid($('enemyGrid'), onEnemyTap);
+buildGrid($('myGrid'), onMyTap);
+const pg = $('placeGrid');
+pg.addEventListener('pointerdown', onPlaceDown);
+pg.addEventListener('pointermove', onPlaceMove);
+pg.addEventListener('pointerup', onPlaceUp);
+pg.addEventListener('pointercancel', () => { S.drag = null; });
+
+$('btnHost').onclick = hostGame;
+$('btnJoin').onclick = joinGame;
+$('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
+$('codeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); msg('menuMsg', ''); });
+$('btnCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText(S.code); msg('lobbyMsg', 'Code copié !'); }
+  catch (e) { msg('lobbyMsg', 'Copie impossible : note le code à la main.'); }
+};
+$('btnRotate').onclick = rotateShip;
+$('btnRandom').onclick = randomFleet;
+$('btnClear').onclick = clearFleet;
+$('btnConfirm').onclick = confirmPlacement;
+$('btnRemove').onclick = removeShip;
+$('btnReady').onclick = setReady;
+$('btnCreate').onclick = createAccount;
+$('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') createAccount(); });
+$('btnGuest').onclick = () => { setCur(null); renderMenu(); show('menu'); };
+// Un autre onglet a modifié les comptes : on rafraîchit le menu.
+window.addEventListener('storage', e => {
+  if (e.key !== null && !e.key.startsWith(STORE_KEY)) return;
+  loadStore();
+  if ($('menu').classList.contains('active')) renderMenu();
+});
+$('btnDelete').onclick = deleteAccount;
+document.querySelectorAll('[data-back]').forEach(b => { b.onclick = () => { renderMenu(); show('menu'); }; });
+document.querySelectorAll('#modes button').forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
+$('btnSeeGrids').onclick = () => $('end').classList.remove('show');
+
+// Raccourcis clavier pendant le placement (PC) : R pivote, Entrée pose, Suppr retire.
+document.addEventListener('keydown', e => {
+  if (S.phase !== 'place' || e.target.tagName === 'INPUT') return;
+  if (e.key === 'r' || e.key === 'R') rotateShip();
+  else if (e.key === 'Enter') confirmPlacement();
+  else if (e.key === 'Delete' || e.key === 'Backspace') removeShip();
+});
+
+const urlCode = new URLSearchParams(location.search).get('code');
+if (urlCode) $('codeInput').value = urlCode.toUpperCase().slice(0, 6);
+renderMenu();
+
+// Bloque le zoom par pincement (Safari iOS ignore user-scalable=no).
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
+document.addEventListener('visibilitychange', onVisibility);
+
+window.addEventListener('pagehide', () => {
+  try { if (S.conn) S.conn.close(); } catch (e) {}
+  try { if (S.peer) S.peer.destroy(); } catch (e) {}
+});
+</script>
+</body>
+</html>
