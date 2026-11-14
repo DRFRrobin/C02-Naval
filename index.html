@@ -161,7 +161,7 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
 .tools .btn{font-size:13px;padding:8px 4px}
 
 /* Grilles */
-.grid{display:grid;grid-template-columns:.7fr repeat(10,1fr);gap:2px;width:min(460px,100%);margin:0 auto;user-select:none}
+.grid{display:grid;grid-template-columns:.7fr repeat(var(--n,10),1fr);gap:2px;width:min(460px,100%);margin:0 auto;user-select:none}
 .grid.small{width:min(340px,100%)}
 #placeGrid{touch-action:none}
 .lbl{display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:clamp(9px,2.5vw,12px);font-weight:700}
@@ -199,7 +199,7 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
 .status{text-align:center;font-weight:800;font-size:1.1rem;padding:11px;border-radius:12px;margin-bottom:12px;background:var(--btn);color:var(--muted)}
 .status.me{background:#059669;color:#fff}
 .status.wait{background:#b45309;color:#fff}
-.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.modes{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;margin-top:14px}
 .modes button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px;font:600 12px var(--font);color:var(--text);
   background:var(--btn);border:1px solid transparent;border-radius:10px;cursor:pointer;position:relative;min-height:54px}
 .modes button .ic{font-size:16px}
@@ -235,6 +235,16 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
   .grid.small{width:min(270px,80%)}
   .small-label{width:min(270px,80%)}
 }
+.stepper{display:flex;align-items:center;gap:10px;margin-left:auto}
+.stepper button{width:36px;height:36px;border-radius:9px;border:1px solid var(--border2);background:#0b1626;color:var(--text);font:800 18px var(--font);cursor:pointer}
+.stepper button:disabled{opacity:.35;cursor:not-allowed}
+.stepper output{min-width:56px;text-align:center;font-weight:800}
+.rule-ship{display:flex;align-items:center;gap:12px;margin-top:10px}
+.rule-ship .blocks{display:flex;gap:2px}.rule-ship .blocks i{width:11px;height:11px;border-radius:2px;background:var(--ship)}
+.rule-ship span.nm{min-width:86px;font-weight:600;font-size:14px}
+.rule-ship .stepper{gap:6px}.rule-ship .stepper output{min-width:24px}
+.rules-sum{text-align:center;margin-top:18px}
+.rules-sum a{color:var(--sky);cursor:pointer;text-decoration:underline}
 @media (max-width:760px){
   .topbar{flex-wrap:wrap;padding:12px}
   .tabsnav{width:100%;margin-left:0}
@@ -312,6 +322,7 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
       <nav class="tabsnav">
         <button class="btn on" data-pane="play"><i class="fa-solid fa-crosshairs"></i><span data-i18n="navPlay"></span></button>
         <button class="btn" data-pane="stats"><i class="fa-solid fa-chart-pie"></i><span data-i18n="navStats"></span></button>
+        <button class="btn" data-pane="rules"><i class="fa-solid fa-ruler-combined"></i><span data-i18n="navRules"></span></button>
         <button class="btn" data-pane="settings"><i class="fa-solid fa-gear"></i><span data-i18n="navSettings"></span></button>
         <button class="btn danger" id="btnLogout"><i class="fa-solid fa-power-off"></i><span data-i18n="navLogout"></span></button>
       </nav>
@@ -324,7 +335,16 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
         <button class="mode-card" id="mJoin"><span class="mode-ic ic-yellow"><i class="fa-solid fa-right-to-bracket"></i></span><h3 data-i18n="mJoinT"></h3><p data-i18n="mJoinD"></p></button>
         <button class="mode-card" id="mHost"><span class="mode-ic ic-purple"><i class="fa-solid fa-tower-broadcast"></i></span><h3 data-i18n="mHostT"></h3><p data-i18n="mHostD"></p></button>
       </div>
+      <p id="rulesSum" class="msg rules-sum"></p>
       <p id="dashMsg" class="msg"></p>
+    </div>
+
+    <div id="pane-rules" class="pane">
+      <div class="panel">
+        <h2><i class="fa-solid fa-ruler-combined"></i><span data-i18n="rulesTitle"></span></h2>
+        <p class="msg" data-i18n="rulesIntro"></p>
+        <div id="rulesBox"></div>
+      </div>
     </div>
 
     <div id="pane-stats" class="pane">
@@ -409,6 +429,7 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
       <div class="card place-side">
         <h2 data-i18n="placeTitle"></h2>
         <p class="help" data-i18n="placeHelp"></p>
+        <p id="rulesInfo" class="help" style="color:var(--sky)"></p>
         <div id="shipList" class="ships"></div>
         <div class="tools">
           <button id="btnRotate" class="btn"><i class="fa-solid fa-rotate"></i><span id="rotLbl"></span></button>
@@ -554,7 +575,20 @@ const I18N = {
     pRelease: 'Relâche pour poser.', pNotHere: 'Impossible ici.', pRestored: 'Placement impossible : {ship} remis à sa place.',
     waitOppReady: "Flotte prête. En attente de l'adversaire…", oppReady: "L'adversaire est prêt.",
     oppAway: "L'adversaire a quitté l'écran du jeu… (2 min max)",
-    ship0: 'Porte-avions', ship1: 'Croiseur', ship2: 'Contre-torpilleur', ship3: 'Sous-marin', ship4: 'Torpilleur',
+    shipNames: { 1: ['Canot'], 2: ['Torpilleur'], 3: ['Contre-torpilleur', 'Sous-marin'], 4: ['Croiseur'], 5: ['Porte-avions'], 6: ['Paquebot'] },
+    navRules: 'Règles', rulesTitle: 'Règles de la partie',
+    rulesIntro: "Personnalise la taille de la grille, la flotte et les améliorations. Elles s'appliquent à tes parties « Hôte » et contre le bot. L'adversaire aléatoire utilise toujours les règles standard ; en rejoignant un ami, ce sont les règles de l'hôte qui comptent.",
+    rGridT: 'Taille de la grille', rGridD: 'De 6 × 6 à 15 × 15 cases.',
+    rFleetT: 'Flotte', rFleetD: 'Nombre de bateaux de chaque taille (10 bateaux max, 40 % de la grille au plus).',
+    rFleetTot: p => `${pl(p.n, 'bateau', 'bateaux')} · ${pl(p.cells, 'case', 'cases')} (${p.pct} % de la grille)`,
+    rUpT: 'Améliorations', rUpD: 'Gagnées en coulant un bateau ennemi. Désactive-les pour une bataille classique.',
+    rBotT: 'Intelligence artificielle', rBotD: 'Autorise la partie contre le bot, et le bot de secours du mode aléatoire.',
+    rSkillT: 'Niveau du bot', skill0: 'Facile', skill1: 'Normal', skill2: 'Difficile',
+    rReset: 'Règles par défaut', rOn: 'ON', rOff: 'OFF', rShip: 'Bateaux',
+    rSumStd: 'Règles standard (10 × 10, 5 bateaux)', rSumCustom: p => `Règles : ${p.size} × ${p.size}, ${pl(p.n, 'bateau', 'bateaux')}`, rEdit: 'Modifier',
+    rulesInfo: p => `Règles : grille ${p.size} × ${p.size}, ${pl(p.n, 'bateau', 'bateaux')}${p.up ? '' : ', sans améliorations'}.`,
+    botOff: "Le bot est désactivé dans les règles.", noBotMsg: "Personne n'a été trouvé et le bot est désactivé. Retour au menu…",
+    customXp: 'XP réduite de moitié : règles personnalisées.',
     stMyTurn: 'À toi de jouer', stOppTurn: "Tour de l'adversaire", stFiring: 'Tir en cours', stOver: 'Partie terminée', stLost: 'Connexion perdue',
     enemyGrid: 'Grille de {name}', myFleet: 'Ta flotte',
     modeShot: 'Tir', modeRadar: 'Radar', modeCross: 'Croix', modeShield: 'Bouclier',
@@ -574,7 +608,7 @@ const I18N = {
     upCrossN: 'Frappe en croix', upCrossD: 'Tire sur la case visée et ses 4 voisines. Coûte le tour.',
     upShieldN: 'Bouclier', upShieldD: 'Le premier coup sur un de tes bateaux est annulé. Coûte le tour, sans tir.',
     choiceTitle: 'Bateau ennemi coulé !', choiceSub: 'Choisis une amélioration :', choiceSubN: 'Choisis une amélioration ({n} à choisir) :',
-    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', loseText: 'Toute ta flotte a été coulée.',
+    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', winForfeit: "L'adversaire a abandonné la partie.", loseText: 'Toute ta flotte a été coulée.',
     endStats: p => `${pl(p.shots, 'tir', 'tirs')}, ${p.acc} % de précision.`,
     lostTitle: 'Connexion perdue', lostText: "La liaison avec l'adversaire est coupée. La partie est arrêtée.",
     newGame: 'Nouvelle partie', seeGrids: 'Voir les grilles', xpGuest: "Joue avec un compte pour gagner de l'XP.",
@@ -643,7 +677,20 @@ const I18N = {
     pRelease: 'Release to place.', pNotHere: 'Not here.', pRestored: 'Cannot place: {ship} put back.',
     waitOppReady: 'Fleet ready. Waiting for the opponent…', oppReady: 'The opponent is ready.',
     oppAway: 'The opponent left the game screen… (2 min max)',
-    ship0: 'Carrier', ship1: 'Battleship', ship2: 'Destroyer', ship3: 'Submarine', ship4: 'Patrol boat',
+    shipNames: { 1: ['Dinghy'], 2: ['Patrol boat'], 3: ['Destroyer', 'Submarine'], 4: ['Battleship'], 5: ['Carrier'], 6: ['Liner'] },
+    navRules: 'Rules', rulesTitle: 'Game rules',
+    rulesIntro: 'Customize the grid size, the fleet and the upgrades. They apply to your "Host" games and games against the bot. Random opponents always use the standard rules; when you join a friend, the host\'s rules apply.',
+    rGridT: 'Grid size', rGridD: 'From 6 × 6 to 15 × 15 squares.',
+    rFleetT: 'Fleet', rFleetD: 'Number of ships of each size (10 ships max, at most 40% of the grid).',
+    rFleetTot: p => `${pl(p.n, 'ship', 'ships')} · ${pl(p.cells, 'square', 'squares')} (${p.pct}% of the grid)`,
+    rUpT: 'Upgrades', rUpD: 'Earned by sinking an enemy ship. Turn them off for a classic battle.',
+    rBotT: 'Artificial intelligence', rBotD: 'Allows games against the bot, and the fallback bot of random matches.',
+    rSkillT: 'Bot level', skill0: 'Easy', skill1: 'Normal', skill2: 'Hard',
+    rReset: 'Default rules', rOn: 'ON', rOff: 'OFF', rShip: 'Ships',
+    rSumStd: 'Standard rules (10 × 10, 5 ships)', rSumCustom: p => `Rules: ${p.size} × ${p.size}, ${pl(p.n, 'ship', 'ships')}`, rEdit: 'Edit',
+    rulesInfo: p => `Rules: ${p.size} × ${p.size} grid, ${pl(p.n, 'ship', 'ships')}${p.up ? '' : ', no upgrades'}.`,
+    botOff: 'The bot is disabled in the rules.', noBotMsg: 'No one was found and the bot is disabled. Back to the menu…',
+    customXp: 'XP halved: custom rules.',
     stMyTurn: 'Your turn', stOppTurn: "Opponent's turn", stFiring: 'Firing…', stOver: 'Game over', stLost: 'Connection lost',
     enemyGrid: "{name}'s grid", myFleet: 'Your fleet',
     modeShot: 'Shot', modeRadar: 'Radar', modeCross: 'Cross', modeShield: 'Shield',
@@ -663,7 +710,7 @@ const I18N = {
     upCrossN: 'Cross strike', upCrossD: 'Fires at the targeted square and its 4 neighbours. Costs your turn.',
     upShieldN: 'Shield', upShieldD: 'The first hit on one of your ships is cancelled. Costs your turn, no shot.',
     choiceTitle: 'Enemy ship sunk!', choiceSub: 'Pick an upgrade:', choiceSubN: 'Pick an upgrade ({n} to pick):',
-    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', loseText: 'Your whole fleet was sunk.',
+    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', winForfeit: 'The opponent left the game.', loseText: 'Your whole fleet was sunk.',
     endStats: p => `${pl(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
     lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
     newGame: 'New game', seeGrids: 'View grids', xpGuest: 'Play with an account to earn XP.',
@@ -696,13 +743,19 @@ function applyLang() {
 /* =========================================================
    Constantes du jeu et état
    ========================================================= */
-const N = 10;
-const ROWS = 'ABCDEFGHIJ';
+let N = 10;
+const ROWS = 'ABCDEFGHIJKLMNOP';
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PREFIX = 'c02-naval-v1-';
 const MM_PREFIX = 'c02-naval-mm-v1-', MM_SLOTS = 6, MM_WAIT_MS = 45000;
-const LENS = [5, 4, 3, 3, 2];
-const shipName = i => t('ship' + i);
+let LENS = [5, 4, 3, 3, 2];
+function shipName(i) {
+  const len = LENS[i], list = (t('shipNames') || {})[len] || ['#' + len];
+  const same = LENS.filter(l => l === len).length;
+  const occ = LENS.slice(0, i).filter(l => l === len).length;
+  if (same === 1) return list[0];
+  return list[occ] || `${list[0]} ${occ + 1}`;
+}
 const HEARTBEAT_MS = 2000, TIMEOUT_MS = 20000, AWAY_TIMEOUT_MS = 120000, JOIN_TIMEOUT_MS = 15000;
 
 /* Serveurs utilisés pour établir la liaison entre les deux appareils.
@@ -731,7 +784,7 @@ const S = {
   enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
   lastSeen: 0, hb: null, joinTimer: null, pendingAct: null, oppAway: false, wakeLock: null,
   mmTimer: null, mmStopped: false, onReject: null,
-  opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
+  oppUsed: 0, opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
 };
 
 /* ---------- Outils ---------- */
@@ -755,6 +808,13 @@ const sunkOf = (s, incoming) => !!s.cells && s.cells.every(([r, c]) => incoming[
 const isSunk = s => sunkOf(s, S.incoming);
 const targetable = k => S.enemy[k] === null || S.enemy[k] === 'scanOcc' || S.enemy[k] === 'scanEmpty' || S.enemy[k] === 'blocked';
 function randomCells(lens) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const out = randomCellsOnce(lens);
+    if (out.every(Boolean)) return out;
+  }
+  return randomCellsOnce(lens);
+}
+function randomCellsOnce(lens) {
   const ships = lens.map(len => ({ len, cells: null }));
   for (const s of ships) {
     for (let tries = 0; tries < 3000 && !s.cells; tries++) {
@@ -781,8 +841,46 @@ function fmtTime(sec) {
   return Math.floor(sec / 3600) + 'h ' + String(Math.floor(sec % 3600 / 60)).padStart(2, '0') + 'm';
 }
 
+/* =========================================================
+   Règles personnalisables (taille de grille, flotte, améliorations)
+   ========================================================= */
+const MIN_SIZE = 6, MAX_SIZE = 15, MAX_LEN = 6, MAX_SHIPS = 10;
+const DEFAULT_RULES = { size: 10, fleet: [5, 4, 3, 3, 2], radar: true, cross: true, shield: true };
+const maxCells = size => Math.floor(size * size * 0.4);
+const sumOf = a => a.reduce((x, y) => x + y, 0);
+// Valide et normalise des règles (venant du stockage ou du réseau). Renvoie null si invalides.
+function sanitizeRules(c) {
+  if (!c || typeof c !== 'object') return null;
+  const size = c.size;
+  if (!Number.isInteger(size) || size < MIN_SIZE || size > MAX_SIZE) return null;
+  if (!Array.isArray(c.fleet) || c.fleet.length < 1 || c.fleet.length > MAX_SHIPS) return null;
+  if (!c.fleet.every(l => Number.isInteger(l) && l >= 1 && l <= MAX_LEN)) return null;
+  const fleet = c.fleet.slice().sort((a, b) => b - a);
+  if (sumOf(fleet) > maxCells(size)) return null;
+  return { size, fleet, radar: c.radar !== false, cross: c.cross !== false, shield: c.shield !== false };
+}
+const cloneRules = r => ({ ...r, fleet: r.fleet.slice() });
+const sameRules = (a, b) => a.size === b.size && a.fleet.join() === b.fleet.join() && a.radar === b.radar && a.cross === b.cross && a.shield === b.shield;
+const isStdRules = r => sameRules(r, DEFAULT_RULES);
+let RULES = sanitizeRules(settings.rules) || cloneRules(DEFAULT_RULES);   // règles choisies par le joueur (hôte / bot)
+let CFG = cloneRules(RULES);                                              // règles de la partie en cours
+if (typeof settings.bot !== 'boolean') settings.bot = true;
+if (![0, 1, 2].includes(settings.skill)) settings.skill = 2;
+const upgradeOn = k => !!CFG[k];
+const anyUpgrade = () => CFG.radar || CFG.cross || CFG.shield;
+
+function applyConfig(rules) {
+  CFG = cloneRules(rules);
+  N = CFG.size; LENS = CFG.fleet.slice();
+  S.ships = LENS.map((len, i) => ({ i, len, cells: null, shield: 'none' }));
+  S.enemy = Array(N * N).fill(null); S.incoming = Array(N * N).fill(null);
+  S.enemySunk = []; S.lastIn = []; S.sel = 0; S.preview = null; S.lifted = null; S.drag = null;
+  buildGrids();
+}
+
 function buildGrid(el, onTap) {
   // Repères : chiffres 1–10 en haut, lettres A–J à gauche (comme dans les messages « C5 »).
+  el.innerHTML = ''; el.style.setProperty('--n', N);
   const lbl = txt => { const s = document.createElement('div'); s.className = 'lbl'; s.textContent = txt; el.appendChild(s); };
   el.cells = [];
   lbl('');
@@ -795,10 +893,10 @@ function buildGrid(el, onTap) {
       el.appendChild(d); el.cells.push(d);
     }
   }
-  if (onTap) el.addEventListener('click', e => {
+  el.onclick = onTap ? e => {
     const d = e.target.closest('.cell');
     if (d && el.contains(d)) onTap(+d.dataset.r, +d.dataset.c);
-  });
+  } : null;
 }
 
 /* =========================================================
@@ -1006,7 +1104,63 @@ function renderDash() {
   document.querySelectorAll('#dash .pane').forEach(e => e.classList.toggle('active', e.id === 'pane-' + pane));
   if (pane === 'stats') renderStats();
   if (pane === 'settings') renderSettings();
+  if (pane === 'rules') renderRules();
+  $('mBot').classList.toggle('off', !settings.bot);
+  $('mBot').style.opacity = settings.bot ? '' : '.45';
+  $('rulesSum').innerHTML = (isStdRules(RULES) ? esc(t('rSumStd')) : esc(t('rSumCustom', { size: RULES.size, n: RULES.fleet.length })))
+    + ` — <a id="rulesLink">${esc(t('rEdit'))}</a>`;
+  $('rulesLink').onclick = () => { pane = 'rules'; renderDash(); };
 }
+
+/* ---------- Écran « Règles » ---------- */
+function setRules(fn) {
+  const c = cloneRules(RULES); fn(c);
+  const ok = sanitizeRules(c); if (!ok) return;
+  RULES = ok; settings.rules = cloneRules(ok); saveSettings(); renderDash();
+}
+function renderRules() {
+  const R = RULES, tot = sumOf(R.fleet), cap = maxCells(R.size);
+  const cnt = len => R.fleet.filter(l => l === len).length;
+  const step = (id, val, minus, plus) => `<div class="stepper"><button data-r="${id}-" ${minus ? '' : 'disabled'}>−</button><output>${val}</output><button data-r="${id}+" ${plus ? '' : 'disabled'}>+</button></div>`;
+  const tog = (k, on) => `<button class="toggle ${on ? 'on' : 'off'}" data-r="t-${k}">${t(on ? 'rOn' : 'rOff')}</button>`;
+  let h = `<div class="set-row"><i class="fa-solid fa-table-cells"></i><div><b>${esc(t('rGridT'))}</b><small>${esc(t('rGridD'))}</small></div>`
+    + step('size', `${R.size} × ${R.size}`, R.size > MIN_SIZE, R.size < MAX_SIZE) + '</div>';
+  h += `<div class="set-block"><b><i class="fa-solid fa-ship"></i>${esc(t('rFleetT'))}</b><small>${esc(t('rFleetD'))}</small>`;
+  for (let len = MAX_LEN; len >= 1; len--) {
+    const n = cnt(len), nm = (t('shipNames')[len] || ['?'])[0];
+    h += `<div class="rule-ship"><span class="nm">${esc(nm)}</span><span class="blocks">${'<i></i>'.repeat(len)}</span>`
+      + step('f' + len, n, n > 0 && R.fleet.length > 1, R.fleet.length < MAX_SHIPS && tot + len <= cap) + '</div>';
+  }
+  h += `<small style="margin-top:12px;color:var(--sky)">${esc(t('rFleetTot', { n: R.fleet.length, cells: tot, pct: Math.round(tot / (R.size * R.size) * 100) }))}</small></div>`;
+  h += `<div class="set-block"><b><i class="fa-solid fa-wand-magic-sparkles"></i>${esc(t('rUpT'))}</b><small>${esc(t('rUpD'))}</small>`;
+  for (const k of ['radar', 'cross', 'shield']) {
+    h += `<div class="set-row" style="margin-top:10px"><i class="fa-solid ${UPG[k][0]}"></i><div><b>${esc(t(UPG[k][1]))}</b><small>${esc(t(UPG[k][2]))}</small></div>${tog(k, R[k])}</div>`;
+  }
+  h += '</div>';
+  h += `<div class="set-row"><i class="fa-solid fa-robot"></i><div><b>${esc(t('rBotT'))}</b><small>${esc(t('rBotD'))}</small></div>${tog('bot', settings.bot)}</div>`;
+  h += `<div class="set-block"><b>${esc(t('rSkillT'))}</b><select id="skillSel" ${settings.bot ? '' : 'disabled'}>`
+    + [0, 1, 2].map(i => `<option value="${i}" ${settings.skill === i ? 'selected' : ''}>${esc(t('skill' + i))}</option>`).join('') + '</select></div>';
+  h += `<div class="row" style="margin-top:18px"><button class="btn" data-r="reset"><i class="fa-solid fa-rotate-left"></i><span>${esc(t('rReset'))}</span></button></div>`;
+  $('rulesBox').innerHTML = h;
+  const sel = $('skillSel'); if (sel) sel.onchange = e => { settings.skill = +e.target.value; saveSettings(); };
+}
+$('rulesBox').addEventListener('click', e => {
+  const b = e.target.closest('button[data-r]'); if (!b || b.disabled) return;
+  const a = b.dataset.r; Snd.play('click');
+  if (a === 'reset') return setRules(c => Object.assign(c, cloneRules(DEFAULT_RULES)));
+  if (a === 't-bot') { settings.bot = !settings.bot; saveSettings(); return renderDash(); }
+  if (a.startsWith('t-')) return setRules(c => { c[a.slice(2)] = !c[a.slice(2)]; });
+  if (a.startsWith('size')) return setRules(c => {
+    c.size += a.endsWith('+') ? 1 : -1;
+    c.fleet.sort((x, y) => y - x);
+    while (c.fleet.length > 1 && sumOf(c.fleet) > maxCells(c.size)) c.fleet.shift();   // flotte trop grande : on retire les plus gros bateaux
+  });
+  const m = /^f(\d)([+-])$/.exec(a);
+  if (m) setRules(c => {
+    const len = +m[1];
+    if (m[2] === '+') c.fleet.push(len); else { const i = c.fleet.indexOf(len); if (i >= 0) c.fleet.splice(i, 1); }
+  });
+});
 function renderStats() {
   const a = me();
   const s = { ...emptyStats(), ...(a ? a.stats : {}) };
@@ -1097,14 +1251,14 @@ function recordGame(win) {
   const m = S.match, s = a.stats = { ...emptyStats(), ...a.stats };
   const acc = m.shots ? m.hits / m.shots : 0;
   let gain = (win ? 100 : 30) + m.hits * 5 + m.sunk * 20 + (win ? Math.round(acc * 50) : 0);
-  if (S.vsBot) gain = Math.round(gain / 2);
+  if (S.vsBot || !isStdRules(CFG)) gain = Math.round(gain / 2);
   const before = levelOf(a.xp);
   a.xp += gain;
   s.games++; s.shots += m.shots; s.hits += m.hits; s.sunk += m.sunk; s.upgrades += m.upgrades;
   s.timePlayed += m.start ? Math.round((Date.now() - m.start) / 1000) : 0;
   if (win) {
     s.wins++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak);
-    if (!s.fastestWin || m.shots < s.fastestWin) s.fastestWin = m.shots;
+    if (m.shots > 0 && (!s.fastestWin || m.shots < s.fastestWin)) s.fastestWin = m.shots;
   } else { s.losses++; s.streak = 0; }
   saveAccount(a);
   return { gain, level: levelOf(a.xp), up: levelOf(a.xp) > before };
@@ -1174,6 +1328,7 @@ function acceptConn(conn) {
 function hostGame() {
   if (!checkPeerLib('dashMsg')) return;
   S.kind = 'host'; S.isHost = true; S.code = genCode(); S.phase = 'lobby';
+  applyConfig(RULES);
   setupLobby('host');
   $('codeBox').textContent = S.code;
   const peer = new Peer(PREFIX + S.code, PEER_OPTS);
@@ -1205,6 +1360,7 @@ function joinGame() {
   msg('joinMsg', t('connecting'));
   $('btnJoin').disabled = true;
   S.kind = 'join'; S.isHost = false;
+  applyConfig(DEFAULT_RULES);
   const peer = new Peer(PEER_OPTS);
   S.peer = peer; S.code = code;
   let failed = false;
@@ -1232,6 +1388,7 @@ function joinGame() {
 function findRandom() {
   if (!checkPeerLib('dashMsg')) return;
   S.kind = 'random'; S.phase = 'lobby'; S.mmStopped = false;
+  applyConfig(DEFAULT_RULES);
   setupLobby('random');
   const deadline = Date.now() + MM_WAIT_MS;
   const tick = () => {
@@ -1241,8 +1398,9 @@ function findRandom() {
     if (left <= 0) {
       clearInterval(S.mmTimer);
       stopSearch();
+      if (!settings.bot) { msg('lobbyMsg', t('noBotMsg'), true); setTimeout(() => location.reload(), 2500); return; }
       msg('lobbyMsg', t('noOneFound'), 'ok');
-      setTimeout(startBot, 1000);
+      setTimeout(() => startBot(true), 1000);
     }
   };
   tick(); S.mmTimer = setInterval(tick, 250);
@@ -1292,7 +1450,7 @@ function joinSlot(k) {
 // Connexion de données commune. La partie démarre quand chacun a reçu le « hello » de l'autre.
 function setupConn(conn, onFail) {
   S.conn = conn; S.onReject = onFail || null;
-  conn.on('open', () => { if (S.conn === conn) send({ t: 'hello', ...myIdentity() }); });
+  conn.on('open', () => { if (S.conn === conn) send({ t: 'hello', ...myIdentity(), ...(S.kind === 'host' ? { rules: CFG } : {}) }); });
   conn.on('data', m => { if (S.conn === conn) onData(m); });
   const closed = () => {
     if (S.conn !== conn) return;
@@ -1342,8 +1500,13 @@ function quitGame() {
   if (!confirm(t('quitConfirm'))) return;
   recordInterrupted();
   S.phase = 'over';
-  try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
-  location.reload();
+  if (!S.vsBot) send({ t: 'quit' });
+  if (S.bot) S.bot.stop();
+  // Petit délai pour que le message d'abandon parte avant la fermeture du lien.
+  setTimeout(() => {
+    try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
+    location.reload();
+  }, S.vsBot ? 0 : 250);
 }
 
 /* Veille et arrière-plan */
@@ -1382,6 +1545,7 @@ function onData(m) {
         level: Math.max(0, Math.min(999, parseInt(m.level, 10) || 0)),
         bot: !!m.bot && S.vsBot,
       };
+      if (!S.connected && S.kind === 'join') applyConfig(sanitizeRules(m.rules) || DEFAULT_RULES);
       if (!S.connected) onConnected(); else renderVs();
       break;
     case 'busy': if (!S.connected && S.onReject) S.onReject(true); break;
@@ -1391,6 +1555,10 @@ function onData(m) {
     case 'act': onAct(m); break;
     case 'res': onRes(m); break;
     case 'pass': onPass(); break;
+    case 'quit':
+      if (S.phase === 'game') endGame(true, true);
+      else lost();
+      break;
   }
 }
 
@@ -1406,6 +1574,7 @@ class Bot {
     this.know = Array(N * N).fill(null);   // ce que le bot sait de ta grille : null | miss | hit | sunk | blocked
     this.remaining = LENS.slice();
     this.timers = [];
+    this.skill = settings.skill;
   }
   later(fn, ms) { this.timers.push(setTimeout(() => { if (S.vsBot && S.phase !== 'over') fn(); }, ms)); }
   emit(m, ms) { this.later(() => onData(m), ms); }
@@ -1415,10 +1584,10 @@ class Bot {
   }
   receive(m) {
     if (m.t === 'act') {
-      const cells = sanitizeCells(m.cells);
-      const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
+      const a = normalizeAct(m, true); if (!a) return;
+      const { kind, cells } = a;
       const { results, over } = resolveOn(this.ships, this.incoming, kind, cells);
-      this.emit({ t: 'res', kind, at: m.at, results, over }, 450);
+      this.emit({ t: 'res', kind, at: a.at, results, over }, 450);
       if (!over) this.later(() => this.move(), 450 + 700 + Math.random() * 600);
     } else if (m.t === 'pass') {
       this.later(() => this.move(), 900);
@@ -1438,8 +1607,21 @@ class Bot {
     const [r, c] = this.choose();
     onData({ t: 'act', kind: 'shot', at: [r, c], cells: [[r, c]] });
   }
+  randomUnknown() {
+    const free = []; this.know.forEach((v, k) => { if (v === null) free.push(k); });
+    const k = free[Math.floor(Math.random() * free.length)];
+    return [Math.floor(k / N), k % N];
+  }
   choose() {
     const K = this.know;
+    if (this.skill === 0) {   // facile : tirs au hasard, avec un peu de bon sens autour d'un touché
+      const near = [];
+      K.forEach((v, k) => { if (v !== 'hit') return; const r = Math.floor(k / N), c = k % N;
+        [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([a, b]) => { if (inside(a, b) && K[a * N + b] === null) near.push([a, b]); }); });
+      if (near.length && Math.random() < 0.6) return near[Math.floor(Math.random() * near.length)];
+      return this.randomUnknown();
+    }
+    if (this.skill === 1 && Math.random() < 0.3) return this.randomUnknown();
     const blocked = K.map((v, k) => (v === 'blocked' ? k : -1)).filter(k => k >= 0);
     if (blocked.length) { const k = blocked[0]; return [Math.floor(k / N), k % N]; }   // bouclier : on retire au même endroit
     const hasHits = K.includes('hit');
@@ -1472,7 +1654,9 @@ class Bot {
   }
   stop() { this.timers.forEach(clearTimeout); }
 }
-function startBot() {
+function startBot(fromRandom) {
+  if (!settings.bot) return;
+  applyConfig(fromRandom ? DEFAULT_RULES : RULES);
   S.kind = 'bot'; S.vsBot = true; S.isHost = true;
   S.bot = new Bot();
   S.connected = true;
@@ -1486,6 +1670,7 @@ function startBot() {
    ========================================================= */
 function enterPlacement() {
   S.phase = 'place';
+  $('rulesInfo').textContent = t('rulesInfo', { size: N, n: LENS.length, up: anyUpgrade() });
   S.sel = 0; S.preview = null;
   renderVs();
   showView('place');
@@ -1709,6 +1894,23 @@ function sanitizeCells(list) {
     .filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && inside(p[0], p[1]))
     .slice(0, 5);
 }
+// Normalise une action reçue : un tir = 1 case, un radar = carré 2 × 2, une frappe en croix = 5 cases.
+// Une amélioration non gagnée est ramenée à un simple tir (anti-triche et robustesse).
+function normalizeAct(m, canUpgrade) {
+  const raw = sanitizeCells(m.cells);
+  const okPt = Array.isArray(m.at) && Number.isInteger(m.at[0]) && Number.isInteger(m.at[1]) && inside(m.at[0], m.at[1]);
+  const at = okPt ? [m.at[0], m.at[1]] : (raw[0] || null);
+  if (!at) return null;
+  let kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
+  if (kind !== 'shot' && (!canUpgrade || !upgradeOn(kind))) kind = 'shot';
+  const [r, c] = at;
+  const allowed = kind === 'radar' ? [[r, c], [r, c + 1], [r + 1, c], [r + 1, c + 1]]
+    : kind === 'cross' ? [[r, c], [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]] : [[r, c]];
+  let cells = raw.filter(([a, b]) => allowed.some(([x, y]) => x === a && y === b));
+  cells = cells.filter((p, i) => cells.findIndex(q => q[0] === p[0] && q[1] === p[1]) === i);
+  if (!cells.length) cells = [at];
+  return { kind, at, cells };
+}
 // Calcule le résultat de tirs sur une flotte (la sienne ou celle du bot).
 function resolveOn(ships, incoming, kind, cells) {
   const occ = occOf(ships), results = [];
@@ -1777,7 +1979,7 @@ function summarize(kind, at, results) {
   const cell = cellName(...at);
   if (kind === 'radar') return t('sumRadar', { cell, n: results.filter(x => x.v === 'occ').length, total: results.length });
   const sunkIdx = results.filter(x => x.v === 'sunk').map(x => x.si);
-  const sunkNames = sunkIdx.map(i => (Number.isInteger(i) && i >= 0 && i < 5 ? shipName(i) : '?'));
+  const sunkNames = sunkIdx.map(i => (Number.isInteger(i) && i >= 0 && i < LENS.length ? shipName(i) : '?'));
   if (kind === 'shot') {
     const v = results[0] && results[0].v;
     return t('sumShot', { cell, v, ship: sunkNames[0] || '' });
@@ -1797,11 +1999,12 @@ function playResultSound(results) {
 // Le défenseur calcule le résultat sur sa propre grille.
 function onAct(m) {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;  // ce n'est pas le tour de l'adversaire
-  const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
-  const cells = sanitizeCells(m.cells);
+  const a = normalizeAct(m, S.oppUsed < S.ships.filter(isSunk).length);
+  if (!a) return;
+  const { kind, cells, at } = a;
+  if (kind !== 'shot') S.oppUsed++;
   const { results, over } = resolveOn(S.ships, S.incoming, kind, cells);
-  send({ t: 'res', kind, at: m.at, results, over });
-  const at = Array.isArray(m.at) && inside(m.at[0], m.at[1]) ? m.at : (cells[0] || [0, 0]);
+  send({ t: 'res', kind, at, results, over });
   S.lastIn = kind === 'radar' ? [] : cells.map(([r, c]) => r * N + c);
   setLog(t('oppPrefix', { name: S.opp ? S.opp.name : '?' }) + summarize(kind, at, results), true);
   if (kind === 'radar') Snd.play('radar'); else playResultSound(results);
@@ -1820,7 +2023,7 @@ function onRes(m) {
   for (const x of results) {
     if (x.v === 'sunk') {
       (Array.isArray(x.ship) ? x.ship : [[x.r, x.c]]).forEach(p => { if (Array.isArray(p) && inside(p[0], p[1])) S.enemy[p[0] * N + p[1]] = 'sunk'; });
-      if (Number.isInteger(x.si) && x.si >= 0 && x.si < 5 && !S.enemySunk.includes(x.si)) S.enemySunk.push(x.si);
+      if (Number.isInteger(x.si) && x.si >= 0 && x.si < LENS.length && !S.enemySunk.includes(x.si)) S.enemySunk.push(x.si);
       sunk++;
     } else {
       const st = { miss: 'miss', hit: 'hit', blocked: 'blocked', occ: 'scanOcc', empty: 'scanEmpty' }[x.v];
@@ -1837,12 +2040,14 @@ function onRes(m) {
   S.waiting = false; S.pendingAct = null;
   if (m.over) return endGame(true);
   S.myTurn = false;
-  S.choices += sunk;
+  if (anyUpgrade()) S.choices += sunk;
   renderGame();
   if (S.choices > 0) setTimeout(openChoice, 500);
 }
 function onPass() {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;
+  if (!CFG.shield || S.oppUsed >= S.ships.filter(isSunk).length) return;   // bouclier non gagné ou désactivé : ignoré
+  S.oppUsed++;
   S.myTurn = true;
   S.lastIn = [];
   setLog(t('oppShield', { name: S.opp ? S.opp.name : '?' }), true);
@@ -1856,7 +2061,7 @@ function openChoice() {
   if (S.phase !== 'game' || S.choices <= 0) { $('choice').classList.remove('show'); return; }
   $('choiceSub').textContent = S.choices > 1 ? t('choiceSubN', { n: S.choices }) : t('choiceSub');
   const list = $('choiceList'); list.innerHTML = '';
-  for (const [k, [icon, nk, dk]] of Object.entries(UPG)) {
+  for (const [k, [icon, nk, dk]] of Object.entries(UPG).filter(([k]) => upgradeOn(k))) {
     const b = document.createElement('button');
     b.className = 'opt';
     b.innerHTML = `<strong><i class="fa-solid ${icon}" style="color:var(--yellow);margin-right:8px"></i>${esc(t(nk))}</strong><span>${esc(t(dk))}</span>`;
@@ -1867,21 +2072,22 @@ function openChoice() {
 }
 
 /* ---------- Fin de partie ---------- */
-function endGame(win) {
+function endGame(win, forfeit) {
   S.phase = 'over';
+  clearInterval(S.hb);
   S.myTurn = false; S.waiting = false;
   if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
   $('endIcon').textContent = win ? '🏆' : '🌊';
   $('endTitle').textContent = t(win ? 'win' : 'lose');
   const acc = S.match.shots ? Math.round(S.match.hits / S.match.shots * 100) : 0;
-  $('endText').textContent = t(win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
+  $('endText').textContent = t(forfeit ? 'winForfeit' : win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
   const r = recordGame(win);
   if (r) {
     const a = me(), l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
     $('endXp').innerHTML = `<div class="xpgain">+${r.gain} XP</div>`
       + (r.up ? `<div class="lvlup">⬆ ${esc(t('levelUp', { n: r.level, rank: rankOf(r.level) }))}</div>` : '')
-      + (S.vsBot ? `<div class="endnote">${esc(t('botXp'))}</div>` : '')
+      + (S.vsBot ? `<div class="endnote">${esc(t('botXp'))}</div>` : !isStdRules(CFG) ? `<div class="endnote">${esc(t('customXp'))}</div>` : '')
       + `<div class="xpbar"><i style="width:${Math.round((a.xp - lo) / (hi - lo) * 100)}%"></i></div>`
       + `<div class="xprow"><span>XP: <b>${a.xp - lo} / ${hi - lo}</b></span><span>${esc(t('levelN', { n: l }))}</span></div>`;
   } else $('endXp').innerHTML = `<p class="endnote">${esc(t('xpGuest'))}</p>`;
@@ -1943,6 +2149,7 @@ function renderGame() {
   document.querySelectorAll('#modes button').forEach(b => {
     const m = b.dataset.mode;
     if (m !== 'shot') b.querySelector('b').textContent = S.inv[m] || '';
+    b.style.display = m === 'shot' || upgradeOn(m) ? '' : 'none';
     b.disabled = !live || (m !== 'shot' && !S.inv[m]);
     b.classList.toggle('on', live && S.mode === m);
   });
@@ -1952,9 +2159,12 @@ function renderGame() {
 /* =========================================================
    Démarrage
    ========================================================= */
-buildGrid($('placeGrid'), null);
-buildGrid($('enemyGrid'), onEnemyTap);
-buildGrid($('myGrid'), onMyTap);
+function buildGrids() {
+  buildGrid($('placeGrid'), null);
+  buildGrid($('enemyGrid'), onEnemyTap);
+  buildGrid($('myGrid'), onMyTap);
+}
+applyConfig(RULES);
 const pg = $('placeGrid');
 pg.addEventListener('pointerdown', onPlaceDown);
 pg.addEventListener('pointermove', onPlaceMove);
@@ -1984,7 +2194,7 @@ $('langMini').onchange = e => setLang(e.target.value);
 $('btnSaveProfile').onclick = saveProfile;
 $('btnDelete').onclick = deleteAccount;
 $('mRandom').onclick = () => { Snd.play('click'); findRandom(); };
-$('mBot').onclick = () => { Snd.play('click'); startBot(); };
+$('mBot').onclick = () => { Snd.play('click'); if (!settings.bot) return msg('dashMsg', t('botOff'), true); startBot(); };
 $('mJoin').onclick = () => { Snd.play('click'); openJoin(''); };
 $('mHost').onclick = () => { Snd.play('click'); hostGame(); };
 
@@ -2035,18 +2245,20 @@ window.addEventListener('storage', e => {
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 document.addEventListener('visibilitychange', onVisibility);
-window.addEventListener('pagehide', () => {
+window.addEventListener('pagehide', e => {
+  if (e.persisted) return;
   try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
   try { if (S.peer) S.peer.destroy(); } catch (e) {}
 });
 
 // Lien d'invitation (?code=…) : la fenêtre « Rejoindre » s'ouvre dès qu'on arrive au tableau de bord.
 pendingCode = (new URLSearchParams(location.search).get('code') || '').toUpperCase().slice(0, 6) || null;
+try { if (pendingCode !== null || location.search) history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
 applyLang();
 loadAccounts();
 restoreSession();
 // #stats ou #settings dans l'adresse ouvre directement cet onglet.
-const startPane = ['play', 'stats', 'settings'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'play';
+const startPane = ['play', 'stats', 'rules', 'settings'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'play';
 if (loggedIn) openDash(startPane); else openAuth();
 </script>
 </body>
