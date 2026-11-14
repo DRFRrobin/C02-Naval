@@ -13,6 +13,17 @@ Bataille navale dans le navigateur, sur PC ou téléphone. Sans installation, sa
 
 Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2 × 2), **Frappe en croix** (5 cases) ou **Bouclier** (annule le premier coup sur un de tes bateaux).
 
+## Règles personnalisables
+
+Onglet **Règles** du tableau de bord :
+
+- **Taille de la grille** : de 6 × 6 à 15 × 15.
+- **Flotte** : nombre de bateaux de chaque taille (1 à 6 cases), 10 bateaux maximum et 40 % de la grille au plus.
+- **Améliorations** : Radar, Frappe en croix et Bouclier activables séparément (toutes désactivées = bataille classique).
+- **Intelligence artificielle** : autoriser ou non le bot (partie contre le bot et bot de secours du mode aléatoire), avec trois niveaux : facile, normal, difficile.
+
+Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qui rejoint un salon reçoit automatiquement les règles de l'hôte. L'adversaire aléatoire utilise toujours les règles standard. Avec des règles personnalisées, l'XP gagnée est divisée par deux.
+
 ## Comptes
 
 - Pseudo + mot de passe (protégé par PBKDF2-SHA-256, jamais stocké en clair), photo de profil.
