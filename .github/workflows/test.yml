@@ -20,3 +20,24 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Tests (logique, bot, multijoueur simulé, reprise après coupure, responsive)
         run: npm test
+
+  sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tester le schéma Supabase sur un vrai PostgreSQL
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 -q -c "create database t encoding 'UTF8' template template0"
+          psql -h localhost -U postgres -d t -v ON_ERROR_STOP=1 -q \
+            -f supabase/tests/stub.sql -f supabase/schema.sql -f supabase/tests/schema.test.sql
