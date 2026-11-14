@@ -1,25 +1,35 @@
 # ⚓ C02 Naval
 
-Bataille navale à deux joueurs, dans le navigateur, sur PC ou téléphone. Sans installation, sans serveur de jeu.
+Bataille navale dans le navigateur, sur PC ou téléphone. Sans installation, sans serveur de jeu.
 
-## Jouer
+**Jouer :** https://drfrrobin.github.io/C02-Naval/
 
-1. Un joueur clique sur **Créer une partie** et obtient un code de 6 caractères.
-2. L'autre joueur saisit ce code et clique sur **Rejoindre**.
-3. Chacun place sa flotte, puis appuie sur **Prêt**. L'hôte tire en premier.
+## Modes de jeu
+
+- **Adversaire aléatoire** : affronte un joueur en ligne au hasard. Si personne n'est trouvé en 45 s, un bot prend sa place.
+- **Partie contre un bot** : entraînement immédiat contre une IA tactique (elle calcule les positions de bateaux les plus probables).
+- **Hôte** : crée un salon privé et partage le code de 6 caractères (ou le lien d'invitation).
+- **Rejoindre une partie** : saisis le code d'un ami.
 
 Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2 × 2), **Frappe en croix** (5 cases) ou **Bouclier** (annule le premier coup sur un de tes bateaux).
 
 ## Comptes
 
-Crée un compte (pseudo + avatar) pour gagner de l'XP, monter de niveau (de Mousse à Amiral) et suivre tes statistiques : victoires, précision, séries, bateaux coulés…
-Les comptes sont enregistrés **dans le navigateur de l'appareil** : ils ne se synchronisent pas entre PC et téléphone, et effacer les données du site efface le compte.
+- Pseudo + mot de passe (protégé par PBKDF2-SHA-256, jamais stocké en clair), photo de profil.
+- XP et niveaux (de Mousse à Amiral), statistiques de carrière : temps joué, victoires, défaites, taux, précision, séries…
+- Les comptes sont enregistrés **dans le navigateur de l'appareil** : ils ne se synchronisent pas entre PC et téléphone, et effacer les données du site efface le compte. Le mot de passe protège le compte sur un appareil partagé, pas contre quelqu'un qui a accès au navigateur.
+- Contre le bot, l'XP gagnée est divisée par deux.
+
+## Paramètres
+
+Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), pseudo, mot de passe, photo.
 
 ## Technique
 
 - Un seul fichier : `index.html` (HTML, CSS et JavaScript).
-- Connexion pair-à-pair (WebRTC) avec [PeerJS](https://peerjs.com) 1.5.4. Le service public de PeerJS sert uniquement à mettre les deux navigateurs en relation.
+- Connexion pair-à-pair (WebRTC) avec [PeerJS](https://peerjs.com) 1.5.4. Le service public de PeerJS sert uniquement à mettre les navigateurs en relation.
 - Sur les réseaux très fermés, la connexion directe peut échouer : un relais TURN personnel peut être ajouté dans la constante `MY_TURN` de `index.html`.
+- Icônes Font Awesome 6, polices Inter et Orbitron (Google Fonts).
 
 ## Tester en local
 
@@ -28,4 +38,4 @@ npm install
 npm start
 ```
 
-Puis ouvrir `http://localhost:8080` (sur un téléphone du même Wi-Fi : `http://<IP-du-PC>:8080`).
+Puis ouvrir `http://localhost:8080`.

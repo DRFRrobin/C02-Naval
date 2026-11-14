@@ -3,267 +3,706 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0b2239">
+<meta name="theme-color" content="#050d1b">
 <meta name="description" content="C02 Naval : bataille navale à deux joueurs dans le navigateur, sur PC et téléphone.">
 <title>C02 Naval</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
 :root{
-  --bg:#0b2239; --panel:#13304e; --panel2:#1a3d61; --line:#081a2c;
-  --water:#1d4e7a; --water-hi:#2a6aa3; --ship:#8ea4bb; --hit:#e5483b; --sunk:#6e1a14;
-  --miss:#cfe0f0; --accent:#f5b83d; --ok:#3fb87f; --text:#eef4fa; --muted:#9fb6cc; --err:#ff8a7e;
+  --card:rgba(12,24,42,.88); --card2:rgba(6,13,25,.72); --border:rgba(64,140,210,.22); --border2:rgba(64,140,210,.36);
+  --text:#e8f1fb; --muted:#8ea3bb; --dim:#5d7189;
+  --primary:#0a84d0; --sky:#38bdf8; --cyan:#22d3ee; --green:#34d399; --yellow:#fbbf24; --purple:#a78bfa; --red:#f87171;
+  --btn:#1a2536; --btn-hi:#233247;
+  --water:#0f2b49; --water-hi:#17497a; --ship:#7b90a8; --hit:#ef4444; --sunk:#7f1d1d; --miss:#cfe0f0; --ok:#10b981;
+  --font:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --num:'Orbitron',ui-monospace,Consolas,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;touch-action:manipulation}
-body{min-height:100vh;display:flex;justify-content:center}
-main{width:100%;max-width:420px;padding:16px 12px 40px}
-.screen{display:none}.screen.active{display:block}
-h1{font-size:1.8rem;text-align:center;margin:18px 0 4px;letter-spacing:.02em}
-h2{font-size:1.25rem;margin:4px 0 8px;text-align:center}
-.sub{color:var(--muted);text-align:center;margin:0 0 16px;font-size:.95rem;line-height:1.4}
-button{font:inherit;color:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--panel2);
-  min-height:44px;cursor:pointer;user-select:none}
-button:active:not(:disabled){filter:brightness(1.2)}
-button.primary{background:var(--accent);color:#1d1400;font-weight:700}
-button.ghost{background:transparent;color:var(--muted);text-decoration:underline}
-button.danger{background:transparent;color:var(--err);text-decoration:underline}
-button:disabled{opacity:.4;cursor:default}
-.wide{display:block;width:100%;margin:8px 0}
-.row{display:flex;gap:8px;margin:8px 0}.row>*{flex:1}
-input{font:inherit;border:2px solid var(--panel2);background:var(--line);color:var(--text);border-radius:10px;padding:10px;min-width:0}
-input:focus{outline:none;border-color:var(--accent)}
-#codeInput{font-size:1.3rem;letter-spacing:.3em;text-transform:uppercase;text-align:center}
-.sep{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.85rem;margin:22px 0 8px}
-.sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--panel2)}
-.msg{min-height:1.4em;text-align:center;margin:10px 0;font-size:.95rem}
-.msg.err{color:var(--err)}
-.code{font-family:ui-monospace,Consolas,monospace;font-size:2.6rem;font-weight:700;letter-spacing:.25em;
-  text-align:center;background:var(--line);border-radius:12px;padding:14px 0 14px .25em;margin:8px 0 12px;user-select:all}
-.logo{display:block;font-size:2.6rem;margin-bottom:2px}
+html,body{margin:0;touch-action:manipulation}
+body{min-height:100vh;color:var(--text);font-family:var(--font);background-color:#050d1b;
+  background-image:radial-gradient(1100px 650px at 28% -8%,rgba(22,62,110,.85) 0%,rgba(22,62,110,0) 62%),linear-gradient(180deg,#081a31 0%,#050d1b 55%,#030810 100%);
+  background-attachment:fixed}
+#app{max-width:1000px;margin:0 auto;padding:16px 16px 48px}
+.view{display:none}.view.active{display:block}
+.pane{display:none}.pane.active{display:block}
+h1,h2,h3{margin:0}
+.muted{color:var(--muted)}
+.msg{min-height:1.4em;text-align:center;margin:10px 0;font-size:.92rem;color:var(--muted)}
+.msg.err{color:#fca5a5}.msg.ok{color:var(--green)}
+input,select{width:100%;background:#03070f;border:1px solid var(--border2);border-radius:10px;color:var(--text);
+  padding:12px 14px;font:16px var(--font);margin-top:8px}
+input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
+.field-label{display:block;font-size:13px;color:var(--muted);margin-top:14px}
 
-/* Profil */
-.profile{display:flex;align-items:center;gap:12px;background:var(--panel);border-radius:14px;padding:12px;margin:14px 0}
-.avatar{font-size:2rem;width:52px;height:52px;flex:0 0 52px;display:flex;align-items:center;justify-content:center;background:var(--line);border-radius:50%}
-.pinfo{flex:1;min-width:0}
-.pname{font-weight:700;font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prank{color:var(--muted);font-size:.85rem;margin:2px 0 6px}
-.xpbar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
-.xpbar i{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .6s}
-.xptxt{font-size:.75rem;color:var(--muted);margin-top:3px}
-.profile-actions{display:flex;gap:8px}.profile-actions button{flex:1;font-size:.9rem;min-height:40px;padding:8px}
-.avatars{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:8px 0 4px}
-.avatars button{font-size:1.4rem;padding:0;aspect-ratio:1;min-height:0;border:2px solid transparent}
-.avatars button.on{border-color:var(--accent)}
-.acclist button{display:flex;align-items:center;gap:10px;width:100%;margin:6px 0;text-align:left}
-.acclist .avatar{width:36px;height:36px;flex-basis:36px;font-size:1.3rem}
-.acclist small{display:block;color:var(--muted)}
-.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
-.stat{background:var(--panel);border-radius:12px;padding:10px 12px}
-.stat b{display:block;font-size:1.4rem}
-.stat span{color:var(--muted);font-size:.8rem}
-label.f{display:block;font-size:.85rem;color:var(--muted);margin:12px 0 4px}
+/* Boutons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 15px var(--font);color:var(--text);
+  background:var(--btn);border:1px solid transparent;border-radius:10px;padding:10px 16px;min-height:44px;cursor:pointer;
+  user-select:none;transition:background .15s,box-shadow .15s,transform .1s}
+.btn:hover:not(:disabled){background:var(--btn-hi)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--primary);color:#fff}.btn.primary:hover:not(:disabled){background:#0b95ea}
+.btn.grad{background:linear-gradient(90deg,#1d4ed8,#0284c7);color:#fff;box-shadow:0 6px 22px rgba(14,165,233,.28)}
+.btn.grad:hover:not(:disabled){background:linear-gradient(90deg,#2563eb,#0ea5e9)}
+.btn.danger{background:#3a0d14;border-color:#7f1d2a;color:#fca5a5}.btn.danger:hover:not(:disabled){background:#4c1119}
+.btn.ok{background:#059669;color:#fff}.btn.ok:hover:not(:disabled){background:#07a877}
+.btn.ghost{background:transparent;color:var(--muted)}.btn.ghost:hover:not(:disabled){background:rgba(255,255,255,.05)}
+.btn.wide{display:flex;width:100%}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:13px}
+
+/* Barre du haut */
+.topbar{display:flex;align-items:center;gap:16px;padding:14px 18px;background:var(--card);border:1px solid var(--border);
+  border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.av-up{width:64px;height:64px;flex:0 0 64px;border:2px dashed var(--sky);border-radius:14px;display:flex;align-items:center;
+  justify-content:center;color:var(--dim);font-size:18px;cursor:pointer;overflow:hidden;background:rgba(0,0,0,.2);position:relative}
+.av-up img{width:100%;height:100%;object-fit:cover}
+.av-up.has{border-style:solid;border-color:var(--border2)}
+.av-up.guest{cursor:default}
+.who{flex:1 1 200px;min-width:0;max-width:330px}
+.who-line{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;min-width:0}
+.who-line .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:12px;font-weight:700;letter-spacing:.05em;color:#67e8f9;background:rgba(14,116,144,.3);
+  border:1px solid rgba(34,211,238,.45);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.xpbar{height:9px;border-radius:6px;background:#060d18;border:1px solid rgba(100,140,180,.35);margin:9px 0 5px;overflow:hidden}
+.xpbar i{display:block;height:100%;background:linear-gradient(90deg,#0ea5e9,#67e8f9);border-radius:6px;transition:width .6s}
+.xprow{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.xprow b{color:var(--sky)}
+.tabsnav{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.tabsnav .btn.on{background:var(--primary);color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+
+/* Jouer */
+.modes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;max-width:770px;margin:clamp(24px,13vh,150px) auto 0}
+.mode-card{text-align:left;background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:24px;color:var(--text);
+  cursor:pointer;font:inherit;transition:transform .15s,border-color .15s,box-shadow .15s}
+.mode-card:hover{transform:translateY(-3px);border-color:rgba(56,189,248,.6);box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.mode-ic{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid;margin-bottom:26px}
+.ic-cyan{color:#22d3ee;background:rgba(8,145,178,.18);border-color:rgba(34,211,238,.45)}
+.ic-green{color:#6ee7b7;background:rgba(5,150,105,.2);border-color:rgba(52,211,153,.45)}
+.ic-yellow{color:#fcd34d;background:rgba(180,120,10,.22);border-color:rgba(251,191,36,.45)}
+.ic-purple{color:#c4b5fd;background:rgba(124,58,237,.22);border-color:rgba(167,139,250,.5)}
+.mode-card h3{font-size:20px;font-weight:800;margin-bottom:8px}
+.mode-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.45}
+
+/* Panneaux */
+.panel{max-width:770px;margin:24px auto 0;background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:28px 32px}
+.panel h2{display:flex;align-items:center;gap:12px;font-size:26px;font-weight:800;padding-bottom:16px;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.panel h2 i{color:var(--cyan);font-size:22px}
+.panel h3.sub{font-size:15px;font-weight:700;color:var(--muted);margin:26px 0 12px;text-transform:uppercase;letter-spacing:.06em}
+.stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.tile{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:20px 8px;text-align:center}
+.tile i{font-size:20px;display:block;margin-bottom:10px}
+.tile b{display:block;font:700 20px var(--num);margin-bottom:8px;letter-spacing:.02em}
+.tile span{font-size:13px;color:var(--muted)}
+.c-sky{color:var(--sky)}.c-purple{color:var(--purple)}.c-green{color:var(--green)}.c-red{color:var(--red)}.c-yellow{color:var(--yellow)}.c-white{color:var(--text)}
+.set-row,.set-block{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:16px}
+.set-row{display:flex;align-items:center;gap:14px}
+.set-row>i{color:var(--sky);font-size:20px;width:24px;text-align:center}
+.set-row b,.set-block>b{display:block;font-size:16px;font-weight:700}
+.set-row small,.set-block>small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
+.set-block>b i{color:var(--yellow);margin-right:6px}
+.toggle{margin-left:auto;font:800 13px var(--font);min-width:54px;padding:9px 12px;border-radius:9px;border:0;cursor:pointer}
+.toggle.on{background:#059669;color:#fff}.toggle.off{background:#334155;color:#cbd5e1}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>.btn{flex:1}
+
+/* Connexion */
+.auth{max-width:440px;margin:7vh auto 0;background:var(--card);border:1px solid var(--border2);border-radius:18px;padding:28px 26px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.brand{text-align:center}
+.brand .logo{width:64px;height:64px;margin:0 auto 12px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+  font-size:30px;color:var(--cyan);background:rgba(8,145,178,.18);border:1px solid rgba(34,211,238,.45)}
+.brand h1{font-size:30px;font-weight:800;letter-spacing:.02em}
+.brand p{color:var(--muted);margin:6px 0 0;font-size:14px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:#03070f;border:1px solid var(--border);border-radius:12px;padding:4px;margin:22px 0 6px;gap:4px}
+.seg button{background:transparent;border:0;color:var(--muted);font:600 14px var(--font);border-radius:9px;padding:10px;cursor:pointer}
+.seg button.on{background:var(--primary);color:#fff}
+.acc-pick{display:flex;flex-direction:column;gap:8px;max-height:230px;overflow:auto;margin-top:8px}
+.acc{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:12px;background:var(--card2);border:1px solid var(--border);
+  cursor:pointer;text-align:left;color:var(--text);font:inherit;width:100%}
+.acc.on{border-color:var(--sky);box-shadow:0 0 0 1px var(--sky) inset}
+.acc small{display:block;color:var(--muted);font-size:12px}
+.mini-av{width:36px;height:36px;flex:0 0 auto;border-radius:10px;background:#0b1a2e;border:1px solid var(--border2);display:flex;
+  align-items:center;justify-content:center;overflow:hidden;font-weight:800;color:var(--sky)}
+.mini-av img{width:100%;height:100%;object-fit:cover}
+.lang-mini{display:flex;justify-content:center;margin-top:10px}
+.lang-mini select{width:auto;margin:0;padding:6px 10px;font-size:13px;background:transparent}
+
+/* Salon */
+.lobby-card{max-width:460px;margin:9vh auto 0;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:18px;padding:28px 24px}
+.lobby-card h2{font-size:24px;font-weight:800;margin:8px 0 6px}
+.code{font:700 2.4rem var(--num);letter-spacing:.22em;background:#03070f;border:1px solid var(--border2);border-radius:12px;
+  padding:16px 0 16px .22em;margin:16px 0 12px;user-select:all;color:var(--cyan)}
+.spin{width:46px;height:46px;border:4px solid rgba(56,189,248,.18);border-top-color:var(--sky);border-radius:50%;animation:spin 1s linear infinite;margin:18px auto 6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.count{font:700 15px var(--num);color:var(--yellow);margin-top:6px}
+
+/* En-tête de partie */
+.ghead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 14px;margin-bottom:14px}
+.vs{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;flex:1;min-width:0;flex-wrap:wrap}
+.vs .who2{display:flex;align-items:center;gap:8px;min-width:0}
+.vs .mini-av{width:30px;height:30px;font-size:13px;border-radius:8px}
+.vs .lv{font-size:11px;color:#67e8f9;font-weight:700}
+.vs .vsep{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+
+/* Placement */
+.place-wrap{display:grid;gap:16px}
+.place-side h2{font-size:20px;font-weight:800;margin-bottom:6px}
+.help{color:var(--muted);font-size:13.5px;line-height:1.45;margin:0 0 12px}
+.ships{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.shipbtn{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:8px 10px;min-height:44px;font:600 12.5px var(--font);
+  border:1px solid var(--border);border-radius:10px;background:var(--card2);color:var(--text);cursor:pointer;flex:1 1 120px}
+.shipbtn.sel{border-color:var(--yellow);box-shadow:0 0 0 1px var(--yellow) inset}
+.shipbtn.placed{opacity:.55}.shipbtn.placed.sel{opacity:1}
+.blocks{display:flex;gap:2px}.blocks i{width:10px;height:10px;background:var(--ship);border-radius:2px}
+.shipbtn.placed .blocks i{background:var(--ok)}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.tools .btn{font-size:13px;padding:8px 4px}
 
 /* Grilles */
-.grid{display:grid;grid-template-columns:.7fr repeat(10,1fr);gap:2px;width:min(380px,100%);margin:0 auto;user-select:none}
-.grid.small{width:min(260px,76%)}
+.grid{display:grid;grid-template-columns:.7fr repeat(10,1fr);gap:2px;width:min(460px,100%);margin:0 auto;user-select:none}
+.grid.small{width:min(340px,100%)}
 #placeGrid{touch-action:none}
-.lbl{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:clamp(9px,2.6vw,12px);font-weight:600}
-.grid.small .lbl{font-size:9px}
-.cell{aspect-ratio:1;border-radius:3px;background:var(--water);display:flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:clamp(11px,3.6vw,17px);line-height:1;cursor:default}
-.grid.small .cell{font-size:clamp(9px,2.6vw,12px)}
+.lbl{display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:clamp(9px,2.5vw,12px);font-weight:700}
+.grid.small .lbl{font-size:10px}
+.cell{aspect-ratio:1;border-radius:4px;background:var(--water);display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:clamp(11px,3.4vw,18px);line-height:1;cursor:default;transition:background .15s}
+.grid.small .cell{font-size:clamp(9px,2.5vw,13px)}
 .cell.ship{background:var(--ship)}
 #placeGrid .cell{cursor:pointer}
 #placeGrid .cell.ship{cursor:grab}
-.cell.pv-ok{background:var(--ok);box-shadow:inset 0 0 0 2px #b6f0d3}
+.cell.pv-ok{background:var(--ok);box-shadow:inset 0 0 0 2px #a7f3d0}
 .cell.pv-bad{background:var(--hit);opacity:.85}
-.cell.shielded{box-shadow:inset 0 0 0 2px var(--accent)}
+.cell.shielded{box-shadow:inset 0 0 0 2px var(--yellow)}
 .cell.miss{color:var(--miss)}
 .cell.hit{background:var(--hit);color:#fff}
-.cell.sunk{background:var(--sunk);color:#ffb3ab}
-.cell.blocked{background:#5a4a1c;color:var(--accent)}
-.cell.scanOcc{background:#3b5f84;color:var(--accent)}
+.cell.sunk{background:var(--sunk);color:#fecaca}
+.cell.blocked{background:#5a4a1c;color:var(--yellow)}
+.cell.scanOcc{background:#2c4f78;color:var(--yellow)}
 .cell.scanEmpty{color:var(--miss)}
+.cell.last{outline:2px solid var(--yellow);outline-offset:-2px}
 .cell.target{cursor:pointer}
 .grid.live .cell.target{background:var(--water-hi)}
-.grid.live .cell.target.scanOcc{background:#4a77a5}
-.grid.pick{outline:3px solid var(--accent);outline-offset:3px;border-radius:4px}
+.grid.live .cell.target:hover{background:#1f5f9c}
+.grid.live .cell.target.scanOcc{background:#3c6a9e}
+.grid.pick{outline:3px solid var(--yellow);outline-offset:4px;border-radius:6px}
 .grid.pick .cell.ship{cursor:pointer}
-
-/* Placement */
-.ships{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:8px}
-.shipbtn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 8px;min-height:44px;font-size:.8rem;
-  border:2px solid transparent}
-.shipbtn.sel{border-color:var(--accent)}
-.shipbtn.placed{opacity:.45}
-.shipbtn.placed.sel{opacity:1}
-.blocks{display:flex;gap:2px}.blocks i{width:9px;height:9px;background:var(--ship);border-radius:2px}
-.shipbtn.placed .blocks i{background:var(--ok)}
-.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
-.tools button{font-size:.9rem;padding:8px 4px}
-.ok-btn{background:var(--ok);color:#04210f;font-weight:700}
+.glabel{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;width:min(460px,100%);margin:0 auto 8px;font-size:13px;color:var(--muted);font-weight:600}
+.small-label{width:min(340px,100%)}
+.fleet{display:flex;gap:4px;flex-wrap:wrap}
+.fleet span{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--btn);color:var(--text)}
+.fleet span.down{text-decoration:line-through;opacity:.45}
 
 /* Partie */
-.status{text-align:center;font-weight:700;font-size:1.15rem;padding:10px;border-radius:10px;margin-bottom:8px;background:var(--panel)}
-.status.me{background:var(--ok);color:#04210f}
-.status.wait{background:var(--accent);color:#1d1400}
-.versus{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:4px}
-.label{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;
-  width:min(380px,100%);margin:12px auto 6px;font-size:.9rem;color:var(--muted)}
-.fleet{display:flex;gap:4px;flex-wrap:wrap}
-.fleet span{font-size:.7rem;padding:2px 6px;border-radius:6px;background:var(--panel2);color:var(--text)}
-.fleet span.down{text-decoration:line-through;opacity:.45}
-.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:min(380px,100%);margin:10px auto 0}
-.modes button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:.72rem;
-  border:2px solid transparent;position:relative}
-.modes button .ic{font-size:1.15rem;line-height:1.2}
-.modes button.on{border-color:var(--accent)}
-.modes button b{position:absolute;top:3px;right:5px;font-size:.7rem;color:var(--accent)}
-.hint{text-align:center;color:var(--muted);font-size:.85rem;min-height:1.2em;margin:8px 0 0}
-.log{text-align:center;font-size:.9rem;min-height:1.3em;margin:6px 0 0}
+.game-wrap{display:grid;gap:16px}
+.status{text-align:center;font-weight:800;font-size:1.1rem;padding:11px;border-radius:12px;margin-bottom:12px;background:var(--btn);color:var(--muted)}
+.status.me{background:#059669;color:#fff}
+.status.wait{background:#b45309;color:#fff}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.modes button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px;font:600 12px var(--font);color:var(--text);
+  background:var(--btn);border:1px solid transparent;border-radius:10px;cursor:pointer;position:relative;min-height:54px}
+.modes button .ic{font-size:16px}
+.modes button.on{border-color:var(--yellow);box-shadow:0 0 0 1px var(--yellow) inset}
+.modes button:disabled{opacity:.35;cursor:default}
+.modes button b{position:absolute;top:4px;right:7px;font:700 11px var(--num);color:var(--yellow)}
+.hint{text-align:center;color:var(--muted);font-size:13px;min-height:1.2em;margin:10px 0 0}
+.log{text-align:center;font-size:14px;font-weight:600;min-height:1.3em;margin:8px 0 0}
 .log.opp{color:var(--muted)}
 
 /* Fenêtres */
-.overlay{position:fixed;inset:0;background:rgba(3,12,22,.78);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.overlay{position:fixed;inset:0;background:rgba(2,6,14,.78);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
 .overlay.show{display:flex}
-.modal{background:var(--panel);border-radius:14px;padding:20px 16px;width:100%;max-width:360px}
+.modal{background:#0c1a2e;border:1px solid var(--border2);border-radius:16px;padding:24px 20px;width:100%;max-width:380px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
 .modal.center{text-align:center}
+.modal h2{font-size:22px;font-weight:800;margin-bottom:6px}
+.modal .sub{color:var(--muted);font-size:14px;margin:0 0 12px}
 .big{font-size:3rem}
-.xpgain{font-size:1.4rem;font-weight:700;color:var(--accent);margin:4px 0}
-.lvlup{color:var(--ok);font-weight:700;margin:4px 0 8px}
-.opt{display:block;width:100%;text-align:left;margin:8px 0;padding:12px}
-.opt strong{display:block;font-size:1rem}
-.opt span{display:block;color:var(--muted);font-size:.85rem;margin-top:2px}
+.xpgain{font:700 1.5rem var(--num);color:var(--yellow);margin:8px 0 4px}
+.lvlup{color:var(--green);font-weight:700;margin:4px 0}
+.endnote{color:var(--muted);font-size:12px;margin:2px 0 8px}
+.opt{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 14px;background:var(--card2);border:1px solid var(--border);border-radius:12px;color:var(--text);cursor:pointer;font:inherit}
+.opt:hover{border-color:var(--sky)}
+.opt strong{display:block;font-size:15px}
+.opt span{display:block;color:var(--muted);font-size:13px;margin-top:3px}
+#codeInput{font:700 1.4rem var(--num);letter-spacing:.3em;text-transform:uppercase;text-align:center}
+
+@media (min-width:880px){
+  .place-wrap{grid-template-columns:minmax(0,1fr) 330px;align-items:start}
+  .game-wrap{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start}
+}
+@media (max-width:879px){
+  .grid.small{width:min(270px,80%)}
+  .small-label{width:min(270px,80%)}
+}
+@media (max-width:760px){
+  .topbar{flex-wrap:wrap;padding:12px}
+  .tabsnav{width:100%;margin-left:0}
+  .tabsnav .btn{flex:1;padding:8px 6px;font-size:13px}
+  .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .panel{padding:20px 16px}
+  .panel h2{font-size:21px}
+}
+@media (max-width:640px){
+  #app{padding:12px 12px 40px}
+  .modes-grid{grid-template-columns:1fr;gap:12px;margin-top:20px}
+  .mode-card{padding:16px;display:grid;grid-template-columns:48px 1fr;column-gap:14px;align-items:center}
+  .mode-ic{margin:0;grid-row:span 2}
+  .mode-card h3{font-size:17px;margin:0 0 3px}
+}
+@media (max-width:520px){
+  .tabsnav .btn span{display:none}
+  .tabsnav .btn{font-size:16px}
+  .code{font-size:2rem}
+}
 </style>
 </head>
 <body>
-<main>
-  <!-- Menu -->
-  <section id="menu" class="screen active">
-    <h1><span class="logo">⚓</span>C02 Naval</h1>
-    <p class="sub">Bataille navale à deux, sur PC ou téléphone.</p>
-    <div id="profileBox"></div>
-    <button id="btnHost" class="primary wide">Créer une partie</button>
-    <div class="sep">ou rejoindre une partie</div>
-    <div class="row">
-      <input id="codeInput" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="CODE" aria-label="Code de la partie">
-      <button id="btnJoin" style="flex:0 0 auto">Rejoindre</button>
+<div id="app">
+
+  <!-- ===== Connexion / création de compte ===== -->
+  <section id="auth" class="view">
+    <div class="auth">
+      <div class="brand">
+        <div class="logo"><i class="fa-solid fa-anchor"></i></div>
+        <h1>C02 Naval</h1>
+        <p data-i18n="tagline"></p>
+      </div>
+      <div class="seg">
+        <button id="segLogin" class="on" data-i18n="tabLogin"></button>
+        <button id="segSignup" data-i18n="tabSignup"></button>
+      </div>
+      <div id="loginPane">
+        <span class="field-label" data-i18n="account"></span>
+        <div id="accPick" class="acc-pick"></div>
+        <label class="field-label" for="loginPass" data-i18n="password"></label>
+        <input id="loginPass" type="password" autocomplete="current-password">
+        <button id="btnLogin" class="btn primary wide" style="margin-top:16px"><i class="fa-solid fa-right-to-bracket"></i><span data-i18n="btnLogin"></span></button>
+      </div>
+      <div id="signupPane" style="display:none">
+        <label class="field-label" for="suName" data-i18n="pseudo"></label>
+        <input id="suName" maxlength="16" autocomplete="username">
+        <label class="field-label" for="suPass" data-i18n="password"></label>
+        <input id="suPass" type="password" autocomplete="new-password">
+        <label class="field-label" for="suPass2" data-i18n="passwordConfirm"></label>
+        <input id="suPass2" type="password" autocomplete="new-password">
+        <button id="btnSignup" class="btn primary wide" style="margin-top:16px"><i class="fa-solid fa-user-plus"></i><span data-i18n="btnSignup"></span></button>
+      </div>
+      <p id="authMsg" class="msg"></p>
+      <button id="btnGuest" class="btn ghost wide" data-i18n="guest"></button>
+      <p class="msg" style="font-size:12px;margin:4px 0 0" data-i18n="localNote"></p>
+      <div class="lang-mini"><select id="langMini" aria-label="Langue / Language"><option value="fr">Français</option><option value="en">English</option></select></div>
     </div>
-    <p id="menuMsg" class="msg"></p>
   </section>
 
-  <!-- Comptes -->
-  <section id="account" class="screen">
-    <h2>Compte</h2>
-    <p class="sub">Ton compte est enregistré dans ce navigateur, sur cet appareil.</p>
-    <div id="accList" class="acclist"></div>
-    <div class="sep">nouveau compte</div>
-    <label class="f" for="nameInput">Pseudo (2 à 16 caractères)</label>
-    <input id="nameInput" maxlength="16" autocomplete="off" style="width:100%" placeholder="Ton pseudo">
-    <label class="f">Avatar</label>
-    <div id="avatarPick" class="avatars"></div>
-    <button id="btnCreate" class="primary wide">Créer le compte</button>
-    <p id="accMsg" class="msg"></p>
-    <button id="btnGuest" class="ghost wide">Jouer en invité (sans XP)</button>
-    <button class="ghost wide" data-back>Retour</button>
-  </section>
+  <!-- ===== Tableau de bord ===== -->
+  <section id="dash" class="view">
+    <header class="topbar">
+      <label id="avUp" class="av-up" title="">
+        <input id="avatarFile" type="file" accept="image/*" hidden>
+        <span id="avImg"><i class="fa-solid fa-camera"></i></span>
+      </label>
+      <div class="who">
+        <div class="who-line"><span id="tbName" class="nm"></span><span id="tbBadge" class="badge"></span></div>
+        <div id="tbXpWrap">
+          <div class="xpbar"><i id="tbXpFill" style="width:0"></i></div>
+          <div class="xprow"><span>XP: <b id="tbXp"></b></span><span id="tbLevel"></span></div>
+        </div>
+      </div>
+      <nav class="tabsnav">
+        <button class="btn on" data-pane="play"><i class="fa-solid fa-crosshairs"></i><span data-i18n="navPlay"></span></button>
+        <button class="btn" data-pane="stats"><i class="fa-solid fa-chart-pie"></i><span data-i18n="navStats"></span></button>
+        <button class="btn" data-pane="settings"><i class="fa-solid fa-gear"></i><span data-i18n="navSettings"></span></button>
+        <button class="btn danger" id="btnLogout"><i class="fa-solid fa-power-off"></i><span data-i18n="navLogout"></span></button>
+      </nav>
+    </header>
 
-  <!-- Statistiques -->
-  <section id="stats" class="screen">
-    <div id="statsProfile"></div>
-    <div id="statsGrid" class="stats"></div>
-    <button class="primary wide" data-back>Retour</button>
-    <button id="btnDelete" class="danger wide">Supprimer ce compte</button>
-  </section>
-
-  <!-- Salon -->
-  <section id="lobby" class="screen">
-    <h2>Salon d'attente</h2>
-    <p class="sub">Donne ce code à ton adversaire :</p>
-    <div id="codeBox" class="code">······</div>
-    <button id="btnCopy" class="wide">Copier le code</button>
-    <p id="lobbyMsg" class="msg"></p>
-    <button class="ghost wide" onclick="location.reload()">Annuler</button>
-  </section>
-
-  <!-- Placement -->
-  <section id="place" class="screen">
-    <h2>Place ta flotte</h2>
-    <p id="placeVs" class="versus"></p>
-    <p class="sub">Touche une case pour voir le bateau, touche-le à nouveau pour le poser.<br>Fais glisser un bateau posé pour le déplacer.</p>
-    <div id="shipList" class="ships"></div>
-    <div class="tools">
-      <button id="btnRotate">⟳ Pivoter</button>
-      <button id="btnRandom">🎲 Aléatoire</button>
-      <button id="btnClear">🧹 Effacer</button>
+    <div id="pane-play" class="pane active">
+      <div class="modes-grid">
+        <button class="mode-card" id="mRandom"><span class="mode-ic ic-cyan"><i class="fa-solid fa-shuffle"></i></span><h3 data-i18n="mRandomT"></h3><p data-i18n="mRandomD"></p></button>
+        <button class="mode-card" id="mBot"><span class="mode-ic ic-green"><i class="fa-solid fa-robot"></i></span><h3 data-i18n="mBotT"></h3><p data-i18n="mBotD"></p></button>
+        <button class="mode-card" id="mJoin"><span class="mode-ic ic-yellow"><i class="fa-solid fa-right-to-bracket"></i></span><h3 data-i18n="mJoinT"></h3><p data-i18n="mJoinD"></p></button>
+        <button class="mode-card" id="mHost"><span class="mode-ic ic-purple"><i class="fa-solid fa-tower-broadcast"></i></span><h3 data-i18n="mHostT"></h3><p data-i18n="mHostD"></p></button>
+      </div>
+      <p id="dashMsg" class="msg"></p>
     </div>
-    <div id="placeGrid" class="grid"></div>
-    <div class="row">
-      <button id="btnConfirm" class="ok-btn">✓ Poser</button>
-      <button id="btnRemove">✕ Retirer</button>
+
+    <div id="pane-stats" class="pane">
+      <div class="panel">
+        <h2><i class="fa-solid fa-chart-line"></i><span data-i18n="statsTitle"></span></h2>
+        <div id="careerGrid" class="stat-grid"></div>
+        <h3 class="sub" data-i18n="combatTitle"></h3>
+        <div id="combatGrid" class="stat-grid"></div>
+        <p id="statsGuest" class="msg" data-i18n="guestStats"></p>
+      </div>
     </div>
-    <p id="placeMsg" class="msg"></p>
-    <button id="btnReady" class="primary wide" disabled>Prêt</button>
+
+    <div id="pane-settings" class="pane">
+      <div class="panel">
+        <h2><i class="fa-solid fa-sliders"></i><span data-i18n="setTitle"></span></h2>
+        <div class="set-row">
+          <i class="fa-solid fa-volume-high"></i>
+          <div><b data-i18n="sndT"></b><small data-i18n="sndD"></small></div>
+          <button id="sndToggle" class="toggle on">ON</button>
+        </div>
+        <div class="set-block">
+          <b data-i18n="langT"></b><small data-i18n="langD"></small>
+          <select id="langSel"><option value="fr">Français</option><option value="en">English</option></select>
+        </div>
+        <div id="acctSettings">
+          <div class="set-block">
+            <b><i class="fa-solid fa-image"></i><span data-i18n="photoT"></span></b><small data-i18n="photoD"></small>
+            <div class="row" style="margin-top:12px">
+              <button id="btnPhoto" class="btn"><i class="fa-solid fa-camera"></i><span data-i18n="photoChange"></span></button>
+              <button id="btnPhotoDel" class="btn"><i class="fa-solid fa-xmark"></i><span data-i18n="photoRemove"></span></button>
+            </div>
+          </div>
+          <div class="set-block">
+            <b><i class="fa-solid fa-user-shield"></i><span data-i18n="editT"></span></b>
+            <label class="field-label" for="editName" data-i18n="newPseudo"></label>
+            <input id="editName" maxlength="16" autocomplete="username">
+            <label class="field-label" for="editPass" data-i18n="newPass"></label>
+            <input id="editPass" type="password" autocomplete="new-password" placeholder="••••••••">
+            <button id="btnSaveProfile" class="btn grad wide" style="margin-top:16px" data-i18n="save"></button>
+            <p id="setMsg" class="msg"></p>
+          </div>
+          <div class="set-row">
+            <i class="fa-solid fa-trash-can" style="color:var(--red)"></i>
+            <div><b data-i18n="deleteT"></b><small data-i18n="deleteD"></small></div>
+            <button id="btnDelete" class="btn danger sm" style="margin-left:auto" data-i18n="deleteBtn"></button>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <!-- Partie -->
-  <section id="game" class="screen">
+  <!-- ===== Salon : privé ou recherche aléatoire ===== -->
+  <section id="lobby" class="view">
+    <div class="lobby-card">
+      <div id="lobbyIcon" class="mode-ic ic-purple" style="margin:0 auto"><i class="fa-solid fa-tower-broadcast"></i></div>
+      <h2 id="lobbyTitle"></h2>
+      <p id="lobbyDesc" class="muted" style="margin:0"></p>
+      <div id="hostBox">
+        <div id="codeBox" class="code">······</div>
+        <div class="row">
+          <button id="btnCopy" class="btn"><i class="fa-regular fa-copy"></i><span data-i18n="copyCode"></span></button>
+          <button id="btnCopyLink" class="btn"><i class="fa-solid fa-link"></i><span data-i18n="copyLink"></span></button>
+        </div>
+      </div>
+      <div class="spin"></div>
+      <p id="lobbyMsg" class="msg"></p>
+      <div id="lobbyCount" class="count"></div>
+      <button class="btn ghost wide" style="margin-top:10px" onclick="location.reload()" data-i18n="cancel"></button>
+    </div>
+  </section>
+
+  <!-- ===== Placement ===== -->
+  <section id="place" class="view">
+    <div class="ghead">
+      <div id="placeVs" class="vs"></div>
+      <button class="btn ghost sm btnQuit"><i class="fa-solid fa-door-open"></i><span data-i18n="quit"></span></button>
+    </div>
+    <div class="place-wrap">
+      <div class="card">
+        <div id="placeGrid" class="grid"></div>
+      </div>
+      <div class="card place-side">
+        <h2 data-i18n="placeTitle"></h2>
+        <p class="help" data-i18n="placeHelp"></p>
+        <div id="shipList" class="ships"></div>
+        <div class="tools">
+          <button id="btnRotate" class="btn"><i class="fa-solid fa-rotate"></i><span id="rotLbl"></span></button>
+          <button id="btnRandom" class="btn"><i class="fa-solid fa-dice"></i><span data-i18n="random"></span></button>
+          <button id="btnClear" class="btn"><i class="fa-solid fa-broom"></i><span data-i18n="clear"></span></button>
+        </div>
+        <div class="row">
+          <button id="btnConfirm" class="btn ok"><i class="fa-solid fa-check"></i><span data-i18n="confirm"></span></button>
+          <button id="btnRemove" class="btn"><i class="fa-solid fa-xmark"></i><span data-i18n="remove"></span></button>
+        </div>
+        <p id="placeMsg" class="msg"></p>
+        <button id="btnReady" class="btn primary wide" disabled><i class="fa-solid fa-flag-checkered"></i><span data-i18n="ready"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Partie ===== -->
+  <section id="game" class="view">
+    <div class="ghead">
+      <div id="gameVs" class="vs"></div>
+      <button class="btn ghost sm btnQuit"><i class="fa-solid fa-door-open"></i><span data-i18n="quit"></span></button>
+    </div>
     <div id="status" class="status"></div>
-    <p id="gameVs" class="versus"></p>
-    <div class="label"><span id="enemyLabel">Grille adverse</span><span id="enemyFleet" class="fleet"></span></div>
-    <div id="enemyGrid" class="grid"></div>
-    <div id="modes" class="modes">
-      <button data-mode="shot"><span class="ic">🎯</span>Tir</button>
-      <button data-mode="radar"><span class="ic">📡</span>Radar<b></b></button>
-      <button data-mode="cross"><span class="ic">✚</span>Croix<b></b></button>
-      <button data-mode="shield"><span class="ic">🛡️</span>Bouclier<b></b></button>
+    <div class="game-wrap">
+      <div class="card">
+        <div class="glabel"><span id="enemyLabel"></span><span id="enemyFleet" class="fleet"></span></div>
+        <div id="enemyGrid" class="grid"></div>
+      </div>
+      <div class="card">
+        <div class="glabel small-label"><span data-i18n="myFleet"></span></div>
+        <div id="myGrid" class="grid small"></div>
+        <div id="modes" class="modes">
+          <button data-mode="shot"><i class="ic fa-solid fa-crosshairs"></i><span data-i18n="modeShot"></span></button>
+          <button data-mode="radar"><i class="ic fa-solid fa-satellite-dish"></i><span data-i18n="modeRadar"></span><b></b></button>
+          <button data-mode="cross"><i class="ic fa-solid fa-plus"></i><span data-i18n="modeCross"></span><b></b></button>
+          <button data-mode="shield"><i class="ic fa-solid fa-shield-halved"></i><span data-i18n="modeShield"></span><b></b></button>
+        </div>
+        <p id="hint" class="hint"></p>
+        <p id="log" class="log"></p>
+      </div>
     </div>
-    <p id="hint" class="hint"></p>
-    <p id="log" class="log"></p>
-    <div class="label"><span>Ta flotte</span></div>
-    <div id="myGrid" class="grid small"></div>
   </section>
-</main>
+</div>
 
+<!-- Rejoindre -->
+<div id="joinModal" class="overlay">
+  <div class="modal">
+    <div class="mode-ic ic-yellow" style="margin:0 0 14px"><i class="fa-solid fa-right-to-bracket"></i></div>
+    <h2 data-i18n="mJoinT"></h2>
+    <p class="sub" data-i18n="mJoinD"></p>
+    <input id="codeInput" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="CODE">
+    <p id="joinMsg" class="msg"></p>
+    <button id="btnJoin" class="btn primary wide" data-i18n="btnJoin"></button>
+    <button id="btnJoinCancel" class="btn ghost wide" data-i18n="cancel"></button>
+  </div>
+</div>
+
+<!-- Choix d'amélioration -->
 <div id="choice" class="overlay">
   <div class="modal">
-    <h2>Bateau ennemi coulé !</h2>
+    <h2 data-i18n="choiceTitle"></h2>
     <p id="choiceSub" class="sub"></p>
     <div id="choiceList"></div>
   </div>
 </div>
 
+<!-- Fin de partie -->
 <div id="end" class="overlay">
   <div class="modal center">
     <div id="endIcon" class="big"></div>
     <h2 id="endTitle"></h2>
     <p id="endText" class="sub"></p>
     <div id="endXp"></div>
-    <button class="primary wide" onclick="location.reload()">Nouvelle partie</button>
-    <button id="btnSeeGrids" class="ghost wide">Voir les grilles</button>
+    <button class="btn primary wide" style="margin-top:12px" onclick="location.reload()" data-i18n="newGame"></button>
+    <button id="btnSeeGrids" class="btn ghost wide" data-i18n="seeGrids"></button>
   </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 'use strict';
+/* =========================================================
+   Textes (français / anglais)
+   ========================================================= */
+const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+const I18N = {
+  fr: {
+    tagline: 'Bataille navale à deux, sur PC ou téléphone.',
+    tabLogin: 'Connexion', tabSignup: 'Créer un compte', account: 'Compte', password: 'Mot de passe',
+    passwordConfirm: 'Confirmer le mot de passe', pseudo: 'Pseudo (2 à 16 caractères)', btnLogin: 'Se connecter',
+    btnSignup: 'Créer le compte', guest: 'Jouer en invité (sans XP)',
+    localNote: 'Les comptes sont enregistrés dans ce navigateur, sur cet appareil.',
+    noAccounts: 'Aucun compte sur cet appareil : crée le tien !',
+    navPlay: 'Jouer', navStats: 'Statistiques', navSettings: 'Paramètres', navLogout: 'Déconnexion',
+    badge: 'NIV {n}', levelN: 'Niveau {n}', guestName: 'Invité', levelShort: 'niv. {n}',
+    mRandomT: 'Adversaire aléatoire', mRandomD: 'Affrontez un joueur en ligne au hasard (Bot après 45s).',
+    mBotT: 'Partie contre un bot', mBotD: "Entraînez-vous immédiatement contre l'IA tactique.",
+    mJoinT: 'Rejoindre une partie', mJoinD: 'Entrez un code de session unique pour rejoindre un ami.',
+    mHostT: 'Hôte', mHostD: 'Créez un salon privé et partagez votre code de session.',
+    statsTitle: 'Statistiques de carrière', combatTitle: 'Combat',
+    stTime: 'Temps joué', stGames: 'Parties faites', stWins: 'Victoires', stLosses: 'Défaites',
+    stWinPct: '% Victoire', stLossPct: '% Défaite', stWinRate: 'Taux de victoire', stLossRate: 'Taux de défaite',
+    stShots: 'Tirs', stAcc: 'Précision', stSunk: 'Bateaux coulés', stUpg: 'Améliorations utilisées',
+    stStreak: 'Série en cours', stBest: 'Meilleure série', stFast: 'Victoire la plus rapide', stInt: 'Parties interrompues',
+    shotsN: '{n} tirs', guestStats: 'Crée un compte pour suivre tes statistiques.',
+    setTitle: 'Paramètres', sndT: 'Effets sonores', sndD: 'Activer ou désactiver les bruitages navals',
+    langT: 'Langue du jeu', langD: "Traduction intégrale de l'interface",
+    photoT: 'Photo de profil', photoD: "Touche aussi l'avatar en haut à gauche pour la changer.",
+    photoChange: 'Changer la photo', photoRemove: 'Retirer',
+    editT: 'Modifier le pseudo et/ou le mot de passe', newPseudo: 'Nouveau pseudo',
+    newPass: 'Nouveau mot de passe (laisser vide pour conserver)', save: 'Enregistrer les modifications',
+    saved: 'Modifications enregistrées.', nothingChanged: 'Aucune modification.',
+    deleteT: 'Supprimer le compte', deleteD: 'Efface le compte, son XP et ses statistiques.', deleteBtn: 'Supprimer',
+    deleteConfirm: 'Supprimer définitivement le compte « {name} », son XP et ses statistiques ?',
+    errPseudoLen: 'Le pseudo doit faire entre 2 et 16 caractères.', errPseudoTaken: 'Ce pseudo existe déjà sur cet appareil.',
+    errPassLen: 'Le mot de passe doit faire au moins 4 caractères.', errPassMatch: 'Les mots de passe ne correspondent pas.',
+    errPassWrong: 'Mot de passe incorrect.', errPickAcc: 'Choisis un compte.',
+    errNoCrypto: "Ce navigateur ne peut pas protéger le mot de passe : ouvre le jeu en https (ou sur localhost).",
+    errStorage: "Ce navigateur bloque l'enregistrement : le compte ne sera pas sauvegardé.",
+    errPhoto: 'Image illisible.', noPassHint: "Ce compte n'a pas de mot de passe : ajoute-en un dans Paramètres.",
+    btnJoin: 'Rejoindre', cancel: 'Annuler', connecting: 'Connexion…',
+    errCodeLen: 'Le code doit contenir 6 caractères.', errCodeChars: 'Code invalide : lettres A–Z (sauf I et O) et chiffres 2–9.',
+    errNoGame: 'Aucune partie avec ce code', errFull: 'Cette partie est déjà complète.',
+    errJoinTimeout: 'Connexion impossible. Le réseau bloque peut-être la liaison directe.',
+    errPeerLib: 'Impossible de charger PeerJS. Vérifie ta connexion Internet.',
+    errBrowser: 'Ce navigateur ne permet pas le jeu en réseau (WebRTC).',
+    errNet: 'Impossible de joindre le service de mise en relation. Vérifie ta connexion.', errNetOther: 'Erreur réseau ({type}).',
+    lobbyHostT: 'Salon privé', lobbyHostD: 'Donne ce code à ton adversaire :', copyCode: 'Copier le code', copyLink: 'Copier le lien',
+    copied: 'Copié !', copyFail: 'Copie impossible : note le code à la main.', creating: 'Création de la partie…',
+    waitingOpp: "En attente d'un adversaire…", reconnecting: 'Reconnexion au service de mise en relation…',
+    lobbyRandomT: "Recherche d'un adversaire", lobbyRandomD: 'Un joueur en ligne au hasard. Sinon, le bot prendra sa place.',
+    searching: 'Recherche en cours…', countdown: 'Bot dans {s} s', noOneFound: 'Aucun joueur trouvé : place au bot !',
+    placeTitle: 'Place ta flotte',
+    placeHelp: 'Touche une case pour voir le bateau, touche-le à nouveau pour le poser. Fais glisser un bateau posé pour le déplacer. Raccourcis : R pivote, Entrée pose, Suppr retire.',
+    rotH: 'Pivoter ↔', rotV: 'Pivoter ↕', random: 'Aléatoire', clear: 'Effacer', confirm: 'Poser', remove: 'Retirer', ready: 'Prêt',
+    pSelPlaced: '{ship} sélectionné : fais-le glisser, pivote-le ou retire-le.', pSelNew: '{ship} : touche une case de départ.',
+    pBad: 'Placement impossible : le bateau dépasse de la grille ou chevauche un autre bateau.',
+    pPlacedNext: '{ship} posé. Au tour du {next}.', pDone: 'Flotte complète ! Appuie sur Prêt.',
+    pAllPlaced: 'Toute la flotte est posée. Touche un bateau pour le modifier.',
+    pTapGhost: 'Touche le bateau vert (ou « Poser ») pour le valider.',
+    pNoFit: 'Ici le bateau ne rentre pas : pivote-le ou choisis une autre case.', pBlocked: 'Position bloquée par un autre bateau.',
+    pRemoved: '{ship} retiré.', pCleared: 'Grille vidée.', pRandom: 'Flotte placée au hasard. Tu peux encore déplacer les bateaux.',
+    pRelease: 'Relâche pour poser.', pNotHere: 'Impossible ici.', pRestored: 'Placement impossible : {ship} remis à sa place.',
+    waitOppReady: "Flotte prête. En attente de l'adversaire…", oppReady: "L'adversaire est prêt.",
+    oppAway: "L'adversaire a quitté l'écran du jeu… (2 min max)",
+    ship0: 'Porte-avions', ship1: 'Croiseur', ship2: 'Contre-torpilleur', ship3: 'Sous-marin', ship4: 'Torpilleur',
+    stMyTurn: 'À toi de jouer', stOppTurn: "Tour de l'adversaire", stFiring: 'Tir en cours', stOver: 'Partie terminée', stLost: 'Connexion perdue',
+    enemyGrid: 'Grille de {name}', myFleet: 'Ta flotte',
+    modeShot: 'Tir', modeRadar: 'Radar', modeCross: 'Croix', modeShield: 'Bouclier',
+    hintShot: 'Touche une case de la grille adverse pour tirer.', hintRadar: 'Radar : touche le coin haut-gauche de la zone 2 × 2 à scanner.',
+    hintCross: 'Frappe en croix : touche la case centrale.', hintShield: 'Bouclier : touche un de tes bateaux dans ta flotte.',
+    fWaitTurn: 'Attends ton tour.', fFiring: 'Tir en cours…', fShieldHere: 'Pour le bouclier, touche un bateau de ta flotte.',
+    fAlready: 'Case déjà visée.', fNoUnknown: 'Aucune case inconnue dans cette zone.', fAllKnown: 'Toutes ces cases sont déjà connues.',
+    fTouchShip: 'Touche une case occupée par un de tes bateaux.', fShipSunk: 'Ce bateau est déjà coulé.', fHasShield: 'Ce bateau a déjà reçu un bouclier.',
+    shieldPlaced: 'Bouclier posé sur ton {ship}.', oppShield: '{name} — bouclier posé sur un de ses bateaux.',
+    startHost: 'La partie commence : tu joues en premier.', startGuest: "La partie commence : l'adversaire joue en premier.",
+    oppPrefix: '{name} — ',
+    sumRadar: p => `Radar en ${p.cell} : ${pl(p.n, 'case occupée', 'cases occupées')} sur ${p.total}.`,
+    sumShot: p => `Tir en ${p.cell} : ${{ miss: 'raté.', hit: 'touché !', blocked: 'bloqué par un bouclier.', sunk: `coulé ! (${p.ship})` }[p.v] || ''}`,
+    sumCross: p => `Frappe en croix sur ${p.cell} : ${pl(p.hits, 'touché', 'touchés')}, ${pl(p.miss, 'raté', 'ratés')}${p.blk ? ', ' + pl(p.blk, 'bloqué', 'bloqués') : ''}.${p.sunk ? ` ${p.sunk} coulé${p.sunkN > 1 ? 's' : ''} !` : ''}`,
+    and: ' et ',
+    upRadarN: 'Radar', upRadarD: 'Scanne une zone 2 × 2 à partir de la case visée. Coûte le tour.',
+    upCrossN: 'Frappe en croix', upCrossD: 'Tire sur la case visée et ses 4 voisines. Coûte le tour.',
+    upShieldN: 'Bouclier', upShieldD: 'Le premier coup sur un de tes bateaux est annulé. Coûte le tour, sans tir.',
+    choiceTitle: 'Bateau ennemi coulé !', choiceSub: 'Choisis une amélioration :', choiceSubN: 'Choisis une amélioration ({n} à choisir) :',
+    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', loseText: 'Toute ta flotte a été coulée.',
+    endStats: p => `${pl(p.shots, 'tir', 'tirs')}, ${p.acc} % de précision.`,
+    lostTitle: 'Connexion perdue', lostText: "La liaison avec l'adversaire est coupée. La partie est arrêtée.",
+    newGame: 'Nouvelle partie', seeGrids: 'Voir les grilles', xpGuest: "Joue avec un compte pour gagner de l'XP.",
+    levelUp: 'Niveau {n} : {rank} !', botXp: "XP réduite de moitié contre le bot.",
+    quit: 'Quitter', quitConfirm: 'Quitter la partie ? Elle sera comptée comme interrompue.',
+    botName: 'Bot tactique', vs: 'contre', welcome: 'Bienvenue, {name} !',
+    ranks: ['Mousse', 'Matelot', 'Quartier-maître', 'Second-maître', 'Maître', 'Enseigne', 'Lieutenant',
+      'Capitaine de corvette', 'Capitaine de frégate', 'Capitaine de vaisseau', 'Amiral'],
+  },
+  en: {
+    tagline: 'Two-player naval battle, on PC or phone.',
+    tabLogin: 'Log in', tabSignup: 'Sign up', account: 'Account', password: 'Password',
+    passwordConfirm: 'Confirm password', pseudo: 'Username (2 to 16 characters)', btnLogin: 'Log in',
+    btnSignup: 'Create account', guest: 'Play as guest (no XP)',
+    localNote: 'Accounts are stored in this browser, on this device.',
+    noAccounts: 'No account on this device yet: create yours!',
+    navPlay: 'Play', navStats: 'Statistics', navSettings: 'Settings', navLogout: 'Log out',
+    badge: 'LVL {n}', levelN: 'Level {n}', guestName: 'Guest', levelShort: 'lvl {n}',
+    mRandomT: 'Random opponent', mRandomD: 'Face a random online player (bot after 45s).',
+    mBotT: 'Play against a bot', mBotD: 'Train right away against the tactical AI.',
+    mJoinT: 'Join a game', mJoinD: "Enter a unique session code to join a friend.",
+    mHostT: 'Host', mHostD: 'Create a private room and share your session code.',
+    statsTitle: 'Career statistics', combatTitle: 'Combat',
+    stTime: 'Time played', stGames: 'Games played', stWins: 'Wins', stLosses: 'Losses',
+    stWinPct: 'Win %', stLossPct: 'Loss %', stWinRate: 'Win rate', stLossRate: 'Loss rate',
+    stShots: 'Shots', stAcc: 'Accuracy', stSunk: 'Ships sunk', stUpg: 'Upgrades used',
+    stStreak: 'Current streak', stBest: 'Best streak', stFast: 'Fastest win', stInt: 'Interrupted games',
+    shotsN: '{n} shots', guestStats: 'Create an account to track your statistics.',
+    setTitle: 'Settings', sndT: 'Sound effects', sndD: 'Turn naval sound effects on or off',
+    langT: 'Game language', langD: 'Full interface translation',
+    photoT: 'Profile picture', photoD: 'You can also tap the avatar at the top left to change it.',
+    photoChange: 'Change picture', photoRemove: 'Remove',
+    editT: 'Change username and/or password', newPseudo: 'New username',
+    newPass: 'New password (leave empty to keep)', save: 'Save changes',
+    saved: 'Changes saved.', nothingChanged: 'Nothing to change.',
+    deleteT: 'Delete account', deleteD: 'Erases the account, its XP and statistics.', deleteBtn: 'Delete',
+    deleteConfirm: 'Permanently delete the account "{name}", its XP and statistics?',
+    errPseudoLen: 'Username must be 2 to 16 characters long.', errPseudoTaken: 'This username already exists on this device.',
+    errPassLen: 'Password must be at least 4 characters long.', errPassMatch: 'Passwords do not match.',
+    errPassWrong: 'Wrong password.', errPickAcc: 'Pick an account.',
+    errNoCrypto: 'This browser cannot protect the password: open the game over https (or on localhost).',
+    errStorage: 'This browser blocks storage: the account will not be saved.',
+    errPhoto: 'Unreadable image.', noPassHint: 'This account has no password: add one in Settings.',
+    btnJoin: 'Join', cancel: 'Cancel', connecting: 'Connecting…',
+    errCodeLen: 'The code must be 6 characters long.', errCodeChars: 'Invalid code: letters A–Z (except I and O) and digits 2–9.',
+    errNoGame: 'No game with this code', errFull: 'This game is already full.',
+    errJoinTimeout: 'Cannot connect. The network may be blocking direct connections.',
+    errPeerLib: 'Could not load PeerJS. Check your Internet connection.',
+    errBrowser: 'This browser does not support online play (WebRTC).',
+    errNet: 'Cannot reach the matchmaking service. Check your connection.', errNetOther: 'Network error ({type}).',
+    lobbyHostT: 'Private room', lobbyHostD: 'Give this code to your opponent:', copyCode: 'Copy code', copyLink: 'Copy link',
+    copied: 'Copied!', copyFail: 'Cannot copy: write the code down.', creating: 'Creating the game…',
+    waitingOpp: 'Waiting for an opponent…', reconnecting: 'Reconnecting to the matchmaking service…',
+    lobbyRandomT: 'Looking for an opponent', lobbyRandomD: 'A random online player. Otherwise, the bot takes over.',
+    searching: 'Searching…', countdown: 'Bot in {s}s', noOneFound: 'No player found: here comes the bot!',
+    placeTitle: 'Deploy your fleet',
+    placeHelp: 'Tap a square to preview the ship, tap it again to place it. Drag a placed ship to move it. Shortcuts: R rotates, Enter places, Del removes.',
+    rotH: 'Rotate ↔', rotV: 'Rotate ↕', random: 'Random', clear: 'Clear', confirm: 'Place', remove: 'Remove', ready: 'Ready',
+    pSelPlaced: '{ship} selected: drag it, rotate it or remove it.', pSelNew: '{ship}: tap a starting square.',
+    pBad: 'Cannot place: the ship goes off the grid or overlaps another ship.',
+    pPlacedNext: '{ship} placed. Next: {next}.', pDone: 'Fleet complete! Press Ready.',
+    pAllPlaced: 'The whole fleet is placed. Tap a ship to change it.',
+    pTapGhost: 'Tap the green ship (or "Place") to confirm.',
+    pNoFit: 'The ship does not fit here: rotate it or pick another square.', pBlocked: 'Blocked by another ship.',
+    pRemoved: '{ship} removed.', pCleared: 'Grid cleared.', pRandom: 'Fleet placed at random. You can still move the ships.',
+    pRelease: 'Release to place.', pNotHere: 'Not here.', pRestored: 'Cannot place: {ship} put back.',
+    waitOppReady: 'Fleet ready. Waiting for the opponent…', oppReady: 'The opponent is ready.',
+    oppAway: 'The opponent left the game screen… (2 min max)',
+    ship0: 'Carrier', ship1: 'Battleship', ship2: 'Destroyer', ship3: 'Submarine', ship4: 'Patrol boat',
+    stMyTurn: 'Your turn', stOppTurn: "Opponent's turn", stFiring: 'Firing…', stOver: 'Game over', stLost: 'Connection lost',
+    enemyGrid: "{name}'s grid", myFleet: 'Your fleet',
+    modeShot: 'Shot', modeRadar: 'Radar', modeCross: 'Cross', modeShield: 'Shield',
+    hintShot: "Tap a square on the enemy grid to fire.", hintRadar: 'Radar: tap the top-left square of the 2 × 2 area to scan.',
+    hintCross: 'Cross strike: tap the center square.', hintShield: 'Shield: tap one of your ships in your fleet.',
+    fWaitTurn: 'Wait for your turn.', fFiring: 'Firing…', fShieldHere: 'For the shield, tap a ship in your fleet.',
+    fAlready: 'Square already targeted.', fNoUnknown: 'No unknown square in this area.', fAllKnown: 'All these squares are already known.',
+    fTouchShip: 'Tap a square holding one of your ships.', fShipSunk: 'This ship is already sunk.', fHasShield: 'This ship already got a shield.',
+    shieldPlaced: 'Shield placed on your {ship}.', oppShield: '{name} — shielded one of their ships.',
+    startHost: 'The game starts: you fire first.', startGuest: 'The game starts: your opponent fires first.',
+    oppPrefix: '{name} — ',
+    sumRadar: p => `Radar at ${p.cell}: ${p.n} of ${p.total} square${p.total > 1 ? 's' : ''} occupied.`,
+    sumShot: p => `Shot at ${p.cell}: ${{ miss: 'miss.', hit: 'hit!', blocked: 'blocked by a shield.', sunk: `sunk! (${p.ship})` }[p.v] || ''}`,
+    sumCross: p => `Cross strike at ${p.cell}: ${pl(p.hits, 'hit', 'hits')}, ${pl(p.miss, 'miss', 'misses')}${p.blk ? ', ' + p.blk + ' blocked' : ''}.${p.sunk ? ` ${p.sunk} sunk!` : ''}`,
+    and: ' and ',
+    upRadarN: 'Radar', upRadarD: 'Scans a 2 × 2 area from the targeted square. Costs your turn.',
+    upCrossN: 'Cross strike', upCrossD: 'Fires at the targeted square and its 4 neighbours. Costs your turn.',
+    upShieldN: 'Shield', upShieldD: 'The first hit on one of your ships is cancelled. Costs your turn, no shot.',
+    choiceTitle: 'Enemy ship sunk!', choiceSub: 'Pick an upgrade:', choiceSubN: 'Pick an upgrade ({n} to pick):',
+    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', loseText: 'Your whole fleet was sunk.',
+    endStats: p => `${pl(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
+    lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
+    newGame: 'New game', seeGrids: 'View grids', xpGuest: 'Play with an account to earn XP.',
+    levelUp: 'Level {n}: {rank}!', botXp: 'XP halved against the bot.',
+    quit: 'Quit', quitConfirm: 'Quit the game? It will count as interrupted.',
+    botName: 'Tactical bot', vs: 'vs', welcome: 'Welcome, {name}!',
+    ranks: ['Cabin boy', 'Sailor', 'Leading seaman', 'Petty officer', 'Chief petty officer', 'Ensign', 'Lieutenant',
+      'Lieutenant commander', 'Commander', 'Captain', 'Admiral'],
+  },
+};
+const SETTINGS_KEY = 'c02naval.v1.settings';
+const settings = { sound: true, lang: (navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en' };
+try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) {}
+if (!I18N[settings.lang]) settings.lang = 'fr';
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+function t(key, p = {}) {
+  let v = I18N[settings.lang][key];
+  if (v === undefined) v = I18N.fr[key];
+  if (v === undefined) return key;
+  if (typeof v === 'function') return v(p);
+  if (typeof v !== 'string') return v;
+  return v.replace(/\{(\w+)\}/g, (_, k) => (p[k] !== undefined ? p[k] : ''));
+}
+function applyLang() {
+  document.documentElement.lang = settings.lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $('langSel').value = $('langMini').value = settings.lang;
+}
+
+/* =========================================================
+   Constantes du jeu et état
+   ========================================================= */
 const N = 10;
 const ROWS = 'ABCDEFGHIJ';
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PREFIX = 'c02-naval-v1-';
-const FLEET = [['Porte-avions', 5], ['Croiseur', 4], ['Contre-torpilleur', 3], ['Sous-marin', 3], ['Torpilleur', 2]];
-const UPG = {
-  radar:  { name: 'Radar',           icon: '📡', desc: 'Scanne une zone 2 × 2 à partir de la case visée. Coûte le tour.' },
-  cross:  { name: 'Frappe en croix', icon: '✚',  desc: 'Tire sur la case visée et ses 4 voisines. Coûte le tour.' },
-  shield: { name: 'Bouclier',        icon: '🛡️', desc: 'Le premier coup sur un de tes bateaux est annulé. Coûte le tour, sans tir.' },
-};
-const HINTS = {
-  shot: 'Touche une case de la grille adverse pour tirer.',
-  radar: 'Radar : touche le coin haut-gauche de la zone 2 × 2 à scanner.',
-  cross: 'Frappe en croix : touche la case centrale.',
-  shield: 'Bouclier : touche un de tes bateaux dans la grille du bas.',
-};
+const MM_PREFIX = 'c02-naval-mm-v1-', MM_SLOTS = 6, MM_WAIT_MS = 45000;
+const LENS = [5, 4, 3, 3, 2];
+const shipName = i => t('ship' + i);
 const HEARTBEAT_MS = 2000, TIMEOUT_MS = 20000, AWAY_TIMEOUT_MS = 120000, JOIN_TIMEOUT_MS = 15000;
 
 /* Serveurs utilisés pour établir la liaison entre les deux appareils.
@@ -282,39 +721,69 @@ const PEER_OPTS = { debug: 0, config: { iceServers: ICE_SERVERS, sdpSemantics: '
 
 const $ = id => document.getElementById(id);
 const S = {
-  peer: null, conn: null, connected: false, isHost: false, code: '', phase: 'menu', lost: false,
-  ships: FLEET.map(([name, len]) => ({ name, len, cells: null, shield: 'none' })),
+  kind: null,                          // 'host' | 'join' | 'random' | 'bot'
+  peer: null, conn: null, connected: false, isHost: false, code: '', phase: 'menu', lost: false, vsBot: false, bot: null,
+  ships: LENS.map((len, i) => ({ i, len, cells: null, shield: 'none' })),
   sel: 0, horiz: true, preview: null, lifted: null, drag: null,
   meReady: false, oppReady: false, myTurn: false, waiting: false, mode: 'shot',
   enemy: Array(N * N).fill(null),     // null | miss | hit | sunk | blocked | scanOcc | scanEmpty
   incoming: Array(N * N).fill(null),  // null | miss | hit | blocked
-  enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0,
+  enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
   lastSeen: 0, hb: null, joinTimer: null, pendingAct: null, oppAway: false, wakeLock: null,
-  opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0 },
+  mmTimer: null, mmStopped: false, onReject: null,
+  opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
 };
 
 /* ---------- Outils ---------- */
 const cellName = (r, c) => ROWS[r] + (c + 1);
 const inside = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
-const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-function show(id) { document.querySelectorAll('.screen').forEach(e => e.classList.toggle('active', e.id === id)); window.scrollTo(0, 0); }
-function msg(el, text, err) { const e = $(el); e.textContent = text || ''; e.classList.toggle('err', !!err); }
+const validPhoto = p => typeof p === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p) && p.length < 90000;
+function showView(id) { document.querySelectorAll('.view').forEach(e => e.classList.toggle('active', e.id === id)); window.scrollTo(0, 0); }
+function msg(el, text, kind) { const e = $(el); e.textContent = text || ''; e.className = 'msg' + (kind === true ? ' err' : kind ? ' ' + kind : ''); }
 function genCode() {
   const a = new Uint32Array(6); crypto.getRandomValues(a);
   return Array.from(a, x => ALPHA[x % ALPHA.length]).join('');
 }
-function occupancy() {
+function occOf(ships) {
   const m = Array(N * N).fill(-1);
-  S.ships.forEach((s, i) => s.cells && s.cells.forEach(([r, c]) => { m[r * N + c] = i; }));
+  ships.forEach((s, i) => s.cells && s.cells.forEach(([r, c]) => { m[r * N + c] = i; }));
   return m;
 }
-const isSunk = s => s.cells && s.cells.every(([r, c]) => S.incoming[r * N + c] === 'hit');
+const occupancy = () => occOf(S.ships);
+const sunkOf = (s, incoming) => !!s.cells && s.cells.every(([r, c]) => incoming[r * N + c] === 'hit');
+const isSunk = s => sunkOf(s, S.incoming);
 const targetable = k => S.enemy[k] === null || S.enemy[k] === 'scanOcc' || S.enemy[k] === 'scanEmpty' || S.enemy[k] === 'blocked';
+function randomCells(lens) {
+  const ships = lens.map(len => ({ len, cells: null }));
+  for (const s of ships) {
+    for (let tries = 0; tries < 3000 && !s.cells; tries++) {
+      const occ = occOf(ships), h = Math.random() < 0.5;
+      const r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N), cells = [];
+      for (let i = 0; i < s.len; i++) {
+        const rr = r + (h ? 0 : i), cc = c + (h ? i : 0);
+        if (!inside(rr, cc) || occ[rr * N + cc] !== -1) break;
+        cells.push([rr, cc]);
+      }
+      if (cells.length === s.len) s.cells = cells;
+    }
+  }
+  return ships.map(s => s.cells);
+}
+function avatarHTML(photo, name) {
+  if (validPhoto(photo)) return `<span class="mini-av"><img src="${photo}" alt=""></span>`;
+  return `<span class="mini-av">${esc((name || '?').trim().charAt(0).toUpperCase() || '?')}</span>`;
+}
+function fmtTime(sec) {
+  sec = Math.round(sec || 0);
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec / 60) + 'm ' + String(sec % 60).padStart(2, '0') + 's';
+  return Math.floor(sec / 3600) + 'h ' + String(Math.floor(sec % 3600 / 60)).padStart(2, '0') + 'm';
+}
 
 function buildGrid(el, onTap) {
   // Repères : chiffres 1–10 en haut, lettres A–J à gauche (comme dans les messages « C5 »).
-  const lbl = t => { const s = document.createElement('div'); s.className = 'lbl'; s.textContent = t; el.appendChild(s); };
+  const lbl = txt => { const s = document.createElement('div'); s.className = 'lbl'; s.textContent = txt; el.appendChild(s); };
   el.cells = [];
   lbl('');
   for (let c = 0; c < N; c++) lbl(c + 1);
@@ -333,158 +802,306 @@ function buildGrid(el, onTap) {
 }
 
 /* =========================================================
-   Comptes locaux : pseudo, avatar, XP, niveau, statistiques
-   (enregistrés dans le navigateur de cet appareil)
+   Effets sonores (synthétisés, aucun fichier à charger)
+   ========================================================= */
+const Snd = {
+  ctx: null,
+  get() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; this.ctx = new AC(); }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  tone(c, f, dur, type = 'sine', vol = 0.15, when = 0, to = null) {
+    const o = c.createOscillator(), g = c.createGain(), t0 = c.currentTime + when;
+    o.type = type; o.frequency.setValueAtTime(f, t0);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+  noise(c, dur, freq, vol = 0.3, when = 0, type = 'lowpass') {
+    const len = Math.floor(c.sampleRate * dur), b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), t0 = c.currentTime + when;
+    s.buffer = b; f.type = type; f.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(f).connect(g).connect(c.destination); s.start(t0);
+  },
+  play(name) {
+    if (!settings.sound) return;
+    try {
+      const c = this.get(); if (!c) return;
+      switch (name) {
+        case 'click': this.tone(c, 640, 0.05, 'square', 0.04); break;
+        case 'place': this.tone(c, 520, 0.08, 'triangle', 0.1); this.tone(c, 780, 0.08, 'triangle', 0.08, 0.05); break;
+        case 'shot': this.noise(c, 0.18, 2600, 0.18, 0, 'highpass'); this.tone(c, 220, 0.15, 'sine', 0.15, 0, 70); break;
+        case 'miss': this.noise(c, 0.7, 900, 0.22); this.tone(c, 300, 0.25, 'sine', 0.05, 0.02, 120); break;
+        case 'hit': this.noise(c, 0.55, 420, 0.5); this.tone(c, 95, 0.45, 'sine', 0.4, 0, 40); break;
+        case 'sunk': this.noise(c, 0.5, 450, 0.5); this.tone(c, 90, 0.5, 'sine', 0.4, 0, 35); this.noise(c, 1.1, 220, 0.45, 0.25); this.tone(c, 60, 0.9, 'sawtooth', 0.08, 0.2, 28); break;
+        case 'blocked': this.tone(c, 880, 0.3, 'triangle', 0.14); this.tone(c, 1320, 0.35, 'triangle', 0.08, 0.04); break;
+        case 'radar': this.tone(c, 900, 0.22, 'sine', 0.1, 0, 1700); this.tone(c, 900, 0.22, 'sine', 0.08, 0.28, 1700); break;
+        case 'shield': this.tone(c, 660, 0.2, 'triangle', 0.12); this.tone(c, 990, 0.3, 'triangle', 0.1, 0.1); break;
+        case 'turn': this.tone(c, 740, 0.09, 'sine', 0.1); this.tone(c, 988, 0.13, 'sine', 0.1, 0.1); break;
+        case 'upgrade': [523, 659, 784].forEach((f, i) => this.tone(c, f, 0.14, 'triangle', 0.1, i * 0.08)); break;
+        case 'win': [523, 659, 784, 1047].forEach((f, i) => this.tone(c, f, 0.3, 'triangle', 0.14, i * 0.13)); break;
+        case 'lose': [392, 330, 262, 196].forEach((f, i) => this.tone(c, f, 0.35, 'triangle', 0.12, i * 0.16)); break;
+        case 'start': this.tone(c, 440, 0.12, 'square', 0.05); this.tone(c, 660, 0.18, 'square', 0.05, 0.12); break;
+      }
+    } catch (e) {}
+  },
+  buzz(pattern) { if (settings.sound && navigator.vibrate) try { navigator.vibrate(pattern); } catch (e) {} },
+};
+
+/* =========================================================
+   Comptes locaux : pseudo, mot de passe, photo, XP, statistiques
+   Chaque compte est rangé sous sa propre clé : deux onglets qui jouent l'un contre
+   l'autre dans le même navigateur ne peuvent pas écraser l'XP de l'autre.
    ========================================================= */
 const STORE_KEY = 'c02naval.v1';
-const AVATARS = ['⚓', '🚢', '🦈', '🐙', '🐳', '🦑', '🧭', '🏴‍☠️'];
-const RANKS = ['Mousse', 'Matelot', 'Quartier-maître', 'Second-maître', 'Maître', 'Enseigne', 'Lieutenant',
-  'Capitaine de corvette', 'Capitaine de frégate', 'Capitaine de vaisseau', 'Amiral'];
+const ACC_PREFIX = STORE_KEY + '.acc.', CUR_KEY = STORE_KEY + '.current', TAB_KEY = STORE_KEY + '.tab';
 const xpFor = l => 50 * l * (l - 1);               // XP total pour atteindre le niveau l : 0, 100, 300, 600, 1000…
 function levelOf(xp) { let l = 1; while (xp >= xpFor(l + 1)) l++; return l; }
-const rankOf = l => RANKS[Math.min(l - 1, RANKS.length - 1)];
+const rankOf = l => { const r = t('ranks'); return r[Math.min(l - 1, r.length - 1)]; };
 const emptyStats = () => ({ games: 0, wins: 0, losses: 0, interrupted: 0, streak: 0, bestStreak: 0,
-  shots: 0, hits: 0, sunk: 0, upgrades: 0, fastestWin: null });
+  shots: 0, hits: 0, sunk: 0, upgrades: 0, fastestWin: null, timePlayed: 0 });
 
-// Chaque compte est rangé sous sa propre clé : deux onglets qui jouent l'un contre l'autre
-// dans le même navigateur ne peuvent pas écraser l'XP de l'autre en enregistrant en même temps.
-// store.current = dernier compte utilisé sur l'appareil ; curId = compte de CET onglet.
-const ACC_PREFIX = STORE_KEY + '.acc.', CUR_KEY = STORE_KEY + '.current';
-let store = { accounts: {}, current: null };
+let accounts = {};
 let storageOk = true;
-let curId = null;
-function loadStore() {
+let curId = null;            // compte connecté dans CET onglet (null = invité)
+let loggedIn = false;
+function loadAccounts() {
   try {
-    const accounts = {};
+    const out = {};
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (!k || !k.startsWith(ACC_PREFIX)) continue;
-      try { const a = JSON.parse(localStorage.getItem(k)); if (a && a.id && a.name) accounts[a.id] = a; } catch (e) {}
+      try { const a = JSON.parse(localStorage.getItem(k)); if (a && a.id && a.name) out[a.id] = a; } catch (e) {}
     }
-    store = { accounts, current: localStorage.getItem(CUR_KEY) };
-    storageOk = true;
-  } catch (e) { storageOk = false; return; }   // stockage bloqué : on garde ce qui est en mémoire
-  if (store.current && !store.accounts[store.current]) store.current = null;
-  if (curId && !store.accounts[curId]) setCur(null);
+    accounts = out; storageOk = true;
+  } catch (e) { storageOk = false; }   // stockage bloqué : on garde ce qui est en mémoire
 }
 function saveAccount(a) {
-  try { localStorage.setItem(ACC_PREFIX + a.id, JSON.stringify(a)); storageOk = true; }
-  catch (e) { storageOk = false; }
+  accounts[a.id] = a;
+  try { localStorage.setItem(ACC_PREFIX + a.id, JSON.stringify(a)); storageOk = true; } catch (e) { storageOk = false; }
 }
-function saveCurrent() {
-  try { if (store.current) localStorage.setItem(CUR_KEY, store.current); else localStorage.removeItem(CUR_KEY); } catch (e) {}
+const me = () => (curId ? accounts[curId] || null : null);
+function setSession(id) {
+  curId = id; loggedIn = true;
+  try {
+    if (id) { sessionStorage.setItem(TAB_KEY, id); localStorage.setItem(CUR_KEY, id); }
+    else sessionStorage.setItem(TAB_KEY, 'guest');
+  } catch (e) {}
 }
-function setCur(id) {
-  curId = id;
-  try { if (id) sessionStorage.setItem(STORE_KEY + '.tab', id); else sessionStorage.removeItem(STORE_KEY + '.tab'); } catch (e) {}
+function clearSession() {
+  curId = null; loggedIn = false;
+  try { sessionStorage.removeItem(TAB_KEY); localStorage.removeItem(CUR_KEY); } catch (e) {}
 }
-function initCur() {
+function restoreSession() {
   let id = null;
-  try { id = sessionStorage.getItem(STORE_KEY + '.tab'); } catch (e) {}
-  setCur(id && store.accounts[id] ? id : store.current);
-}
-const me = () => (curId ? store.accounts[curId] || null : null);
-function useAccount(id) { loadStore(); setCur(id); store.current = id; saveCurrent(); }
-
-function profileHTML(a, actions) {
-  if (!a) return `<div class="profile"><div class="avatar">👤</div><div class="pinfo">
-      <div class="pname">Invité</div><div class="prank">Crée un compte pour gagner de l'XP et suivre tes statistiques.</div></div></div>
-    ${actions ? '<button class="wide" id="btnAccount">Créer ou choisir un compte</button>' : ''}`;
-  const l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
-  const pct = Math.round((a.xp - lo) / (hi - lo) * 100);
-  return `<div class="profile"><div class="avatar">${esc(a.avatar)}</div><div class="pinfo">
-      <div class="pname">${esc(a.name)}</div>
-      <div class="prank">Niveau ${l} · ${rankOf(l)}</div>
-      <div class="xpbar"><i style="width:${pct}%"></i></div>
-      <div class="xptxt">${a.xp - lo} / ${hi - lo} XP vers le niveau ${l + 1}</div></div></div>
-    ${actions ? '<div class="profile-actions"><button id="btnStats">📊 Statistiques</button><button id="btnAccount">👥 Changer de compte</button></div>' : ''}`;
-}
-function renderMenu() {
-  $('profileBox').innerHTML = profileHTML(me(), true);
-  const bs = $('btnStats'); if (bs) bs.onclick = openStats;
-  $('btnAccount').onclick = openAccount;
-  if (!storageOk) msg('menuMsg', 'Ce navigateur bloque l\'enregistrement : le compte ne sera pas sauvegardé.', true);
+  try { id = sessionStorage.getItem(TAB_KEY) || localStorage.getItem(CUR_KEY); } catch (e) {}
+  if (id === 'guest') { curId = null; loggedIn = true; return; }
+  if (id && accounts[id]) { curId = id; loggedIn = true; }
 }
 
-let pickedAvatar = AVATARS[0];
-function openAccount() {
-  loadStore();
-  const list = $('accList'); list.innerHTML = '';
-  const accs = Object.values(store.accounts).sort((a, b) => b.xp - a.xp);
-  if (accs.length) {
-    const t = document.createElement('p'); t.className = 'sub'; t.style.margin = '0 0 4px'; t.textContent = 'Choisir un compte :';
-    list.appendChild(t);
-  }
+// Mot de passe : PBKDF2-SHA-256 salé (jamais stocké en clair).
+const b64e = u8 => btoa(String.fromCharCode(...u8));
+const b64d = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+async function hashPass(pw, saltB64, iter = 120000) {
+  if (!window.crypto || !crypto.subtle) throw new Error('nocrypto');
+  const salt = saltB64 ? b64d(saltB64) : crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256);
+  return { salt: b64e(salt), hash: b64e(new Uint8Array(bits)), iter };
+}
+const nameTaken = (name, exceptId) => Object.values(accounts).some(a => a.id !== exceptId && a.name.toLowerCase() === name.toLowerCase());
+
+/* ---------- Écran de connexion ---------- */
+let authTab = 'login', pickedId = null;
+function openAuth(tab) {
+  loadAccounts();
+  authTab = tab || (Object.keys(accounts).length ? 'login' : 'signup');
+  const accs = Object.values(accounts).sort((a, b) => (b.lastLogin || '').localeCompare(a.lastLogin || ''));
+  if (!pickedId || !accounts[pickedId]) pickedId = accs.length ? accs[0].id : null;
+  $('segLogin').classList.toggle('on', authTab === 'login');
+  $('segSignup').classList.toggle('on', authTab === 'signup');
+  $('loginPane').style.display = authTab === 'login' ? '' : 'none';
+  $('signupPane').style.display = authTab === 'signup' ? '' : 'none';
+  const list = $('accPick'); list.innerHTML = '';
+  if (!accs.length) list.innerHTML = `<p class="msg" style="margin:6px 0">${esc(t('noAccounts'))}</p>`;
   accs.forEach(a => {
     const b = document.createElement('button');
-    const l = levelOf(a.xp);
-    b.innerHTML = `<span class="avatar">${esc(a.avatar)}</span><span><strong>${esc(a.name)}</strong>${a.id === curId ? ' ✓' : ''}<small>Niveau ${l} · ${a.xp} XP</small></span>`;
-    b.onclick = () => { useAccount(a.id); renderMenu(); show('menu'); };
+    b.className = 'acc' + (a.id === pickedId ? ' on' : '');
+    b.innerHTML = `${avatarHTML(a.photo, a.name)}<span><strong>${esc(a.name)}</strong><small>${esc(t('levelN', { n: levelOf(a.xp) }))} · ${a.xp} XP</small></span>`;
+    b.onclick = () => { pickedId = a.id; openAuth('login'); $('loginPass').focus(); };
     list.appendChild(b);
   });
-  $('avatarPick').innerHTML = '';
-  AVATARS.forEach(av => {
-    const b = document.createElement('button');
-    b.textContent = av; b.className = av === pickedAvatar ? 'on' : '';
-    b.onclick = () => { pickedAvatar = av; openAccount(); };
-    $('avatarPick').appendChild(b);
-  });
-  msg('accMsg', '');
-  show('account');
+  $('btnLogin').disabled = !accs.length;
+  showView('auth');
 }
-function createAccount() {
-  loadStore();
-  const name = $('nameInput').value.trim().replace(/\s+/g, ' ');
-  if (name.length < 2 || name.length > 16) return msg('accMsg', 'Le pseudo doit faire entre 2 et 16 caractères.', true);
-  if (Object.values(store.accounts).some(a => a.name.toLowerCase() === name.toLowerCase()))
-    return msg('accMsg', 'Ce pseudo existe déjà sur cet appareil.', true);
+async function doLogin() {
+  loadAccounts();
+  const a = accounts[pickedId];
+  if (!a) return msg('authMsg', t('errPickAcc'), true);
+  if (a.pass) {
+    try {
+      const h = await hashPass($('loginPass').value, a.pass.salt, a.pass.iter);
+      if (h.hash !== a.pass.hash) { Snd.play('blocked'); return msg('authMsg', t('errPassWrong'), true); }
+    } catch (e) { return msg('authMsg', t('errNoCrypto'), true); }
+  }
+  a.lastLogin = new Date().toISOString(); saveAccount(a);
+  $('loginPass').value = '';
+  setSession(a.id);
+  openDash('play');
+  msg('dashMsg', a.pass ? t('welcome', { name: a.name }) : t('noPassHint'), a.pass ? 'ok' : true);
+}
+async function doSignup() {
+  loadAccounts();
+  const name = $('suName').value.trim().replace(/\s+/g, ' ');
+  const pw = $('suPass').value, pw2 = $('suPass2').value;
+  if (name.length < 2 || name.length > 16) return msg('authMsg', t('errPseudoLen'), true);
+  if (nameTaken(name)) return msg('authMsg', t('errPseudoTaken'), true);
+  if (pw.length < 4) return msg('authMsg', t('errPassLen'), true);
+  if (pw !== pw2) return msg('authMsg', t('errPassMatch'), true);
+  let pass;
+  try { pass = await hashPass(pw); } catch (e) { return msg('authMsg', t('errNoCrypto'), true); }
   const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const acc = { id, name, avatar: pickedAvatar, xp: 0, created: new Date().toISOString(), stats: emptyStats() };
-  store.accounts[id] = acc;
+  const now = new Date().toISOString();
+  const acc = { id, name, pass, photo: null, xp: 0, created: now, lastLogin: now, stats: emptyStats() };
   saveAccount(acc);
-  if (storageOk) useAccount(id); else setCur(id);   // sans stockage : compte gardé pour cette visite seulement
-  $('nameInput').value = '';
-  renderMenu(); show('menu');
-  msg('menuMsg', storageOk ? `Compte « ${name} » créé. Bonne chasse !` : 'Compte créé, mais ce navigateur bloque l\'enregistrement.', !storageOk);
+  $('suName').value = $('suPass').value = $('suPass2').value = '';
+  setSession(id);
+  openDash('play');
+  msg('dashMsg', storageOk ? t('welcome', { name }) : t('errStorage'), storageOk ? 'ok' : true);
 }
-function openStats() {
-  loadStore();
+
+/* ---------- Tableau de bord ---------- */
+let pane = 'play';
+let pendingCode = null;
+function openDash(p) {
+  S.phase = 'menu';
+  pane = p || pane;
+  if (renderDash() === false) return;
+  showView('dash');
+  if (pendingCode) { const c = pendingCode; pendingCode = null; openJoin(c); }
+}
+function renderDash() {
+  loadAccounts();
+  const a = me();
+  if (curId && !a) { clearSession(); openAuth(); return false; }   // compte supprimé ailleurs
+  // Barre du haut
+  const up = $('avUp');
+  up.classList.toggle('has', !!(a && validPhoto(a.photo)));
+  up.classList.toggle('guest', !a);
+  up.title = a ? t('photoChange') : '';
+  $('avImg').innerHTML = a && validPhoto(a.photo) ? `<img src="${a.photo}" alt="">` : `<i class="fa-solid ${a ? 'fa-camera' : 'fa-user'}"></i>`;
+  $('tbName').textContent = a ? a.name : t('guestName');
+  $('tbBadge').style.display = $('tbXpWrap').style.display = a ? '' : 'none';
+  if (a) {
+    const l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
+    $('tbBadge').textContent = t('badge', { n: l });
+    $('tbXp').textContent = `${a.xp - lo} / ${hi - lo}`;
+    $('tbLevel').textContent = t('levelN', { n: l }) + ' · ' + rankOf(l);
+    $('tbXpFill').style.width = Math.round((a.xp - lo) / (hi - lo) * 100) + '%';
+  }
+  document.querySelectorAll('.tabsnav [data-pane]').forEach(b => b.classList.toggle('on', b.dataset.pane === pane));
+  document.querySelectorAll('#dash .pane').forEach(e => e.classList.toggle('active', e.id === 'pane-' + pane));
+  if (pane === 'stats') renderStats();
+  if (pane === 'settings') renderSettings();
+}
+function renderStats() {
+  const a = me();
+  const s = { ...emptyStats(), ...(a ? a.stats : {}) };
+  const pct = (x, y) => (y ? Math.round(x / y * 100) : 0) + '%';
+  const rate = (x, y) => (y ? x / y : 0).toFixed(2);
+  const tile = (icon, color, val, label, valColor) =>
+    `<div class="tile"><i class="fa-solid ${icon} ${color}"></i><b class="${valColor || 'c-white'}">${val}</b><span>${esc(label)}</span></div>`;
+  $('careerGrid').innerHTML = [
+    tile('fa-clock', 'c-sky', fmtTime(s.timePlayed), t('stTime')),
+    tile('fa-gamepad', 'c-purple', s.games, t('stGames')),
+    tile('fa-trophy', 'c-green', s.wins, t('stWins'), 'c-green'),
+    tile('fa-skull-crossbones', 'c-red', s.losses, t('stLosses'), 'c-red'),
+    tile('fa-percent', 'c-sky', pct(s.wins, s.games), t('stWinPct'), 'c-sky'),
+    tile('fa-percent', 'c-yellow', pct(s.losses, s.games), t('stLossPct'), 'c-yellow'),
+    tile('fa-arrow-trend-up', 'c-green', rate(s.wins, s.games), t('stWinRate'), 'c-green'),
+    tile('fa-arrow-trend-down', 'c-red', rate(s.losses, s.games), t('stLossRate'), 'c-red'),
+  ].join('');
+  $('combatGrid').innerHTML = [
+    tile('fa-crosshairs', 'c-sky', s.shots, t('stShots')),
+    tile('fa-bullseye', 'c-green', pct(s.hits, s.shots), t('stAcc'), 'c-green'),
+    tile('fa-ship', 'c-red', s.sunk, t('stSunk')),
+    tile('fa-wand-magic-sparkles', 'c-purple', s.upgrades, t('stUpg')),
+    tile('fa-fire', 'c-yellow', s.streak, t('stStreak'), 'c-yellow'),
+    tile('fa-medal', 'c-yellow', s.bestStreak, t('stBest'), 'c-yellow'),
+    tile('fa-bolt', 'c-sky', s.fastestWin ? t('shotsN', { n: s.fastestWin }) : '—', t('stFast')),
+    tile('fa-plug-circle-xmark', 'c-red', s.interrupted, t('stInt')),
+  ].join('');
+  $('statsGuest').style.display = a ? 'none' : '';
+}
+function renderSettings() {
+  const a = me();
+  $('sndToggle').className = 'toggle ' + (settings.sound ? 'on' : 'off');
+  $('sndToggle').textContent = settings.sound ? 'ON' : 'OFF';
+  $('acctSettings').style.display = a ? '' : 'none';
+  if (a) {
+    if (document.activeElement !== $('editName')) $('editName').value = a.name;
+    $('btnPhotoDel').disabled = !validPhoto(a.photo);
+  }
+}
+async function saveProfile() {
+  loadAccounts();
   const a = me(); if (!a) return;
-  const s = { ...emptyStats(), ...a.stats };
-  const pct = (x, y) => y ? Math.round(x / y * 100) + ' %' : '—';
-  $('statsProfile').innerHTML = profileHTML(a, false);
-  const tiles = [
-    [s.games, 'Parties jouées'], [pct(s.wins, s.games), 'Victoires'],
-    [s.wins, 'Gagnées'], [s.losses, 'Perdues'],
-    [s.streak, 'Série en cours'], [s.bestStreak, 'Meilleure série'],
-    [s.shots, 'Tirs'], [pct(s.hits, s.shots), 'Précision'],
-    [s.sunk, 'Bateaux coulés'], [s.upgrades, 'Améliorations utilisées'],
-    [s.fastestWin ? s.fastestWin + ' tirs' : '—', 'Victoire la plus rapide'], [s.interrupted, 'Parties interrompues'],
-  ];
-  $('statsGrid').innerHTML = tiles.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('');
-  show('stats');
+  const name = $('editName').value.trim().replace(/\s+/g, ' ');
+  const pw = $('editPass').value;
+  if (name.length < 2 || name.length > 16) return msg('setMsg', t('errPseudoLen'), true);
+  if (nameTaken(name, a.id)) return msg('setMsg', t('errPseudoTaken'), true);
+  if (pw && pw.length < 4) return msg('setMsg', t('errPassLen'), true);
+  if (name === a.name && !pw) return msg('setMsg', t('nothingChanged'));
+  if (pw) { try { a.pass = await hashPass(pw); } catch (e) { return msg('setMsg', t('errNoCrypto'), true); } }
+  a.name = name;
+  saveAccount(a);
+  $('editPass').value = '';
+  renderDash();
+  msg('setMsg', t('saved'), 'ok');
 }
 function deleteAccount() {
   const a = me(); if (!a) return;
-  if (!confirm(`Supprimer définitivement le compte « ${a.name} », son XP et ses statistiques ?`)) return;
+  if (!confirm(t('deleteConfirm', { name: a.name }))) return;
   try { localStorage.removeItem(ACC_PREFIX + a.id); } catch (e) {}
-  loadStore();
-  delete store.accounts[a.id];
-  if (store.current === a.id) { store.current = null; saveCurrent(); }
-  setCur(null);
-  renderMenu(); show('menu');
+  delete accounts[a.id];
+  clearSession();
+  openAuth();
+}
+// Photo : recadrée en carré 160 × 160 et compressée (quelques Ko).
+function pickPhoto() { if (me()) $('avatarFile').click(); }
+function onPhotoFile(e) {
+  const f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f || !me()) return;
+  const url = URL.createObjectURL(f), img = new Image();
+  img.onload = () => {
+    const size = 160, cv = document.createElement('canvas'); cv.width = cv.height = size;
+    const s = Math.min(img.width, img.height);
+    cv.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+    URL.revokeObjectURL(url);
+    loadAccounts();
+    const a = me(); if (!a) return;
+    a.photo = cv.toDataURL('image/jpeg', 0.82);
+    saveAccount(a); renderDash();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); msg('dashMsg', t('errPhoto'), true); };
+  img.src = url;
 }
 
-// Fin de partie : XP gagnée et statistiques. Renvoie le détail pour l'affichage.
+/* ---------- Enregistrement des parties ---------- */
 function recordGame(win) {
-  loadStore();
+  loadAccounts();
   const a = me(); if (!a) return null;
   const m = S.match, s = a.stats = { ...emptyStats(), ...a.stats };
   const acc = m.shots ? m.hits / m.shots : 0;
-  const gain = (win ? 100 : 30) + m.hits * 5 + m.sunk * 20 + (win ? Math.round(acc * 50) : 0);
+  let gain = (win ? 100 : 30) + m.hits * 5 + m.sunk * 20 + (win ? Math.round(acc * 50) : 0);
+  if (S.vsBot) gain = Math.round(gain / 2);
   const before = levelOf(a.xp);
   a.xp += gain;
   s.games++; s.shots += m.shots; s.hits += m.hits; s.sunk += m.sunk; s.upgrades += m.upgrades;
+  s.timePlayed += m.start ? Math.round((Date.now() - m.start) / 1000) : 0;
   if (win) {
     s.wins++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak);
     if (!s.fastestWin || m.shots < s.fastestWin) s.fastestWin = m.shots;
@@ -493,56 +1110,77 @@ function recordGame(win) {
   return { gain, level: levelOf(a.xp), up: levelOf(a.xp) > before };
 }
 function recordInterrupted() {
-  loadStore();
-  const a = me(); if (!a || S.phase !== 'game') return;
+  if (S.phase !== 'game') return;
+  loadAccounts();
+  const a = me(); if (!a) return;
   a.stats = { ...emptyStats(), ...a.stats };
-  a.stats.interrupted++; saveAccount(a);
+  a.stats.interrupted++;
+  a.stats.timePlayed += S.match.start ? Math.round((Date.now() - S.match.start) / 1000) : 0;
+  saveAccount(a);
 }
 function myIdentity() {
   const a = me();
-  return a ? { name: a.name, avatar: a.avatar, level: levelOf(a.xp) } : { name: 'Invité', avatar: '👤', level: 0 };
+  return a ? { name: a.name, photo: validPhoto(a.photo) ? a.photo : null, level: levelOf(a.xp) } : { name: t('guestName'), photo: null, level: 0 };
 }
-function vsText() {
-  if (!S.opp) return '';
-  const o = S.opp, i = myIdentity();
-  const tag = p => `${p.avatar} ${p.name}${p.level ? ' (niv. ' + p.level + ')' : ''}`;
-  return `${tag(i)}  contre  ${tag(o)}`;
+function renderVs() {
+  const i = myIdentity(), o = S.opp;
+  const who = (p, bot) => `<span class="who2">${bot ? '<span class="mini-av" style="color:var(--green)"><i class="fa-solid fa-robot"></i></span>' : avatarHTML(p.photo, p.name)}<span>${esc(p.name)}</span>${p.level ? `<span class="lv">${esc(t('levelShort', { n: p.level }))}</span>` : ''}</span>`;
+  const html = who(i) + (o ? `<span class="vsep">${esc(t('vs'))}</span>` + who(o, o.bot) : '');
+  $('placeVs').innerHTML = $('gameVs').innerHTML = html;
+  $('enemyLabel').textContent = t('enemyGrid', { name: o ? o.name : '?' });
 }
 
-/* ---------- Réseau ---------- */
+/* =========================================================
+   Réseau (PeerJS / WebRTC)
+   ========================================================= */
 function netErrorText(err) {
   switch (err && err.type) {
-    case 'browser-incompatible': return 'Ce navigateur ne permet pas le jeu en réseau (WebRTC).';
-    case 'network': case 'server-error': case 'socket-error': case 'socket-closed':
-      return 'Impossible de joindre le service de mise en relation. Vérifie ta connexion.';
-    default: return 'Erreur réseau' + (err && err.type ? ' (' + err.type + ')' : '') + '.';
+    case 'browser-incompatible': return t('errBrowser');
+    case 'network': case 'server-error': case 'socket-error': case 'socket-closed': return t('errNet');
+    default: return t('errNetOther', { type: (err && err.type) || '?' });
   }
 }
-function checkPeerLib() {
-  if (typeof Peer === 'undefined') { msg('menuMsg', 'Impossible de charger PeerJS. Vérifie ta connexion Internet.', true); return false; }
+function checkPeerLib(where) {
+  if (typeof Peer === 'undefined') { msg(where, t('errPeerLib'), true); return false; }
   return true;
 }
-
-function hostGame() {
-  if (!checkPeerLib()) return;
-  S.isHost = true; S.code = genCode();
-  show('lobby'); S.phase = 'lobby';
-  $('codeBox').textContent = S.code;
-  msg('lobbyMsg', 'Création de la partie…');
-  const peer = new Peer(PREFIX + S.code, PEER_OPTS);
-  S.peer = peer;
-  peer.on('open', () => msg('lobbyMsg', 'En attente d\'un adversaire…'));
+function keepPeerAlive(peer) {
   // Lien perdu avec le service de mise en relation (veille, réseau) : on se réenregistre
   // pour que le code reste valable tant que l'adversaire n'est pas arrivé.
-  peer.on('disconnected', () => {
-    if (S.connected || peer.destroyed) return;
-    msg('lobbyMsg', 'Reconnexion au service de mise en relation…');
-    setTimeout(() => { if (!S.connected && !peer.destroyed && peer.disconnected) peer.reconnect(); }, 1000);
-  });
-  peer.on('connection', conn => {
-    if (S.conn) { conn.on('open', () => conn.close()); return; }
-    setupConn(conn);
-  });
+  if (S.connected || peer.destroyed) return;
+  msg('lobbyMsg', t('reconnecting'));
+  setTimeout(() => { if (!S.connected && !peer.destroyed && peer.disconnected) peer.reconnect(); }, 1000);
+}
+function setupLobby(kind) {
+  const host = kind === 'host';
+  $('hostBox').style.display = host ? '' : 'none';
+  $('lobbyIcon').className = 'mode-ic ' + (host ? 'ic-purple' : 'ic-cyan');
+  $('lobbyIcon').innerHTML = `<i class="fa-solid ${host ? 'fa-tower-broadcast' : 'fa-shuffle'}"></i>`;
+  $('lobbyTitle').textContent = t(host ? 'lobbyHostT' : 'lobbyRandomT');
+  $('lobbyDesc').textContent = t(host ? 'lobbyHostD' : 'lobbyRandomD');
+  $('lobbyCount').textContent = '';
+  msg('lobbyMsg', t(host ? 'creating' : 'searching'));
+  showView('lobby');
+}
+function acceptConn(conn) {
+  if (S.conn || S.connected) {          // déjà un adversaire : on refuse poliment
+    conn.on('open', () => { try { conn.send({ t: 'busy' }); } catch (e) {} setTimeout(() => conn.close(), 300); });
+    return;
+  }
+  setupConn(conn, () => { S.conn = null; if (!S.connected) msg('lobbyMsg', t('waitingOpp')); });
+}
+
+// Salon privé
+function hostGame() {
+  if (!checkPeerLib('dashMsg')) return;
+  S.kind = 'host'; S.isHost = true; S.code = genCode(); S.phase = 'lobby';
+  setupLobby('host');
+  $('codeBox').textContent = S.code;
+  const peer = new Peer(PREFIX + S.code, PEER_OPTS);
+  S.peer = peer;
+  peer.on('open', () => msg('lobbyMsg', t('waitingOpp')));
+  peer.on('disconnected', () => keepPeerAlive(peer));
+  peer.on('connection', acceptConn);
   peer.on('error', err => {
     if (err.type === 'unavailable-id') { peer.destroy(); hostGame(); return; }  // code déjà pris : on en tire un autre
     if (S.connected) return;
@@ -550,55 +1188,142 @@ function hostGame() {
   });
 }
 
+// Rejoindre avec un code
+function openJoin(code) {
+  $('codeInput').value = (code || '').toUpperCase().slice(0, 6);
+  msg('joinMsg', '');
+  $('btnJoin').disabled = false;
+  $('joinModal').classList.add('show');
+  setTimeout(() => $('codeInput').focus(), 50);
+}
 function joinGame() {
   if (S.peer) return;
   const code = $('codeInput').value.toUpperCase().replace(/\s+/g, '');
-  if (code.length !== 6) return msg('menuMsg', 'Le code doit contenir 6 caractères.', true);
-  if ([...code].some(ch => !ALPHA.includes(ch))) return msg('menuMsg', 'Code invalide : lettres A–Z (sauf I et O) et chiffres 2–9.', true);
-  if (!checkPeerLib()) return;
-  msg('menuMsg', 'Connexion…');
-  $('btnJoin').disabled = $('btnHost').disabled = true;
+  if (code.length !== 6) return msg('joinMsg', t('errCodeLen'), true);
+  if ([...code].some(ch => !ALPHA.includes(ch))) return msg('joinMsg', t('errCodeChars'), true);
+  if (!checkPeerLib('joinMsg')) return;
+  msg('joinMsg', t('connecting'));
+  $('btnJoin').disabled = true;
+  S.kind = 'join'; S.isHost = false;
   const peer = new Peer(PEER_OPTS);
   S.peer = peer; S.code = code;
+  let failed = false;
   const fail = text => {
     clearTimeout(S.joinTimer);
-    if (S.connected) return;
+    if (S.connected || failed) return;
+    failed = true;
     try { peer.destroy(); } catch (e) {}
     S.peer = null; S.conn = null;
-    $('btnJoin').disabled = $('btnHost').disabled = false;
-    msg('menuMsg', text, true);
+    $('btnJoin').disabled = false;
+    msg('joinMsg', text, true);
   };
   peer.on('open', () => {
-    setupConn(peer.connect(PREFIX + code, { reliable: true }));
-    S.joinTimer = setTimeout(() => fail('Connexion impossible. Le réseau bloque peut-être la liaison directe.'), JOIN_TIMEOUT_MS);
+    setupConn(peer.connect(PREFIX + code, { reliable: true }), busy => fail(busy ? t('errFull') : t('errJoinTimeout')));
+    S.joinTimer = setTimeout(() => fail(t('errJoinTimeout')), JOIN_TIMEOUT_MS);
   });
   peer.on('error', err => {
     if (S.connected) return;
-    fail(err.type === 'peer-unavailable' ? 'Aucune partie avec ce code' : netErrorText(err));
+    fail(err.type === 'peer-unavailable' ? t('errNoGame') : netErrorText(err));
   });
 }
 
-function setupConn(conn) {
-  S.conn = conn;
-  conn.on('open', () => {
-    S.connected = true;
-    clearTimeout(S.joinTimer);
-    S.lastSeen = Date.now();
-    S.hb = setInterval(() => {
-      send({ t: 'ping' });
-      // Adversaire parti dans une autre appli ou écran éteint : on lui laisse plus de temps.
-      if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) lost();
-    }, HEARTBEAT_MS);
-    send({ t: 'hello', ...myIdentity() });
-    keepAwake();
-    enterPlacement();
+// Adversaire aléatoire : quelques « créneaux » publics. On essaie d'en occuper un (on attend),
+// et s'il est déjà pris, quelqu'un y attend : on le rejoint. Bot au bout de 45 s.
+function findRandom() {
+  if (!checkPeerLib('dashMsg')) return;
+  S.kind = 'random'; S.phase = 'lobby'; S.mmStopped = false;
+  setupLobby('random');
+  const deadline = Date.now() + MM_WAIT_MS;
+  const tick = () => {
+    if (S.connected) { clearInterval(S.mmTimer); $('lobbyCount').textContent = ''; return; }
+    const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    $('lobbyCount').textContent = t('countdown', { s: left });
+    if (left <= 0) {
+      clearInterval(S.mmTimer);
+      stopSearch();
+      msg('lobbyMsg', t('noOneFound'), 'ok');
+      setTimeout(startBot, 1000);
+    }
+  };
+  tick(); S.mmTimer = setInterval(tick, 250);
+  trySlot(0);
+}
+function stopSearch() {
+  S.mmStopped = true;
+  const c = S.conn, p = S.peer;
+  S.conn = null; S.peer = null;
+  try { if (c) c.close(); } catch (e) {}
+  try { if (p) p.destroy(); } catch (e) {}
+}
+function trySlot(k) {
+  if (S.connected || S.mmStopped) return;
+  if (k >= MM_SLOTS) { setTimeout(() => trySlot(0), 1500); return; }
+  const peer = new Peer(MM_PREFIX + k, PEER_OPTS);
+  S.peer = peer;
+  peer.on('open', () => { if (S.mmStopped) return peer.destroy(); S.isHost = true; msg('lobbyMsg', t('waitingOpp')); });
+  peer.on('connection', conn => { if (!S.mmStopped) acceptConn(conn); });
+  peer.on('disconnected', () => keepPeerAlive(peer));
+  peer.on('error', err => {
+    if (S.connected || S.mmStopped || S.peer !== peer) return;
+    if (err.type === 'unavailable-id') { peer.destroy(); joinSlot(k); return; }
+    msg('lobbyMsg', netErrorText(err), true);
   });
-  conn.on('data', onData);
-  conn.on('close', lost);
-  conn.on('error', lost);
+}
+function joinSlot(k) {
+  if (S.connected || S.mmStopped) return;
+  const peer = new Peer(PEER_OPTS);
+  S.peer = peer; S.isHost = false;
+  let done = false, tm = null;
+  const next = () => {
+    if (done || S.connected || S.mmStopped) return;
+    done = true; clearTimeout(tm);
+    S.conn = null;
+    try { peer.destroy(); } catch (e) {}
+    trySlot(k + 1);
+  };
+  peer.on('open', () => {
+    if (S.mmStopped) return peer.destroy();
+    setupConn(peer.connect(MM_PREFIX + k, { reliable: true }), next);
+    tm = setTimeout(() => { if (!S.connected) next(); }, 8000);
+  });
+  peer.on('error', () => { if (!S.connected) next(); });
 }
 
-function send(m) { try { if (S.conn && S.conn.open) S.conn.send(m); } catch (e) {} }
+// Connexion de données commune. La partie démarre quand chacun a reçu le « hello » de l'autre.
+function setupConn(conn, onFail) {
+  S.conn = conn; S.onReject = onFail || null;
+  conn.on('open', () => { if (S.conn === conn) send({ t: 'hello', ...myIdentity() }); });
+  conn.on('data', m => { if (S.conn === conn) onData(m); });
+  const closed = () => {
+    if (S.conn !== conn) return;
+    if (S.connected) lost();
+    else if (S.onReject) S.onReject(false);
+  };
+  conn.on('close', closed);
+  conn.on('error', closed);
+}
+function onConnected() {
+  S.connected = true;
+  clearTimeout(S.joinTimer); clearInterval(S.mmTimer);
+  $('joinModal').classList.remove('show');
+  S.lastSeen = Date.now();
+  S.hb = setInterval(() => {
+    send({ t: 'ping' });
+    // Adversaire parti dans une autre appli ou écran éteint : on lui laisse plus de temps.
+    if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) lost();
+  }, HEARTBEAT_MS);
+  // Créneau aléatoire : on le libère pour le prochain joueur (la liaison directe reste ouverte).
+  if (S.kind === 'random' && S.peer) try { S.peer.disconnect(); } catch (e) {}
+  keepAwake();
+  enterPlacement();
+}
+
+function send(m) {
+  try {
+    if (S.vsBot) { if (S.bot) S.bot.receive(m); return; }
+    if (S.conn && S.conn.open) S.conn.send(m);
+  } catch (e) {}
+}
 
 function lost() {
   if (!S.connected || S.lost || S.phase === 'over') return;
@@ -607,11 +1332,18 @@ function lost() {
   clearInterval(S.hb);
   $('choice').classList.remove('show');
   $('endIcon').textContent = '📴';
-  $('endTitle').textContent = 'Connexion perdue';
-  $('endText').textContent = 'La liaison avec l\'adversaire est coupée. La partie est arrêtée.';
+  $('endTitle').textContent = t('lostTitle');
+  $('endText').textContent = t('lostText');
   $('endXp').innerHTML = '';
   $('end').classList.add('show');
   if ($('game').classList.contains('active')) renderGame();
+}
+function quitGame() {
+  if (!confirm(t('quitConfirm'))) return;
+  recordInterrupted();
+  S.phase = 'over';
+  try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
+  location.reload();
 }
 
 /* Veille et arrière-plan */
@@ -624,7 +1356,7 @@ async function keepAwake() {
   } catch (e) { S.wakeLock = null; }
 }
 function onVisibility() {
-  if (!S.connected || S.lost || S.phase === 'over') return;
+  if (!S.connected || S.vsBot || S.lost || S.phase === 'over') return;
   if (document.visibilityState === 'hidden') { send({ t: 'away' }); return; }
   // De retour : nos minuteurs ont pu être ralentis, on repart d'un délai neuf avant de juger la liaison.
   S.lastSeen = Date.now();
@@ -634,7 +1366,7 @@ function onVisibility() {
 function showAway() {
   if (S.phase === 'game') return renderHint();
   if (S.phase === 'place') {
-    if (S.oppAway) msg('placeMsg', 'L\'adversaire a quitté l\'écran du jeu… (2 min max)');
+    if (S.oppAway) msg('placeMsg', t('oppAway'));
     else renderPlace();
   }
 }
@@ -645,13 +1377,14 @@ function onData(m) {
   switch (m.t) {
     case 'hello':
       S.opp = {
-        name: String(m.name || 'Adversaire').slice(0, 16),
-        avatar: AVATARS.includes(m.avatar) || m.avatar === '👤' ? m.avatar : '⚓',
+        name: String(m.name || '?').slice(0, 16),
+        photo: validPhoto(m.photo) ? m.photo : null,
         level: Math.max(0, Math.min(999, parseInt(m.level, 10) || 0)),
+        bot: !!m.bot && S.vsBot,
       };
-      $('placeVs').textContent = $('gameVs').textContent = vsText();
-      $('enemyLabel').textContent = 'Grille de ' + S.opp.name;
+      if (!S.connected) onConnected(); else renderVs();
       break;
+    case 'busy': if (!S.connected && S.onReject) S.onReject(true); break;
     case 'away': S.oppAway = true; showAway(); break;
     case 'back': S.oppAway = false; showAway(); break;
     case 'ready': S.oppReady = true; renderPlace(); maybeStart(); break;
@@ -662,13 +1395,102 @@ function onData(m) {
 }
 
 /* =========================================================
+   Bot tactique : il calcule, pour chaque case, combien de positions
+   de bateaux restants y passent (et privilégie celles qui prolongent
+   un coup au but), puis tire sur la case la plus probable.
+   ========================================================= */
+class Bot {
+  constructor() {
+    this.ships = randomCells(LENS).map((cells, i) => ({ i, len: LENS[i], cells, shield: 'none' }));
+    this.incoming = Array(N * N).fill(null);
+    this.know = Array(N * N).fill(null);   // ce que le bot sait de ta grille : null | miss | hit | sunk | blocked
+    this.remaining = LENS.slice();
+    this.timers = [];
+  }
+  later(fn, ms) { this.timers.push(setTimeout(() => { if (S.vsBot && S.phase !== 'over') fn(); }, ms)); }
+  emit(m, ms) { this.later(() => onData(m), ms); }
+  start() {
+    this.emit({ t: 'hello', name: t('botName'), photo: null, level: myIdentity().level || 1, bot: true }, 10);
+    this.emit({ t: 'ready' }, 900 + Math.random() * 900);
+  }
+  receive(m) {
+    if (m.t === 'act') {
+      const cells = sanitizeCells(m.cells);
+      const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
+      const { results, over } = resolveOn(this.ships, this.incoming, kind, cells);
+      this.emit({ t: 'res', kind, at: m.at, results, over }, 450);
+      if (!over) this.later(() => this.move(), 450 + 700 + Math.random() * 600);
+    } else if (m.t === 'pass') {
+      this.later(() => this.move(), 900);
+    } else if (m.t === 'res') {
+      for (const x of (m.results || [])) {
+        const k = x.r * N + x.c;
+        if (x.v === 'sunk') {
+          (x.ship || []).forEach(([r, c]) => { this.know[r * N + c] = 'sunk'; });
+          const idx = this.remaining.indexOf((x.ship || []).length);
+          if (idx >= 0) this.remaining.splice(idx, 1);
+        } else if (x.v === 'miss' || x.v === 'hit' || x.v === 'blocked') this.know[k] = x.v;
+      }
+    }
+  }
+  move() {
+    if (S.phase !== 'game') return;
+    const [r, c] = this.choose();
+    onData({ t: 'act', kind: 'shot', at: [r, c], cells: [[r, c]] });
+  }
+  choose() {
+    const K = this.know;
+    const blocked = K.map((v, k) => (v === 'blocked' ? k : -1)).filter(k => k >= 0);
+    if (blocked.length) { const k = blocked[0]; return [Math.floor(k / N), k % N]; }   // bouclier : on retire au même endroit
+    const hasHits = K.includes('hit');
+    const score = Array(N * N).fill(0);
+    for (const len of this.remaining) {
+      for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) for (const h of [true, false]) {
+        const cells = []; let ok = true, nh = 0;
+        for (let i = 0; i < len; i++) {
+          const rr = r + (h ? 0 : i), cc = c + (h ? i : 0);
+          if (!inside(rr, cc)) { ok = false; break; }
+          const v = K[rr * N + cc];
+          if (v === 'miss' || v === 'sunk') { ok = false; break; }
+          if (v === 'hit') nh++;
+          cells.push(rr * N + cc);
+        }
+        if (!ok || (hasHits && !nh)) continue;
+        const w = hasHits ? Math.pow(12, nh) : 1;
+        cells.forEach(k => { if (K[k] === null) score[k] += w; });
+      }
+    }
+    let best = -1, bestK = -1;
+    for (let k = 0; k < N * N; k++) {
+      if (K[k] !== null) continue;
+      const parity = !hasHits && ((Math.floor(k / N) + k % N) % 2 === 0) ? 1.25 : 1;
+      const v = score[k] * parity + Math.random() * 0.5;
+      if (v > best) { best = v; bestK = k; }
+    }
+    if (bestK < 0) bestK = K.indexOf(null);
+    return [Math.floor(bestK / N), bestK % N];
+  }
+  stop() { this.timers.forEach(clearTimeout); }
+}
+function startBot() {
+  S.kind = 'bot'; S.vsBot = true; S.isHost = true;
+  S.bot = new Bot();
+  S.connected = true;
+  S.opp = { name: t('botName'), photo: null, level: myIdentity().level || 1, bot: true };
+  enterPlacement();
+  S.bot.start();
+}
+
+/* =========================================================
    Placement : aperçu, confirmation, glisser-déposer, pivoter
    ========================================================= */
 function enterPlacement() {
   S.phase = 'place';
   S.sel = 0; S.preview = null;
-  show('place');
+  renderVs();
+  showView('place');
   renderPlace();
+  Snd.play('start');
 }
 const nextUnplaced = () => S.ships.findIndex(s => !s.cells);
 const shipHoriz = cells => cells.length < 2 || cells[0][0] === cells[1][0];
@@ -687,7 +1509,7 @@ function previewInfo() {
   }
   return { cells, valid };
 }
-function placeHint(text, err) { msg('placeMsg', text, err); }
+const placeHint = (text, err) => msg('placeMsg', text, err);
 
 // Termine le déplacement d'un bateau soulevé : on le pose à l'aperçu si possible, sinon on le remet.
 function settleLifted() {
@@ -711,94 +1533,85 @@ function selectShip(i) {
     S.preview = { r: s.cells[0][0], c: s.cells[0][1], h: shipHoriz(s.cells) };
     S.horiz = S.preview.h;
     s.cells = null;
-    placeHint(`${s.name} sélectionné : fais-le glisser, pivote-le ou retire-le.`);
+    placeHint(t('pSelPlaced', { ship: shipName(i) }));
   } else {
     S.preview = null;
-    placeHint(`${s.name} : touche une case de départ.`);
+    placeHint(t('pSelNew', { ship: shipName(i) }));
   }
+  Snd.play('click');
   renderPlace();
 }
 function confirmPlacement() {
   const pv = previewInfo();
   if (!pv) return;
-  if (!pv.valid) return placeHint('Placement impossible : le bateau dépasse de la grille ou chevauche un autre bateau.', true);
+  if (!pv.valid) return placeHint(t('pBad'), true);
   const s = S.ships[S.sel];
   s.cells = pv.cells;
   S.lifted = null; S.preview = null;
   S.sel = nextUnplaced();
-  placeHint(S.sel >= 0 ? `${s.name} posé. Au tour du ${S.ships[S.sel].name}.` : 'Flotte complète ! Appuie sur Prêt.');
+  placeHint(S.sel >= 0 ? t('pPlacedNext', { ship: shipName(s.i), next: shipName(S.sel) }) : t('pDone'), S.sel >= 0 ? '' : 'ok');
+  Snd.play('place');
   renderPlace();
 }
 function tapPlaceCell(r, c) {
   if (S.meReady) return;
   const pv = previewInfo();
-  // Toucher le fantôme le pose.
-  if (pv && pv.cells.some(([a, b]) => a === r && b === c)) return confirmPlacement();
+  if (pv && pv.cells.some(([a, b]) => a === r && b === c)) return confirmPlacement();   // toucher le fantôme le pose
   const idx = occupancy()[r * N + c];
   if (idx >= 0) return selectShip(idx);
   if (S.sel < 0 || (S.ships[S.sel].cells && !(S.lifted && S.lifted.idx === S.sel))) {
     S.sel = nextUnplaced();
-    if (S.sel < 0) return placeHint('Toute la flotte est posée. Touche un bateau pour le modifier.');
+    if (S.sel < 0) return placeHint(t('pAllPlaced'));
   }
   S.preview = { r, c, h: S.preview ? S.preview.h : S.horiz };
   const np = previewInfo();
-  placeHint(np.valid ? 'Touche le bateau vert (ou « Poser ») pour le valider.' : 'Ici le bateau ne rentre pas : pivote-le ou choisis une autre case.', !np.valid);
+  placeHint(np.valid ? t('pTapGhost') : t('pNoFit'), !np.valid);
+  Snd.play('click');
   renderPlace();
 }
 function rotateShip() {
   if (S.meReady) return;
   if (S.preview) {
     S.preview.h = !S.preview.h;
-    const pv = previewInfo();
-    // Si le bateau sort de la grille en pivotant, on le recale à l'intérieur.
-    if (!pv.valid) {
+    if (!previewInfo().valid) {   // s'il sort de la grille en pivotant, on le recale à l'intérieur
       const s = S.ships[S.sel];
       if (S.preview.h) S.preview.c = Math.min(S.preview.c, N - s.len); else S.preview.r = Math.min(S.preview.r, N - s.len);
     }
     const p2 = previewInfo();
-    placeHint(p2.valid ? '' : 'Position bloquée par un autre bateau.', !p2.valid);
+    placeHint(p2.valid ? '' : t('pBlocked'), !p2.valid);
   }
   S.horiz = S.preview ? S.preview.h : !S.horiz;
+  Snd.play('click');
   renderPlace();
 }
 function removeShip() {
   if (S.meReady || !S.lifted) return;
-  const s = S.ships[S.lifted.idx];
+  const i = S.lifted.idx;
   S.lifted = null; S.preview = null;
-  placeHint(s.name + ' retiré.');
+  placeHint(t('pRemoved', { ship: shipName(i) }));
   renderPlace();
 }
 function clearFleet() {
   if (S.meReady) return;
   S.ships.forEach(s => { s.cells = null; });
   S.lifted = null; S.preview = null; S.sel = 0;
-  placeHint('Grille vidée.');
+  placeHint(t('pCleared'));
   renderPlace();
 }
 function randomFleet() {
   if (S.meReady) return;
   S.lifted = null; S.preview = null;
-  S.ships.forEach(s => { s.cells = null; });
-  for (const s of S.ships) {
-    for (let tries = 0; tries < 2000 && !s.cells; tries++) {
-      const occ = occupancy(), h = Math.random() < 0.5;
-      const r = Math.floor(Math.random() * N), c = Math.floor(Math.random() * N), cells = [];
-      for (let i = 0; i < s.len; i++) {
-        const rr = r + (h ? 0 : i), cc = c + (h ? i : 0);
-        if (!inside(rr, cc) || occ[rr * N + cc] !== -1) break;
-        cells.push([rr, cc]);
-      }
-      if (cells.length === s.len) s.cells = cells;
-    }
-  }
+  randomCells(LENS).forEach((cells, i) => { S.ships[i].cells = cells; });
   S.sel = -1;
-  placeHint('Flotte placée au hasard. Tu peux encore déplacer les bateaux.');
+  placeHint(t('pRandom'));
+  Snd.play('place');
   renderPlace();
 }
 function setReady() {
   if (S.meReady || nextUnplaced() !== -1 || S.lifted) return;
   S.meReady = true; S.sel = -1; S.preview = null;
   send({ t: 'ready' });
+  Snd.play('click');
   renderPlace();
   maybeStart();
 }
@@ -814,13 +1627,11 @@ function onPlaceDown(e) {
   const p = placeCellAt(e.clientX, e.clientY); if (!p) return;
   const [r, c] = p;
   const pv = previewInfo();
-  const onPreview = pv && pv.cells.some(([a, b]) => a === r && b === c);
+  const onPreview = !!pv && pv.cells.some(([a, b]) => a === r && b === c);
   const idx = occupancy()[r * N + c];
   S.drag = { r, c, moved: false, ship: false, wasSelected: onPreview };
-  if (idx >= 0 && !onPreview) {
-    selectShip(idx);                               // soulève le bateau touché
-    S.drag.ship = true;
-  } else if (onPreview) S.drag.ship = true;
+  if (idx >= 0 && !onPreview) { selectShip(idx); S.drag.ship = true; }   // soulève le bateau touché
+  else if (onPreview) S.drag.ship = true;
   if (S.drag.ship) S.drag.off = [r - S.preview.r, c - S.preview.c];
   try { $('placeGrid').setPointerCapture(e.pointerId); } catch (_) {}
   e.preventDefault();
@@ -832,7 +1643,7 @@ function onPlaceMove(e) {
   d.moved = true;
   S.preview.r = p[0] - d.off[0]; S.preview.c = p[1] - d.off[1];
   const pv = previewInfo();
-  placeHint(pv.valid ? 'Relâche pour poser.' : 'Impossible ici.', !pv.valid);
+  placeHint(pv.valid ? t('pRelease') : t('pNotHere'), !pv.valid);
   renderPlace();
 }
 function onPlaceUp() {
@@ -841,13 +1652,12 @@ function onPlaceUp() {
   if (d.ship && d.moved) {
     const pv = previewInfo();
     if (pv && pv.valid) return confirmPlacement();
-    // Position refusée : on remet le bateau à sa place d'origine.
-    const name = S.sel >= 0 ? S.ships[S.sel].name : 'Bateau';
+    const i = S.sel;   // position refusée : on remet le bateau à sa place d'origine
     if (S.lifted) { S.ships[S.lifted.idx].cells = S.lifted.cells; S.lifted = null; S.preview = null; }
-    placeHint(`Placement impossible : ${name} remis à sa place.`, true);
+    placeHint(t('pRestored', { ship: i >= 0 ? shipName(i) : '' }), true);
     return renderPlace();
   }
-  if (d.ship && !d.wasSelected) return;           // simple appui sur un bateau posé : il reste sélectionné
+  if (d.ship && !d.wasSelected) return;   // simple appui sur un bateau posé : il reste sélectionné
   tapPlaceCell(d.r, d.c);
 }
 
@@ -866,7 +1676,7 @@ function renderPlace() {
     const b = document.createElement('button');
     const placed = !!s.cells || (S.lifted && S.lifted.idx === i);
     b.className = 'shipbtn' + (i === S.sel && !S.meReady ? ' sel' : '') + (placed ? ' placed' : '');
-    b.innerHTML = `<span>${s.name}</span><span class="blocks">${'<i></i>'.repeat(s.len)}</span>`;
+    b.innerHTML = `<span>${esc(shipName(i))}</span><span class="blocks">${'<i></i>'.repeat(s.len)}</span>`;
     b.disabled = S.meReady;
     b.onclick = () => selectShip(i);
     $('shipList').appendChild(b);
@@ -876,38 +1686,65 @@ function renderPlace() {
   $('btnRandom').disabled = $('btnRotate').disabled = $('btnClear').disabled = S.meReady;
   $('btnConfirm').disabled = S.meReady || !pv || !pv.valid;
   $('btnRemove').disabled = S.meReady || !S.lifted;
-  $('btnRotate').textContent = (S.preview ? S.preview.h : S.horiz) ? '⟳ Pivoter ↔' : '⟳ Pivoter ↕';
-  if (S.meReady) msg('placeMsg', S.oppReady ? '' : 'Flotte prête. En attente de l\'adversaire…');
-  else if (S.oppReady && !$('placeMsg').textContent) msg('placeMsg', 'L\'adversaire est prêt.');
+  $('rotLbl').textContent = t((S.preview ? S.preview.h : S.horiz) ? 'rotH' : 'rotV');
+  if (S.meReady) msg('placeMsg', S.oppReady ? '' : t('waitOppReady'));
+  else if (S.oppReady && !$('placeMsg').textContent) msg('placeMsg', t('oppReady'));
 }
 function maybeStart() {
   if (S.phase !== 'place' || !S.meReady || !S.oppReady) return;
   S.phase = 'game';
   S.myTurn = S.isHost;
-  show('game');
-  setLog(S.isHost ? 'La partie commence : tu joues en premier.' : 'La partie commence : l\'hôte joue en premier.');
+  S.match.start = Date.now();
+  showView('game');
+  setLog(t(S.isHost ? 'startHost' : 'startGuest'));
+  Snd.play(S.myTurn ? 'turn' : 'start');
   renderGame();
 }
 
-/* ---------- Partie : mes actions ---------- */
+/* =========================================================
+   Partie
+   ========================================================= */
+function sanitizeCells(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && inside(p[0], p[1]))
+    .slice(0, 5);
+}
+// Calcule le résultat de tirs sur une flotte (la sienne ou celle du bot).
+function resolveOn(ships, incoming, kind, cells) {
+  const occ = occOf(ships), results = [];
+  for (const [r, c] of cells) {
+    const k = r * N + c, i = occ[k];
+    if (kind === 'radar') { results.push({ r, c, v: i >= 0 ? 'occ' : 'empty' }); continue; }
+    if (incoming[k] === 'miss' || incoming[k] === 'hit') { results.push({ r, c, v: incoming[k] }); continue; }
+    if (i < 0) { incoming[k] = 'miss'; results.push({ r, c, v: 'miss' }); continue; }
+    const s = ships[i];
+    if (s.shield === 'active') { s.shield = 'used'; incoming[k] = 'blocked'; results.push({ r, c, v: 'blocked' }); continue; }
+    incoming[k] = 'hit';
+    results.push(sunkOf(s, incoming) ? { r, c, v: 'sunk', ship: s.cells, si: i } : { r, c, v: 'hit' });
+  }
+  return { results, over: ships.every(s => sunkOf(s, incoming)) };
+}
+
+/* ---------- Mes actions ---------- */
 function onEnemyTap(r, c) {
   if (S.phase !== 'game') return;
-  if (!S.myTurn || S.waiting) return flashHint(S.waiting ? 'Tir en cours…' : 'Attends ton tour.');
-  if (S.mode === 'shield') return flashHint('Pour le bouclier, touche un bateau de ta flotte (grille du bas).');
+  if (!S.myTurn || S.waiting) return flashHint(t(S.waiting ? 'fFiring' : 'fWaitTurn'));
+  if (S.mode === 'shield') return flashHint(t('fShieldHere'));
   let cells;
   if (S.mode === 'shot') {
-    if (!targetable(r * N + c)) return flashHint('Case déjà visée.');
+    if (!targetable(r * N + c)) return flashHint(t('fAlready'));
     cells = [[r, c]];
   } else if (S.mode === 'radar') {
     cells = [[r, c], [r, c + 1], [r + 1, c], [r + 1, c + 1]].filter(([a, b]) => inside(a, b) && S.enemy[a * N + b] === null);
-    if (!cells.length) return flashHint('Aucune case inconnue dans cette zone.');
+    if (!cells.length) return flashHint(t('fNoUnknown'));
     S.inv.radar--; S.match.upgrades++;
   } else if (S.mode === 'cross') {
     cells = [[r, c], [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].filter(([a, b]) => inside(a, b) && targetable(a * N + b));
-    if (!cells.length) return flashHint('Toutes ces cases sont déjà connues.');
+    if (!cells.length) return flashHint(t('fAllKnown'));
     S.inv.cross--; S.match.upgrades++;
   }
   S.pendingAct = { kind: S.mode, at: [r, c] };
+  Snd.play(S.mode === 'radar' ? 'radar' : 'shot');
   send({ t: 'act', kind: S.mode, at: [r, c], cells });
   S.waiting = true; S.mode = 'shot';
   renderGame();
@@ -915,83 +1752,76 @@ function onEnemyTap(r, c) {
 function onMyTap(r, c) {
   if (S.phase !== 'game' || S.mode !== 'shield' || !S.myTurn || S.waiting) return;
   const idx = occupancy()[r * N + c];
-  if (idx < 0) return flashHint('Touche une case occupée par un de tes bateaux.');
+  if (idx < 0) return flashHint(t('fTouchShip'));
   const s = S.ships[idx];
-  if (isSunk(s)) return flashHint('Ce bateau est déjà coulé.');
-  if (s.shield !== 'none') return flashHint('Ce bateau a déjà reçu un bouclier.');
+  if (isSunk(s)) return flashHint(t('fShipSunk'));
+  if (s.shield !== 'none') return flashHint(t('fHasShield'));
   s.shield = 'active';
   S.inv.shield--; S.match.upgrades++;
   S.mode = 'shot'; S.myTurn = false;
   send({ t: 'pass' });
-  setLog(`Bouclier posé sur ton ${s.name}.`);
+  Snd.play('shield');
+  setLog(t('shieldPlaced', { ship: shipName(idx) }));
   renderGame();
 }
 function setMode(m) {
   if (S.phase !== 'game' || !S.myTurn || S.waiting) return;
   if (m !== 'shot' && !S.inv[m]) return;
   S.mode = S.mode === m ? 'shot' : m;
+  Snd.play('click');
   renderGame();
 }
 
-/* ---------- Partie : réponses ---------- */
+/* ---------- Réponses ---------- */
 function summarize(kind, at, results) {
-  if (kind === 'radar') {
-    const n = results.filter(x => x.v === 'occ').length;
-    return `Radar en ${cellName(...at)} : ${plural(n, 'case')} occupée${n > 1 ? 's' : ''} sur ${results.length}.`;
-  }
-  const sunk = results.filter(x => x.v === 'sunk').map(x => x.name);
-  const sunkTxt = sunk.length ? ` ${sunk.join(' et ')} coulé${sunk.length > 1 ? 's' : ''} !` : '';
+  const cell = cellName(...at);
+  if (kind === 'radar') return t('sumRadar', { cell, n: results.filter(x => x.v === 'occ').length, total: results.length });
+  const sunkIdx = results.filter(x => x.v === 'sunk').map(x => x.si);
+  const sunkNames = sunkIdx.map(i => (Number.isInteger(i) && i >= 0 && i < 5 ? shipName(i) : '?'));
   if (kind === 'shot') {
     const v = results[0] && results[0].v;
-    const word = { miss: 'raté.', hit: 'touché !', blocked: 'bloqué par un bouclier.', sunk: 'coulé !' }[v] || '';
-    return `Tir en ${cellName(...at)} : ${word}${sunk.length ? ' (' + sunk[0] + ')' : ''}`;
+    return t('sumShot', { cell, v, ship: sunkNames[0] || '' });
   }
-  const hits = results.filter(x => x.v === 'hit' || x.v === 'sunk').length;
-  const miss = results.filter(x => x.v === 'miss').length;
-  const blk = results.filter(x => x.v === 'blocked').length;
-  const parts = [plural(hits, 'touché'), plural(miss, 'raté')];
-  if (blk) parts.push(plural(blk, 'bloqué'));
-  return `Frappe en croix sur ${cellName(...at)} : ${parts.join(', ')}.${sunkTxt}`;
+  return t('sumCross', {
+    cell, hits: results.filter(x => x.v === 'hit' || x.v === 'sunk').length, miss: results.filter(x => x.v === 'miss').length,
+    blk: results.filter(x => x.v === 'blocked').length, sunk: sunkNames.join(t('and')), sunkN: sunkNames.length,
+  });
+}
+function playResultSound(results) {
+  if (results.some(x => x.v === 'sunk')) { Snd.play('sunk'); Snd.buzz([80, 40, 140]); }
+  else if (results.some(x => x.v === 'hit')) { Snd.play('hit'); Snd.buzz(50); }
+  else if (results.some(x => x.v === 'blocked')) Snd.play('blocked');
+  else if (results.some(x => x.v === 'miss')) Snd.play('miss');
 }
 
 // Le défenseur calcule le résultat sur sa propre grille.
 function onAct(m) {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;  // ce n'est pas le tour de l'adversaire
   const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
-  const cells = (Array.isArray(m.cells) ? m.cells : [])
-    .filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && inside(p[0], p[1]))
-    .slice(0, 5);
-  const occ = occupancy(), results = [];
-  for (const [r, c] of cells) {
-    const k = r * N + c, i = occ[k];
-    if (kind === 'radar') { results.push({ r, c, v: i >= 0 ? 'occ' : 'empty' }); continue; }
-    if (S.incoming[k] === 'miss' || S.incoming[k] === 'hit') { results.push({ r, c, v: S.incoming[k] }); continue; }
-    if (i < 0) { S.incoming[k] = 'miss'; results.push({ r, c, v: 'miss' }); continue; }
-    const s = S.ships[i];
-    if (s.shield === 'active') { s.shield = 'used'; S.incoming[k] = 'blocked'; results.push({ r, c, v: 'blocked' }); continue; }
-    S.incoming[k] = 'hit';
-    results.push(isSunk(s) ? { r, c, v: 'sunk', ship: s.cells, name: s.name } : { r, c, v: 'hit' });
-  }
-  const over = S.ships.every(isSunk);
+  const cells = sanitizeCells(m.cells);
+  const { results, over } = resolveOn(S.ships, S.incoming, kind, cells);
   send({ t: 'res', kind, at: m.at, results, over });
   const at = Array.isArray(m.at) && inside(m.at[0], m.at[1]) ? m.at : (cells[0] || [0, 0]);
-  setLog((S.opp ? S.opp.name : 'Adversaire') + ' — ' + summarize(kind, at, results), true);
+  S.lastIn = kind === 'radar' ? [] : cells.map(([r, c]) => r * N + c);
+  setLog(t('oppPrefix', { name: S.opp ? S.opp.name : '?' }) + summarize(kind, at, results), true);
+  if (kind === 'radar') Snd.play('radar'); else playResultSound(results);
   if (over) return endGame(false);
   S.myTurn = true; S.waiting = false;
+  setTimeout(() => { if (S.myTurn && S.phase === 'game') Snd.play('turn'); }, 500);
   renderGame();
 }
 
 // L'attaquant reçoit le résultat.
 function onRes(m) {
   if (S.phase !== 'game' || !S.waiting) return;
-  const results = Array.isArray(m.results) ? m.results : [];
+  const results = (Array.isArray(m.results) ? m.results : []).filter(x => x && inside(x.r, x.c));
   const act = S.pendingAct || { kind: m.kind, at: m.at };
   let sunk = 0;
   for (const x of results) {
-    if (!inside(x.r, x.c)) continue;
     if (x.v === 'sunk') {
-      (Array.isArray(x.ship) ? x.ship : [[x.r, x.c]]).forEach(([r, c]) => { if (inside(r, c)) S.enemy[r * N + c] = 'sunk'; });
-      S.enemySunk.push(x.name); sunk++;
+      (Array.isArray(x.ship) ? x.ship : [[x.r, x.c]]).forEach(p => { if (Array.isArray(p) && inside(p[0], p[1])) S.enemy[p[0] * N + p[1]] = 'sunk'; });
+      if (Number.isInteger(x.si) && x.si >= 0 && x.si < 5 && !S.enemySunk.includes(x.si)) S.enemySunk.push(x.si);
+      sunk++;
     } else {
       const st = { miss: 'miss', hit: 'hit', blocked: 'blocked', occ: 'scanOcc', empty: 'scanEmpty' }[x.v];
       if (st) S.enemy[x.r * N + x.c] = st;
@@ -1001,6 +1831,7 @@ function onRes(m) {
     S.match.shots += results.length;
     S.match.hits += results.filter(x => x.v === 'hit' || x.v === 'sunk').length;
     S.match.sunk += sunk;
+    playResultSound(results);
   }
   setLog(summarize(act.kind, act.at, results));
   S.waiting = false; S.pendingAct = null;
@@ -1008,25 +1839,28 @@ function onRes(m) {
   S.myTurn = false;
   S.choices += sunk;
   renderGame();
-  if (S.choices > 0) openChoice();
+  if (S.choices > 0) setTimeout(openChoice, 500);
 }
 function onPass() {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;
   S.myTurn = true;
-  setLog((S.opp ? S.opp.name : 'Adversaire') + ' — bouclier posé sur un de ses bateaux.', true);
+  S.lastIn = [];
+  setLog(t('oppShield', { name: S.opp ? S.opp.name : '?' }), true);
+  Snd.play('turn');
   renderGame();
 }
 
 /* ---------- Améliorations ---------- */
+const UPG = { radar: ['fa-satellite-dish', 'upRadarN', 'upRadarD'], cross: ['fa-plus', 'upCrossN', 'upCrossD'], shield: ['fa-shield-halved', 'upShieldN', 'upShieldD'] };
 function openChoice() {
   if (S.phase !== 'game' || S.choices <= 0) { $('choice').classList.remove('show'); return; }
-  $('choiceSub').textContent = 'Choisis une amélioration' + (S.choices > 1 ? ` (${S.choices} à choisir)` : '') + ' :';
+  $('choiceSub').textContent = S.choices > 1 ? t('choiceSubN', { n: S.choices }) : t('choiceSub');
   const list = $('choiceList'); list.innerHTML = '';
-  for (const [k, u] of Object.entries(UPG)) {
+  for (const [k, [icon, nk, dk]] of Object.entries(UPG)) {
     const b = document.createElement('button');
     b.className = 'opt';
-    b.innerHTML = `<strong>${u.icon} ${u.name}</strong><span>${u.desc}</span>`;
-    b.onclick = () => { S.inv[k]++; S.choices--; renderGame(); openChoice(); };
+    b.innerHTML = `<strong><i class="fa-solid ${icon}" style="color:var(--yellow);margin-right:8px"></i>${esc(t(nk))}</strong><span>${esc(t(dk))}</span>`;
+    b.onclick = () => { S.inv[k]++; S.choices--; Snd.play('upgrade'); renderGame(); openChoice(); };
     list.appendChild(b);
   }
   $('choice').classList.add('show');
@@ -1036,30 +1870,37 @@ function openChoice() {
 function endGame(win) {
   S.phase = 'over';
   S.myTurn = false; S.waiting = false;
+  if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
   $('endIcon').textContent = win ? '🏆' : '🌊';
-  $('endTitle').textContent = win ? 'Victoire !' : 'Défaite…';
+  $('endTitle').textContent = t(win ? 'win' : 'lose');
   const acc = S.match.shots ? Math.round(S.match.hits / S.match.shots * 100) : 0;
-  $('endText').textContent = (win ? 'Tu as coulé toute la flotte adverse.' : 'Toute ta flotte a été coulée.')
-    + ` ${plural(S.match.shots, 'tir')}, ${acc} % de précision.`;
+  $('endText').textContent = t(win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
   const r = recordGame(win);
-  $('endXp').innerHTML = r
-    ? `<div class="xpgain">+${r.gain} XP</div>${r.up ? `<div class="lvlup">⬆ Niveau ${r.level} : ${rankOf(r.level)} !</div>` : ''}${profileHTML(me(), false)}`
-    : '<p class="sub">Joue avec un compte pour gagner de l\'XP.</p>';
-  $('end').classList.add('show');
+  if (r) {
+    const a = me(), l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
+    $('endXp').innerHTML = `<div class="xpgain">+${r.gain} XP</div>`
+      + (r.up ? `<div class="lvlup">⬆ ${esc(t('levelUp', { n: r.level, rank: rankOf(r.level) }))}</div>` : '')
+      + (S.vsBot ? `<div class="endnote">${esc(t('botXp'))}</div>` : '')
+      + `<div class="xpbar"><i style="width:${Math.round((a.xp - lo) / (hi - lo) * 100)}%"></i></div>`
+      + `<div class="xprow"><span>XP: <b>${a.xp - lo} / ${hi - lo}</b></span><span>${esc(t('levelN', { n: l }))}</span></div>`;
+  } else $('endXp').innerHTML = `<p class="endnote">${esc(t('xpGuest'))}</p>`;
+  setTimeout(() => Snd.play(win ? 'win' : 'lose'), 600);
+  setTimeout(() => $('end').classList.add('show'), 700);
   renderGame();
 }
 
 /* ---------- Affichage de la partie ---------- */
 let hintTimer = null;
-function flashHint(t) {
-  const h = $('hint'); h.textContent = t; h.style.color = 'var(--err)';
+function flashHint(text) {
+  const h = $('hint'); h.textContent = text; h.style.color = '#fca5a5';
   clearTimeout(hintTimer);
   hintTimer = setTimeout(() => { h.style.color = ''; renderHint(); }, 1800);
 }
 function renderHint() {
-  if (S.phase === 'game' && S.oppAway) { $('hint').textContent = 'L\'adversaire a quitté l\'écran du jeu… (2 min max)'; return; }
-  $('hint').textContent = (S.phase === 'game' && S.myTurn && !S.waiting) ? HINTS[S.mode] : '';
+  if (S.phase === 'game' && S.oppAway) { $('hint').textContent = t('oppAway'); return; }
+  const key = { shot: 'hintShot', radar: 'hintRadar', cross: 'hintCross', shield: 'hintShield' }[S.mode];
+  $('hint').textContent = (S.phase === 'game' && S.myTurn && !S.waiting) ? t(key) : '';
 }
 function setLog(text, fromOpp) {
   const l = $('log'); l.textContent = text; l.className = 'log' + (fromOpp ? ' opp' : '');
@@ -1067,11 +1908,11 @@ function setLog(text, fromOpp) {
 function renderGame() {
   const live = S.phase === 'game' && S.myTurn && !S.waiting;
   const st = $('status');
-  if (S.lost) { st.textContent = 'Connexion perdue'; st.className = 'status'; }
-  else if (S.phase === 'over') { st.textContent = 'Partie terminée'; st.className = 'status'; }
-  else if (S.waiting) { st.textContent = 'Tir en cours'; st.className = 'status wait'; }
-  else if (S.myTurn) { st.textContent = 'À toi de jouer'; st.className = 'status me'; }
-  else { st.textContent = 'Tour de l\'adversaire'; st.className = 'status'; }
+  if (S.lost) { st.textContent = t('stLost'); st.className = 'status'; }
+  else if (S.phase === 'over') { st.textContent = t('stOver'); st.className = 'status'; }
+  else if (S.waiting) { st.textContent = t('stFiring'); st.className = 'status wait'; }
+  else if (S.myTurn) { st.textContent = t('stMyTurn'); st.className = 'status me'; }
+  else { st.textContent = t('stOppTurn'); st.className = 'status'; }
 
   const SYM = { miss: '•', hit: '✕', sunk: '✕', blocked: '🛡', scanOcc: '?', scanEmpty: '·' };
   const eg = $('enemyGrid');
@@ -1092,11 +1933,12 @@ function renderGame() {
     if (v === 'hit' && !(i >= 0 && isSunk(S.ships[i]))) cls += ' hit';
     if (v === 'miss') cls += ' miss';
     if (v === 'blocked') cls += ' blocked';
+    if (S.lastIn.includes(k)) cls += ' last';   // dernier tir adverse
     d.className = cls;
     d.textContent = v ? SYM[v] : '';
   });
 
-  $('enemyFleet').innerHTML = FLEET.map(([n]) => `<span class="${S.enemySunk.includes(n) ? 'down' : ''}">${n}</span>`).join('');
+  $('enemyFleet').innerHTML = LENS.map((_, i) => `<span class="${S.enemySunk.includes(i) ? 'down' : ''}">${esc(shipName(i))}</span>`).join('');
 
   document.querySelectorAll('#modes button').forEach(b => {
     const m = b.dataset.mode;
@@ -1107,9 +1949,9 @@ function renderGame() {
   renderHint();
 }
 
-/* ---------- Démarrage ---------- */
-loadStore();
-initCur();
+/* =========================================================
+   Démarrage
+   ========================================================= */
 buildGrid($('placeGrid'), null);
 buildGrid($('enemyGrid'), onEnemyTap);
 buildGrid($('myGrid'), onMyTap);
@@ -1119,31 +1961,58 @@ pg.addEventListener('pointermove', onPlaceMove);
 pg.addEventListener('pointerup', onPlaceUp);
 pg.addEventListener('pointercancel', () => { S.drag = null; });
 
-$('btnHost').onclick = hostGame;
+// Connexion
+$('segLogin').onclick = () => { msg('authMsg', ''); openAuth('login'); };
+$('segSignup').onclick = () => { msg('authMsg', ''); openAuth('signup'); };
+$('btnLogin').onclick = doLogin;
+$('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('btnSignup').onclick = doSignup;
+$('suPass2').addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
+$('btnGuest').onclick = () => { setSession(null); openDash('play'); };
+
+// Tableau de bord
+document.querySelectorAll('.tabsnav [data-pane]').forEach(b => { b.onclick = () => { pane = b.dataset.pane; msg('setMsg', ''); Snd.play('click'); renderDash(); }; });
+$('btnLogout').onclick = () => { clearSession(); msg('authMsg', ''); openAuth('login'); };
+$('avUp').addEventListener('click', e => { e.preventDefault(); pickPhoto(); });
+$('avatarFile').addEventListener('change', onPhotoFile);
+$('btnPhoto').onclick = pickPhoto;
+$('btnPhotoDel').onclick = () => { loadAccounts(); const a = me(); if (a) { a.photo = null; saveAccount(a); renderDash(); } };
+$('sndToggle').onclick = () => { settings.sound = !settings.sound; saveSettings(); renderSettings(); Snd.play('click'); };
+const setLang = v => { settings.lang = I18N[v] ? v : 'fr'; saveSettings(); applyLang(); if ($('dash').classList.contains('active')) renderDash(); else if ($('auth').classList.contains('active')) openAuth(authTab); };
+$('langSel').onchange = e => setLang(e.target.value);
+$('langMini').onchange = e => setLang(e.target.value);
+$('btnSaveProfile').onclick = saveProfile;
+$('btnDelete').onclick = deleteAccount;
+$('mRandom').onclick = () => { Snd.play('click'); findRandom(); };
+$('mBot').onclick = () => { Snd.play('click'); startBot(); };
+$('mJoin').onclick = () => { Snd.play('click'); openJoin(''); };
+$('mHost').onclick = () => { Snd.play('click'); hostGame(); };
+
+// Rejoindre
 $('btnJoin').onclick = joinGame;
-$('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
-$('codeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); msg('menuMsg', ''); });
-$('btnCopy').onclick = async () => {
-  try { await navigator.clipboard.writeText(S.code); msg('lobbyMsg', 'Code copié !'); }
-  catch (e) { msg('lobbyMsg', 'Copie impossible : note le code à la main.'); }
+$('btnJoinCancel').onclick = () => {
+  if (S.peer && !S.connected) { try { S.peer.destroy(); } catch (e) {} S.peer = null; S.conn = null; clearTimeout(S.joinTimer); }
+  $('joinModal').classList.remove('show');
 };
+$('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
+$('codeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); msg('joinMsg', ''); });
+
+// Salon
+const copy = async (text) => {
+  try { await navigator.clipboard.writeText(text); msg('lobbyMsg', t('copied'), 'ok'); }
+  catch (e) { msg('lobbyMsg', t('copyFail'), true); }
+};
+$('btnCopy').onclick = () => copy(S.code);
+$('btnCopyLink').onclick = () => copy(location.origin + location.pathname + '?code=' + S.code);
+
+// Placement et partie
 $('btnRotate').onclick = rotateShip;
 $('btnRandom').onclick = randomFleet;
 $('btnClear').onclick = clearFleet;
 $('btnConfirm').onclick = confirmPlacement;
 $('btnRemove').onclick = removeShip;
 $('btnReady').onclick = setReady;
-$('btnCreate').onclick = createAccount;
-$('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') createAccount(); });
-$('btnGuest').onclick = () => { setCur(null); renderMenu(); show('menu'); };
-// Un autre onglet a modifié les comptes : on rafraîchit le menu.
-window.addEventListener('storage', e => {
-  if (e.key !== null && !e.key.startsWith(STORE_KEY)) return;
-  loadStore();
-  if ($('menu').classList.contains('active')) renderMenu();
-});
-$('btnDelete').onclick = deleteAccount;
-document.querySelectorAll('[data-back]').forEach(b => { b.onclick = () => { renderMenu(); show('menu'); }; });
+document.querySelectorAll('.btnQuit').forEach(b => { b.onclick = quitGame; });
 document.querySelectorAll('#modes button').forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
 $('btnSeeGrids').onclick = () => $('end').classList.remove('show');
 
@@ -1155,20 +2024,30 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Delete' || e.key === 'Backspace') removeShip();
 });
 
-const urlCode = new URLSearchParams(location.search).get('code');
-if (urlCode) $('codeInput').value = urlCode.toUpperCase().slice(0, 6);
-renderMenu();
+// Un autre onglet a modifié les comptes : on rafraîchit l'affichage.
+window.addEventListener('storage', e => {
+  if (e.key !== null && !e.key.startsWith(STORE_KEY)) return;
+  if ($('dash').classList.contains('active')) renderDash();
+  else if ($('auth').classList.contains('active')) openAuth(authTab);
+});
 
 // Bloque le zoom par pincement (Safari iOS ignore user-scalable=no).
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-
 document.addEventListener('visibilitychange', onVisibility);
-
 window.addEventListener('pagehide', () => {
-  try { if (S.conn) S.conn.close(); } catch (e) {}
+  try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
   try { if (S.peer) S.peer.destroy(); } catch (e) {}
 });
+
+// Lien d'invitation (?code=…) : la fenêtre « Rejoindre » s'ouvre dès qu'on arrive au tableau de bord.
+pendingCode = (new URLSearchParams(location.search).get('code') || '').toUpperCase().slice(0, 6) || null;
+applyLang();
+loadAccounts();
+restoreSession();
+// #stats ou #settings dans l'adresse ouvre directement cet onglet.
+const startPane = ['play', 'stats', 'settings'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'play';
+if (loggedIn) openDash(startPane); else openAuth();
 </script>
 </body>
 </html>
