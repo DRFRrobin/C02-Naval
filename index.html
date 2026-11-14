@@ -574,7 +574,7 @@ const I18N = {
     upCrossN: 'Frappe en croix', upCrossD: 'Tire sur la case visée et ses 4 voisines. Coûte le tour.',
     upShieldN: 'Bouclier', upShieldD: 'Le premier coup sur un de tes bateaux est annulé. Coûte le tour, sans tir.',
     choiceTitle: 'Bateau ennemi coulé !', choiceSub: 'Choisis une amélioration :', choiceSubN: 'Choisis une amélioration ({n} à choisir) :',
-    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', loseText: 'Toute ta flotte a été coulée.',
+    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', winForfeit: "L'adversaire a abandonné la partie.", loseText: 'Toute ta flotte a été coulée.',
     endStats: p => `${pl(p.shots, 'tir', 'tirs')}, ${p.acc} % de précision.`,
     lostTitle: 'Connexion perdue', lostText: "La liaison avec l'adversaire est coupée. La partie est arrêtée.",
     newGame: 'Nouvelle partie', seeGrids: 'Voir les grilles', xpGuest: "Joue avec un compte pour gagner de l'XP.",
@@ -663,7 +663,7 @@ const I18N = {
     upCrossN: 'Cross strike', upCrossD: 'Fires at the targeted square and its 4 neighbours. Costs your turn.',
     upShieldN: 'Shield', upShieldD: 'The first hit on one of your ships is cancelled. Costs your turn, no shot.',
     choiceTitle: 'Enemy ship sunk!', choiceSub: 'Pick an upgrade:', choiceSubN: 'Pick an upgrade ({n} to pick):',
-    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', loseText: 'Your whole fleet was sunk.',
+    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', winForfeit: 'The opponent left the game.', loseText: 'Your whole fleet was sunk.',
     endStats: p => `${pl(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
     lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
     newGame: 'New game', seeGrids: 'View grids', xpGuest: 'Play with an account to earn XP.',
@@ -731,7 +731,7 @@ const S = {
   enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
   lastSeen: 0, hb: null, joinTimer: null, pendingAct: null, oppAway: false, wakeLock: null,
   mmTimer: null, mmStopped: false, onReject: null,
-  opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
+  oppUsed: 0, opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
 };
 
 /* ---------- Outils ---------- */
@@ -755,6 +755,13 @@ const sunkOf = (s, incoming) => !!s.cells && s.cells.every(([r, c]) => incoming[
 const isSunk = s => sunkOf(s, S.incoming);
 const targetable = k => S.enemy[k] === null || S.enemy[k] === 'scanOcc' || S.enemy[k] === 'scanEmpty' || S.enemy[k] === 'blocked';
 function randomCells(lens) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const out = randomCellsOnce(lens);
+    if (out.every(Boolean)) return out;
+  }
+  return randomCellsOnce(lens);
+}
+function randomCellsOnce(lens) {
   const ships = lens.map(len => ({ len, cells: null }));
   for (const s of ships) {
     for (let tries = 0; tries < 3000 && !s.cells; tries++) {
@@ -1104,7 +1111,7 @@ function recordGame(win) {
   s.timePlayed += m.start ? Math.round((Date.now() - m.start) / 1000) : 0;
   if (win) {
     s.wins++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak);
-    if (!s.fastestWin || m.shots < s.fastestWin) s.fastestWin = m.shots;
+    if (m.shots > 0 && (!s.fastestWin || m.shots < s.fastestWin)) s.fastestWin = m.shots;
   } else { s.losses++; s.streak = 0; }
   saveAccount(a);
   return { gain, level: levelOf(a.xp), up: levelOf(a.xp) > before };
@@ -1342,8 +1349,13 @@ function quitGame() {
   if (!confirm(t('quitConfirm'))) return;
   recordInterrupted();
   S.phase = 'over';
-  try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
-  location.reload();
+  if (!S.vsBot) send({ t: 'quit' });
+  if (S.bot) S.bot.stop();
+  // Petit délai pour que le message d'abandon parte avant la fermeture du lien.
+  setTimeout(() => {
+    try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
+    location.reload();
+  }, S.vsBot ? 0 : 250);
 }
 
 /* Veille et arrière-plan */
@@ -1391,6 +1403,10 @@ function onData(m) {
     case 'act': onAct(m); break;
     case 'res': onRes(m); break;
     case 'pass': onPass(); break;
+    case 'quit':
+      if (S.phase === 'game') endGame(true, true);
+      else lost();
+      break;
   }
 }
 
@@ -1415,10 +1431,10 @@ class Bot {
   }
   receive(m) {
     if (m.t === 'act') {
-      const cells = sanitizeCells(m.cells);
-      const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
+      const a = normalizeAct(m, true); if (!a) return;
+      const { kind, cells } = a;
       const { results, over } = resolveOn(this.ships, this.incoming, kind, cells);
-      this.emit({ t: 'res', kind, at: m.at, results, over }, 450);
+      this.emit({ t: 'res', kind, at: a.at, results, over }, 450);
       if (!over) this.later(() => this.move(), 450 + 700 + Math.random() * 600);
     } else if (m.t === 'pass') {
       this.later(() => this.move(), 900);
@@ -1709,6 +1725,23 @@ function sanitizeCells(list) {
     .filter(p => Array.isArray(p) && Number.isInteger(p[0]) && Number.isInteger(p[1]) && inside(p[0], p[1]))
     .slice(0, 5);
 }
+// Normalise une action reçue : un tir = 1 case, un radar = carré 2 × 2, une frappe en croix = 5 cases.
+// Une amélioration non gagnée est ramenée à un simple tir (anti-triche et robustesse).
+function normalizeAct(m, canUpgrade) {
+  const raw = sanitizeCells(m.cells);
+  const okPt = Array.isArray(m.at) && Number.isInteger(m.at[0]) && Number.isInteger(m.at[1]) && inside(m.at[0], m.at[1]);
+  const at = okPt ? [m.at[0], m.at[1]] : (raw[0] || null);
+  if (!at) return null;
+  let kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
+  if (kind !== 'shot' && !canUpgrade) kind = 'shot';
+  const [r, c] = at;
+  const allowed = kind === 'radar' ? [[r, c], [r, c + 1], [r + 1, c], [r + 1, c + 1]]
+    : kind === 'cross' ? [[r, c], [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]] : [[r, c]];
+  let cells = raw.filter(([a, b]) => allowed.some(([x, y]) => x === a && y === b));
+  cells = cells.filter((p, i) => cells.findIndex(q => q[0] === p[0] && q[1] === p[1]) === i);
+  if (!cells.length) cells = [at];
+  return { kind, at, cells };
+}
 // Calcule le résultat de tirs sur une flotte (la sienne ou celle du bot).
 function resolveOn(ships, incoming, kind, cells) {
   const occ = occOf(ships), results = [];
@@ -1797,11 +1830,12 @@ function playResultSound(results) {
 // Le défenseur calcule le résultat sur sa propre grille.
 function onAct(m) {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;  // ce n'est pas le tour de l'adversaire
-  const kind = ['shot', 'cross', 'radar'].includes(m.kind) ? m.kind : 'shot';
-  const cells = sanitizeCells(m.cells);
+  const a = normalizeAct(m, S.oppUsed < S.ships.filter(isSunk).length);
+  if (!a) return;
+  const { kind, cells, at } = a;
+  if (kind !== 'shot') S.oppUsed++;
   const { results, over } = resolveOn(S.ships, S.incoming, kind, cells);
-  send({ t: 'res', kind, at: m.at, results, over });
-  const at = Array.isArray(m.at) && inside(m.at[0], m.at[1]) ? m.at : (cells[0] || [0, 0]);
+  send({ t: 'res', kind, at, results, over });
   S.lastIn = kind === 'radar' ? [] : cells.map(([r, c]) => r * N + c);
   setLog(t('oppPrefix', { name: S.opp ? S.opp.name : '?' }) + summarize(kind, at, results), true);
   if (kind === 'radar') Snd.play('radar'); else playResultSound(results);
@@ -1843,6 +1877,8 @@ function onRes(m) {
 }
 function onPass() {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;
+  if (S.oppUsed >= S.ships.filter(isSunk).length) return;   // bouclier non gagné : ignoré
+  S.oppUsed++;
   S.myTurn = true;
   S.lastIn = [];
   setLog(t('oppShield', { name: S.opp ? S.opp.name : '?' }), true);
@@ -1867,15 +1903,16 @@ function openChoice() {
 }
 
 /* ---------- Fin de partie ---------- */
-function endGame(win) {
+function endGame(win, forfeit) {
   S.phase = 'over';
+  clearInterval(S.hb);
   S.myTurn = false; S.waiting = false;
   if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
   $('endIcon').textContent = win ? '🏆' : '🌊';
   $('endTitle').textContent = t(win ? 'win' : 'lose');
   const acc = S.match.shots ? Math.round(S.match.hits / S.match.shots * 100) : 0;
-  $('endText').textContent = t(win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
+  $('endText').textContent = t(forfeit ? 'winForfeit' : win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
   const r = recordGame(win);
   if (r) {
     const a = me(), l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
@@ -2035,13 +2072,15 @@ window.addEventListener('storage', e => {
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 document.addEventListener('visibilitychange', onVisibility);
-window.addEventListener('pagehide', () => {
+window.addEventListener('pagehide', e => {
+  if (e.persisted) return;
   try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
   try { if (S.peer) S.peer.destroy(); } catch (e) {}
 });
 
 // Lien d'invitation (?code=…) : la fenêtre « Rejoindre » s'ouvre dès qu'on arrive au tableau de bord.
 pendingCode = (new URLSearchParams(location.search).get('code') || '').toUpperCase().slice(0, 6) || null;
+try { if (pendingCode !== null || location.search) history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
 applyLang();
 loadAccounts();
 restoreSession();
