@@ -1,0 +1,39 @@
+[package]
+name = "c02-naval"
+version = "1.1.0"
+edition = "2021"
+description = "C02 Naval : bataille navale multijoueur pour Windows (Rust, egui, WebRTC compatible PeerJS)"
+publish = false
+
+[dependencies]
+eframe = { version = "0.29", default-features = false, features = ["default_fonts", "glow", "persistence"] }
+egui-phosphor = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+webrtc = "0.11"
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+rand = "0.8"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
+rfd = "0.14"
+arboard = { version = "3", default-features = false }
+cpal = "0.15"
+dirs = "5"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+windows-sys = { version = "0.52", features = ["Win32_System_Power"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
