@@ -3,7 +3,7 @@
      et, hors ligne, depuis le cache : le jeu s'ouvre et on peut jouer contre le bot.
    - Les bibliothèques et polices (CDN) sont gardées en cache après la première visite.
    - Rien d'autre n'est intercepté : le serveur PeerJS, les WebSockets et le TURN passent directement. */
-const VERSION = 'c02-naval-v1';
+const VERSION = 'c02-naval-v1.2.0';   // = APP_VERSION d'index.html (vérifié par les tests)
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const CDN = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css'];
@@ -29,12 +29,13 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.origin === location.origin && url.pathname.endsWith('/version.json')) return;   // toujours lu directement sur le réseau
   if (url.origin === location.origin) {
     // même origine : réseau d'abord, cache en secours
     e.respondWith((async () => {
       const c = await caches.open(VERSION);
       try {
-        const r = await fetch(req);
+        const r = await fetch(req, { cache: 'no-cache' });   // on revalide : pas de vieille copie du cache HTTP
         if (r && r.ok) c.put(req.mode === 'navigate' ? 'index.html' : req, r.clone());
         return r;
       } catch (err) {

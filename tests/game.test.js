@@ -627,3 +627,69 @@ test('le texte du jeu n\'est pas sélectionnable, sauf les champs de saisie et l
   assert.equal(await pg.evaluate(() => getComputedStyle($('codeBox')).userSelect), 'all');
   await ctx.close();
 });
+
+/* ---------------- Version, mises à jour, sons ---------------- */
+test('numéro de version identique partout (package.json, index.html, version.json, service worker)', () => {
+  const v = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  assert.match(v, /^\d+\.\d+\.\d+$/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8')).version, v);
+  assert.equal(/const APP_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'))[1], v);
+  assert.ok(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8').includes(`'c02-naval-v${v}'`));
+});
+
+test('paramètres : le numéro de version s\'affiche et la recherche de mise à jour répond', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 1000, height: 800 });
+  const v = await pg.evaluate(() => APP_VERSION);
+  await pg.evaluate(() => { pane = 'settings'; renderDash(); });
+  assert.equal(await pg.textContent('#verNum'), v);
+  await pg.click('#btnVer');
+  await pg.waitForFunction(() => /dernière version|latest/.test($('verMsg').textContent), null, { timeout: 5000 });
+  assert.equal(await pg.isVisible('#updBar'), false, 'rien à signaler : pas de bandeau');
+  await ctx.close();
+});
+
+test('mise à jour : une version plus récente est détectée à l\'ouverture, un seul rechargement automatique', async () => {
+  const ctx = await newContext();
+  let hits = 0;
+  await ctx.route(/version\.json/, r => { hits++; r.fulfill({ contentType: 'application/json', body: '{"version":"99.0.0"}' }); });
+  const pg = await ctx.newPage();
+  let loads = 0; pg.on('load', () => loads++);
+  await pg.goto(base);
+  // 1er chargement : rechargement automatique ; 2e : garde-fou, le bandeau propose la mise à jour
+  await pg.waitForSelector('#updBar', { state: 'visible', timeout: 15000 });
+  assert.equal(loads, 2, 'un seul rechargement automatique (pas de boucle)');
+  assert.match(await pg.textContent('#updTxt'), /99\.0\.0/);
+  assert.ok(hits >= 2);
+  await ctx.close();
+});
+
+test('mise à jour : hors ligne ou fichier illisible, le jeu fonctionne sans rien afficher', async () => {
+  const ctx = await newContext();
+  await ctx.route(/version\.json/, r => r.abort());
+  const pg = await newPage(ctx);
+  await pg.waitForTimeout(800);
+  assert.equal(await pg.isVisible('#updBar'), false);
+  assert.equal(await pg.evaluate(() => S.phase), 'menu');
+  await ctx.close();
+});
+
+test('sons : chaque son est défini, joue sans erreur, et le volume est réglable', async () => {
+  const names = new Set([...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/Snd\.play\('([a-z]+)'\)/g)].map(m => m[1]));
+  ['win', 'lose', 'levelup', 'xp'].forEach(n => names.add(n));
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  const r = await pg.evaluate(async list => {
+    settings.sound = true; settings.volume = 0.5;
+    const missing = list.filter(n => typeof Snd.sounds[n] !== 'function');
+    const errs = [];
+    for (const n of list) { try { Snd.sounds[n] && Snd.sounds[n](Snd.get(), Snd); } catch (e) { errs.push(n + ': ' + e.message); } }
+    return { missing, errs, vol: Snd.bus.gain.value, hasRev: !!Snd.rev };
+  }, [...names]);
+  assert.deepEqual(r.missing, []);
+  assert.deepEqual(r.errs, []);
+  assert.equal(r.vol, 0.5); assert.ok(r.hasRev);
+  await pg.evaluate(() => { pane = 'settings'; renderDash(); });
+  await pg.fill('#volRange', '30');
+  assert.equal(await pg.evaluate(() => settings.volume), 0.3);
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
