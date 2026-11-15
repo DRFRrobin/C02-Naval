@@ -54,6 +54,14 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 **Texte non sélectionnable :** le texte du jeu ne se sélectionne ni ne se copie (pas de menu « copier » à l'appui long), pour éviter qu'un geste de déplacement de bateau sélectionne du texte. Les champs de saisie et le code de salon restent sélectionnables.
 
+## Version et mises à jour
+
+Le numéro de version (`1.2.0`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+
+**Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `index.html` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
+
+**Sons :** bruitages synthétisés (canon, explosion, éclaboussure, sonar, cloches, fanfare…) avec réverbération et compresseur ; le volume se règle dans Paramètres.
+
 ## Installer comme une application (iPhone, Android, PC)
 
 Le jeu est une application web installable : une fois ajoutée à l'écran d'accueil, elle s'ouvre en plein écran, avec son icône et sans barre d'adresse.
