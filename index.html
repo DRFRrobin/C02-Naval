@@ -39,6 +39,12 @@ try { if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone === t
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;touch-action:manipulation;overscroll-behavior-y:none}
+/* Pas de sélection de texte (ni menu « copier » à l'appui long) : évite de sélectionner du texte en voulant déplacer un bateau.
+   Restent sélectionnables : les champs de saisie et le code de salon (à partager). */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,[contenteditable],.code{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+.code{-webkit-user-select:all;user-select:all}
+img,svg{-webkit-user-drag:none;user-drag:none}
 html{-webkit-text-size-adjust:100%}
 .install-tip{display:none;align-items:center;gap:12px;background:var(--card2);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin:0 0 16px}
 .install-tip.show{display:flex}.install-tip>i{font-size:22px;color:var(--sky)}.install-tip div{flex:1;min-width:0;font-size:14px}.install-tip small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
@@ -244,6 +250,14 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box
 .log.opp{color:var(--muted)}
 
 /* Fenêtres */
+.rotate-lock{position:fixed;inset:0;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;
+  padding:24px;background:#050d1b;color:#e8f1fb;font:600 17px var(--font)}
+.rotate-lock i{font-size:44px;color:var(--sky);animation:rot 2.4s ease-in-out infinite}
+.rotate-lock small{display:block;font-weight:400;font-size:13px;color:#8aa3bf;margin-top:6px}
+@keyframes rot{0%,20%{transform:rotate(-90deg)}60%,100%{transform:rotate(0)}}
+/* Téléphone tenu à l'horizontale (écran tactile bas) : on demande de le remettre en portrait. Les tablettes et PC ne sont pas concernés. */
+@media (orientation:landscape) and (pointer:coarse) and (max-height:500px){.rotate-lock{display:flex}body{overflow:hidden}}
+@media (prefers-reduced-motion:reduce){.rotate-lock i{animation:none}}
 .overlay{position:fixed;inset:0;background:var(--overlay);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
 .overlay.show{display:flex}
 .modal{background:var(--modal);border:1px solid var(--border2);border-radius:16px;padding:24px 20px;width:100%;max-width:380px;max-height:calc(100dvh - 32px);overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.55)}
@@ -694,6 +708,8 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
   </div>
 </div>
 
+<div id="rotateLock" class="rotate-lock" role="alert"><i class="fa-solid fa-mobile-screen-button"></i><div data-i18n="rotateT"></div><small data-i18n="rotateD"></small></div>
+
 <!-- Fin de partie -->
 <div id="end" class="overlay">
   <div class="modal center">
@@ -844,6 +860,7 @@ const I18N = {
     lostTitle: 'Connexion perdue', lostText: "La liaison avec l'adversaire est coupée. La partie est arrêtée.",
     rematch: 'Revanche', rematchWait: 'En attente de {name}…', rematchOpp: '{name} propose une revanche !', rematchGone: "L'adversaire a quitté la partie.",
     xpBase1: 'Victoire', xpBase0: 'Participation', xpHits: 'Touchés', xpSunk: 'Bateaux coulés', xpAcc: 'Précision', xpTime: 'Rapidité',
+    rotateT: 'Remets ton téléphone en mode portrait', rotateD: 'Le jeu se joue à la verticale.',
     newGame: 'Nouvelle partie', seeGrids: 'Voir les grilles', xpGuest: "Joue avec un compte pour gagner de l'XP.",
     levelUp: 'Niveau {n} : {rank} !', botXp: "XP réduite de moitié contre le bot.",
     quit: 'Quitter', quitConfirm: 'Quitter la partie ? Elle sera comptée comme interrompue.',
@@ -979,6 +996,7 @@ const I18N = {
     lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
     rematch: 'Rematch', rematchWait: 'Waiting for {name}…', rematchOpp: '{name} wants a rematch!', rematchGone: 'Your opponent left the game.',
     xpBase1: 'Victory', xpBase0: 'Participation', xpHits: 'Hits', xpSunk: 'Ships sunk', xpAcc: 'Accuracy', xpTime: 'Speed',
+    rotateT: 'Turn your phone back to portrait', rotateD: 'The game is played upright.',
     newGame: 'New game', seeGrids: 'View grids', xpGuest: 'Play with an account to earn XP.',
     levelUp: 'Level {n}: {rank}!', botXp: 'XP halved against the bot.',
     quit: 'Quit', quitConfirm: 'Quit the game? It will count as interrupted.',
@@ -3011,6 +3029,9 @@ window.addEventListener('pagehide', e => {
 pendingCode = (new URLSearchParams(location.search).get('code') || '').toUpperCase().slice(0, 6) || null;
 try { if (pendingCode !== null || location.search) history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
 applyTheme();
+document.addEventListener('contextmenu', e => { if (!e.target.closest('input,textarea,.code')) e.preventDefault(); });
+document.addEventListener('selectstart', e => { if (!e.target.closest || !e.target.closest('input,textarea,.code')) e.preventDefault(); });
+try { if (screen.orientation && screen.orientation.lock && /Android|iPhone|iPod/.test(navigator.userAgent)) screen.orientation.lock('portrait').catch(() => {}); } catch (e) {}
 applyLang();
 loadAccounts();
 restoreSession();

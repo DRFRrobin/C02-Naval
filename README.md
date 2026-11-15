@@ -50,6 +50,10 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 - Si un profil du même pseudo existe déjà, le plus avancé est conservé (confirmation avant d'écraser).
 - La sécurité repose sur la phrase secrète : plus elle est longue, mieux c'est. Ce n'est pas une synchronisation automatique : chaque transfert est manuel.
 
+**Orientation :** sur téléphone, le jeu est prévu en portrait. L'application installée est verrouillée en portrait (Android ; iOS ne permet pas de verrouiller l'écran) et, si le téléphone est tourné, un écran demande de le remettre à la verticale. Les tablettes et ordinateurs ne sont pas concernés.
+
+**Texte non sélectionnable :** le texte du jeu ne se sélectionne ni ne se copie (pas de menu « copier » à l'appui long), pour éviter qu'un geste de déplacement de bateau sélectionne du texte. Les champs de saisie et le code de salon restent sélectionnables.
+
 ## Installer comme une application (iPhone, Android, PC)
 
 Le jeu est une application web installable : une fois ajoutée à l'écran d'accueil, elle s'ouvre en plein écran, avec son icône et sans barre d'adresse.
