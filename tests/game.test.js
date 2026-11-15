@@ -24,7 +24,8 @@ before(async () => {
 });
 after(async () => { await browser.close(); server.close(); });
 
-async function newPage(ctx, viewport) {
+let pseudoN = 0;
+async function newPage(ctx, viewport, pseudo) {
   const pg = await ctx.newPage();
   if (viewport) await pg.setViewportSize(viewport);
   const errors = [];
@@ -32,13 +33,14 @@ async function newPage(ctx, viewport) {
   pg.on('pageerror', e => errors.push(e.message));
   pg.on('dialog', d => d.accept());
   await pg.goto(base);
-  await pg.click('#btnGuest');
+  if (!(await pg.$('#auth.active'))) await pg.click('#btnLogout');   // le profil du premier onglet est repris : on change de pseudo
+  await pg.fill('#suName', pseudo || 'Joueur' + (++pseudoN));
+  await pg.click('#btnPlay');
   return pg;
 }
 async function newContext() {
   const ctx = await browser.newContext();
   await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());   // aucun accès réseau : PeerJS est simulé
-  await ctx.addInitScript(() => { window.C02_CONFIG = { url: '', key: '' }; });   // ces tests couvrent le mode sans Supabase
   await ctx.addInitScript({ path: path.join(__dirname, 'fake-peer.js') });
   return ctx;
 }
@@ -240,6 +242,52 @@ test('un adversaire ne peut pas tricher avec une amélioration non gagnée', asy
   await B.waitForFunction(() => S.myTurn, null, { timeout: 5000 });
   const hits = await B.evaluate(() => S.incoming.filter(Boolean).length);
   assert.equal(hits, 1, 'seule 1 case doit être touchée');
+  await ctx.close();
+});
+
+/* ---------------- Profil dans le navigateur (pseudo seul) ---------------- */
+test('connexion : un pseudo suffit, sans mot de passe', async () => {
+  const ctx = await newContext(); const pg = await ctx.newPage();
+  const errs = []; pg.on('pageerror', e => errs.push(e.message));
+  await pg.goto(base);
+  assert.equal(await pg.locator('#auth input[type=password]').count(), 0, 'aucun champ mot de passe sur l\'écran de connexion');
+  await pg.fill('#suName', 'A');
+  await pg.click('#btnPlay');
+  assert.ok(await pg.$('#auth.active'), 'pseudo trop court refusé');
+  assert.match(await pg.textContent('#authMsg'), /\S/);
+  await pg.fill('#suName', 'Capitaine');
+  await pg.press('#suName', 'Enter');
+  await pg.waitForSelector('#dash.active');
+  assert.equal(await pg.textContent('#tbName'), 'Capitaine');
+  // le profil survit au rechargement (stocké dans le navigateur)
+  await pg.reload();
+  await pg.waitForSelector('#dash.active');
+  assert.equal(await pg.textContent('#tbName'), 'Capitaine');
+  assert.deepEqual(errs, []);
+  await ctx.close();
+});
+
+test('connexion : retrouver un pseudo existant reprend son XP et ses statistiques', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, undefined, 'Amiral');
+  await pg.evaluate(() => { const a = me(); a.xp = 250; a.stats = { ...emptyStats(), games: 3, wins: 2 }; saveAccount(a); });
+  await pg.click('#btnLogout');
+  assert.ok(await pg.$('#auth.active'));
+  assert.equal(await pg.locator('#accPick .acc').count(), 1, 'le pseudo de cet appareil est proposé');
+  await pg.fill('#suName', 'amiral');                                  // casse différente : même profil
+  await pg.click('#btnPlay');
+  await pg.waitForSelector('#dash.active');
+  const r = await pg.evaluate(() => ({ xp: me().xp, games: me().stats.games, n: Object.keys(accounts).length }));
+  assert.deepEqual(r, { xp: 250, games: 3, n: 1 });
+  await ctx.close();
+});
+
+test('une partie contre le bot enregistre l\'XP dans le navigateur', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, undefined, 'Moussaillon');
+  const before = await pg.evaluate(() => me().xp);
+  const gain = await pg.evaluate(() => { S.match = { shots: 10, hits: 6, sunk: 2, upgrades: 0, start: Date.now() - 60000 }; S.vsBot = true; return recordGame(true).gain; });
+  assert.ok(gain > 0);
+  await pg.reload(); await pg.waitForSelector('#dash.active');
+  assert.equal(await pg.evaluate(() => me().xp), before + gain);
   await ctx.close();
 });
 
