@@ -4,6 +4,8 @@ Bataille navale dans le navigateur, sur PC ou téléphone. Sans installation, sa
 
 **Jouer :** https://drfrrobin.github.io/C02-Naval/
 
+**Version Windows (application native en Rust) :** voir le [README de la version Rust](rust/README.md) — téléchargement de l'exécutable sur la [page des versions](https://github.com/DRFRrobin/C02-Naval/releases).
+
 ## Modes de jeu
 
 - **Adversaire aléatoire** : affronte un joueur en ligne au hasard. Si personne n'est trouvé en 45 s, un bot prend sa place.
