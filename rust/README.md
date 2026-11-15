@@ -4,8 +4,21 @@ The full C02 Naval game, rewritten in Rust as a native Windows 11 x64 applicatio
 
 ## ⬇️ Download
 
-**[Latest Windows version (releases page)](https://github.com/DRFRrobin/C02-Naval/releases)**: download `C02-Naval-windows-x64.exe` and run it.
+- **[Download the latest version (C02-Naval-windows-x64.exe)](https://github.com/DRFRrobin/C02-Naval/releases/latest/download/C02-Naval-windows-x64.exe)**
+- **[See all releases](https://github.com/DRFRrobin/C02-Naval/releases)** (the most recent at the top)
+
 The executable isn't signed: if Windows SmartScreen shows a warning, click "More info" then "Run anyway".
+
+### Versions
+
+The most recent first:
+
+| Version | Date | Changes |
+|---|---|---|
+| [**1.2.0**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) (latest) | 2026-11-15 | Mandatory update from GitHub on every launch |
+| [1.1.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.1.0-windows) | 2026-11-15 | First Windows version in Rust |
+
+> Version 1.1.0 can't update itself: replace it once by hand with the latest version.
 
 ## Automatic updates (mandatory)
 
@@ -16,7 +29,7 @@ On every launch, the game checks the [GitHub releases](https://github.com/DRFRro
 - No Internet (or GitHub not responding): the game starts with the current version.
 - If the replacement fails (for example in a write-protected folder such as `Program Files`), a link to the releases page is shown.
 
-To publish an update: raise `version` in `Cargo.toml`, build, then create a release tagged `vX.Y.Z-windows` with the `C02-Naval-windows-x64.exe` file attached.
+To publish an update: raise `version` in `Cargo.toml`, build, then create a release tagged `vX.Y.Z-windows` with the `C02-Naval-windows-x64.exe` file attached, and add a line at the top of the **Versions** table.
 
 ## Features (same as the web version)
 
