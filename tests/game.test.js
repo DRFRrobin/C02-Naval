@@ -398,3 +398,23 @@ test('responsive : aucun débordement horizontal à 320 px (tous thèmes)', asyn
   assert.deepEqual(issues, []);
   await ctx.close();
 });
+
+test('téléphone : onglets en bas de l\'écran, profil/XP en haut', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
+  const r = await pg.evaluate(() => {
+    const n = document.querySelector('.tabsnav').getBoundingClientRect();
+    const t = document.querySelector('.topbar').getBoundingClientRect();
+    const last = document.querySelector('#pane-play').lastElementChild.getBoundingClientRect();
+    return { navBottom: n.bottom, navTop: n.top, h: innerHeight, topBottom: t.bottom, lastBottom: last.bottom };
+  });
+  assert.ok(Math.abs(r.navBottom - r.h) <= 1, 'barre collée en bas');
+  assert.ok(r.topBottom < 200, 'profil en haut et compact');
+  await pg.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  const clear = await pg.evaluate(() => document.querySelector('#pane-play').lastElementChild.getBoundingClientRect().bottom <= document.querySelector('.tabsnav').getBoundingClientRect().top);
+  assert.ok(clear, 'le contenu n\'est pas masqué par la barre');
+  // Ordinateur : la barre reste dans l'en-tête
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  const pos = await pg.evaluate(() => getComputedStyle(document.querySelector('.tabsnav')).position);
+  assert.equal(pos, 'static');
+  await ctx.close();
+});
