@@ -120,8 +120,14 @@ const SHIELD_SYM: &str = ic::SHIELD;
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.tick(ctx);
         theme::paint_background(ctx);
+        // Mise à jour obligatoire : tant qu'elle n'est pas faite, le jeu reste bloqué.
+        let upd = self.upd.lock().unwrap().clone();
+        if upd != crate::update::UpdState::UpToDate {
+            self.ui_update(ctx, upd);
+            return;
+        }
+        self.tick(ctx);
         egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
             egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
                 let pad = if ui.available_width() < 640.0 { 12.0 } else { 16.0 };
@@ -181,6 +187,67 @@ impl App {
                 self.remove_ship();
             }
         }
+    }
+
+    fn ui_update(&mut self, ctx: &egui::Context, st: crate::update::UpdState) {
+        use crate::update::UpdState;
+        egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
+            let h = ui.available_height();
+            ui.add_space((h * 0.22).max(16.0));
+            centered(ui, 440.0, |ui| {
+                egui::Frame::none()
+                    .fill(card())
+                    .stroke(sk(1.0, border2()))
+                    .rounding(18.0)
+                    .inner_margin(egui::Margin::symmetric(26.0, 28.0))
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.vertical_centered(|ui| {
+                            let (c, bg) = icon_colors("cyan");
+                            mode_icon(ui, ic::ANCHOR, c, bg, 64.0);
+                            label(ui, "C02 Naval", bold(26.0), TEXT);
+                            label(ui, format!("v{}", crate::update::current_version()), reg(13.0), MUTED);
+                            ui.add_space(12.0);
+                            match &st {
+                                UpdState::Checking => {
+                                    spinner(ui);
+                                    label(ui, self.t("updChecking"), reg(14.0), MUTED);
+                                }
+                                UpdState::Downloading { version, got, total } => {
+                                    label(ui, self.t("updTitle"), bold(20.0), YELLOW);
+                                    wrapped(ui, self.tf("updText", &[("to", version.clone()), ("from", crate::update::current_version())]), reg(14.0), MUTED);
+                                    ui.add_space(10.0);
+                                    let frac = if *total > 0 { *got as f32 / *total as f32 } else { 0.0 };
+                                    let w = ui.available_width();
+                                    xp_bar(ui, frac, w);
+                                    let pct = if *total > 0 { format!("{} %", (frac * 100.0).round()) } else { format!("{:.1} Mo", *got as f32 / 1e6) };
+                                    label(ui, self.tf("updDownloading", &[("pct", pct)]), reg(13.0), MUTED);
+                                    ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
+                                }
+                                UpdState::Restarting => {
+                                    spinner(ui);
+                                    label(ui, self.t("updRestarting"), reg(14.0), GREEN);
+                                }
+                                UpdState::Failed { version, .. } => {
+                                    label(ui, self.t("updTitle"), bold(20.0), YELLOW);
+                                    label(ui, format!("v{} → v{}", crate::update::current_version(), version), num(14.0), SKY);
+                                    ui.add_space(6.0);
+                                    wrapped(ui, self.t("updFailed"), reg(14.0), ERR);
+                                    ui.add_space(12.0);
+                                    if Btn::new(&self.t("updOpen")).icon(ic::LINK).style(Bs::Primary).wide().show(ui).clicked() {
+                                        let _ = std::process::Command::new("explorer").arg(crate::update::RELEASES_URL).spawn();
+                                    }
+                                    ui.add_space(4.0);
+                                    if Btn::new(&self.t("updQuit")).style(Bs::Ghost).wide().show(ui).clicked() {
+                                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                                    }
+                                }
+                                UpdState::UpToDate => {}
+                            }
+                        });
+                    });
+            });
+        });
     }
 
     /// Petit avatar : photo, initiale ou robot.

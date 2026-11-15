@@ -14,6 +14,7 @@ mod net;
 mod sound;
 mod theme;
 mod ui;
+mod update;
 
 use eframe::egui;
 

@@ -598,7 +598,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "c02-naval"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -612,6 +612,7 @@ dependencies = [
  "hmac",
  "image",
  "log",
+ "native-tls",
  "pbkdf2",
  "rand",
  "rfd",
@@ -620,6 +621,7 @@ dependencies = [
  "sha2",
  "tokio",
  "tokio-tungstenite",
+ "ureq",
  "webrtc",
  "windows-sys 0.52.0",
  "winresource",
@@ -4346,6 +4348,21 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
+name = "ureq"
+version = "2.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
+dependencies = [
+ "base64 0.22.1",
+ "log",
+ "native-tls",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "url",
+]
 
 [[package]]
 name = "url"

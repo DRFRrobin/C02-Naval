@@ -1,6 +1,6 @@
 [package]
 name = "c02-naval"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "C02 Naval : bataille navale multijoueur pour Windows (Rust, egui, WebRTC compatible PeerJS)"
 publish = false
@@ -16,6 +16,8 @@ bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
+ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
+native-tls = "0.2"
 rand = "0.8"
 pbkdf2 = "0.12"
 sha2 = "0.10"

@@ -293,6 +293,7 @@ pub struct App {
     awake: bool,
     pub focus_pass: bool,
     pub focus_code: bool,
+    pub upd: crate::update::Shared,
 }
 
 pub fn gen_code() -> String {
@@ -349,6 +350,7 @@ impl App {
             awake: false,
             focus_pass: false,
             focus_code: false,
+            upd: crate::update::start(cc.egui_ctx.clone()),
         };
         // Session précédente.
         match app.settings.current.clone() {
