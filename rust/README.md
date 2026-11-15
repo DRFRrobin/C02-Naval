@@ -1,86 +1,86 @@
-# ⚓ C02 Naval — native Windows version (Rust)
+# ⚓ C02 Naval — version Windows native (Rust)
 
-The full C02 Naval game, rewritten in Rust as a native Windows 11 x64 application (a single `.exe`, no browser, no installation).
+Le jeu C02 Naval complet, réécrit en Rust sous forme d'application Windows 11 x64 native (un seul `.exe`, sans navigateur, sans installation).
 
-## ⬇️ Download
+## ⬇️ Téléchargement
 
-- **[Download the latest version (C02-Naval-windows-x64.exe)](https://github.com/DRFRrobin/C02-Naval/releases/latest/download/C02-Naval-windows-x64.exe)**
-- **[See all releases](https://github.com/DRFRrobin/C02-Naval/releases)** (the most recent at the top)
+- **[Télécharger la dernière version (C02-Naval-windows-x64.exe)](https://github.com/DRFRrobin/C02-Naval/releases/latest/download/C02-Naval-windows-x64.exe)**
+- **[Voir toutes les versions](https://github.com/DRFRrobin/C02-Naval/releases)** (la plus récente en haut)
 
-The executable isn't signed: if Windows SmartScreen shows a warning, click "More info" then "Run anyway".
+L'exécutable n'est pas signé : si Windows SmartScreen affiche un avertissement, cliquer sur « Informations complémentaires » puis « Exécuter quand même ».
 
 ### Versions
 
-The most recent first:
+La plus récente en premier :
 
-| Version | Date | Changes |
+| Version | Date | Changements |
 |---|---|---|
-| [**1.2.0**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) (latest) | 2026-11-15 | Mandatory update from GitHub on every launch |
-| [1.1.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.1.0-windows) | 2026-11-15 | First Windows version in Rust |
+| [**1.2.0**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) (dernière) | 2026-11-15 | Mise à jour obligatoire depuis GitHub à chaque lancement |
+| [1.1.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.1.0-windows) | 2026-11-15 | Première version Windows en Rust |
 
-> Version 1.1.0 can't update itself: replace it once by hand with the latest version.
+> La version 1.1.0 ne peut pas se mettre à jour toute seule : la remplacer une fois à la main par la dernière version.
 
-## Automatic updates (mandatory)
+## Mises à jour automatiques (obligatoires)
 
-On every launch, the game checks the [GitHub releases](https://github.com/DRFRrobin/C02-Naval/releases) (tags ending in `-windows`, `.exe` file attached).
+À chaque lancement, le jeu consulte les [versions publiées sur GitHub](https://github.com/DRFRrobin/C02-Naval/releases) (tags se terminant par `-windows`, fichier `.exe` joint).
 
-- No newer version: the game starts normally.
-- Newer version: the update is **mandatory**. The game downloads it, replaces its own `.exe` and restarts, with no way to play the old version.
-- No Internet (or GitHub not responding): the game starts with the current version.
-- If the replacement fails (for example in a write-protected folder such as `Program Files`), a link to the releases page is shown.
+- Pas de version plus récente : le jeu démarre normalement.
+- Version plus récente : la mise à jour est **obligatoire**. Le jeu la télécharge, remplace son propre `.exe` et redémarre, sans possibilité de jouer à l'ancienne version.
+- Pas d'Internet (ou GitHub ne répond pas) : le jeu démarre avec la version actuelle.
+- Si le remplacement échoue (par exemple dans un dossier protégé en écriture comme `Program Files`), un lien vers la page des versions est affiché.
 
-To publish an update: raise `version` in `Cargo.toml`, build, then create a release tagged `vX.Y.Z-windows` with the `C02-Naval-windows-x64.exe` file attached, and add a line at the top of the **Versions** table.
+Pour publier une mise à jour : augmenter `version` dans `Cargo.toml`, compiler, puis créer une release avec le tag `vX.Y.Z-windows` et le fichier `C02-Naval-windows-x64.exe` joint, et ajouter une ligne en haut du tableau **Versions**.
 
-## Features (same as the web version)
+## Fonctionnalités (identiques à la version web)
 
-- **Login**: local accounts with username + password (PBKDF2-SHA-256, 120,000 iterations), profile photo (cropped to 160 × 160), guest mode.
-- **Dashboard**: top bar (avatar, level, XP bar, rank), tabs Play / Statistics / Settings / Log out.
-- **4 modes**: random opponent (bot after 45 s), game against the tactical bot, join with a code, host a private room (6-character code, copy the code or the invite link).
-- **Placement**: preview then confirm, drag and drop, rotation (R key or right click), random, clear, Enter / Del shortcuts.
-- **Game**: shot, **Radar** (2 × 2), **Cross strike** (5 squares), **Shield**, upgrade choice after each sunk ship, log, last enemy shot highlighted.
-- **Career statistics**, XP and levels (Cabin boy → Admiral), XP halved against the bot.
-- **Settings**: synthesized sound effects (no audio file), French / English language, change username / password / photo, delete the account.
-- Keeps the screen awake during an online game; minimizing the window = "away" for the opponent (2 min).
+- **Connexion** : comptes locaux pseudo + mot de passe (PBKDF2-SHA-256, 120 000 itérations), photo de profil (recadrée en 160 × 160), mode invité.
+- **Tableau de bord** : barre du haut (avatar, niveau, barre d'XP, grade), onglets Jouer / Statistiques / Paramètres / Déconnexion.
+- **4 modes** : adversaire aléatoire (bot au bout de 45 s), partie contre le bot tactique, rejoindre avec un code, héberger un salon privé (code de 6 caractères, copie du code ou du lien d'invitation).
+- **Placement** : aperçu puis validation, glisser-déposer, rotation (touche R ou clic droit), aléatoire, effacer, raccourcis Entrée / Suppr.
+- **Partie** : tir, **Radar** (2 × 2), **Frappe en croix** (5 cases), **Bouclier**, choix d'une amélioration après chaque bateau coulé, journal, dernier tir ennemi mis en évidence.
+- **Statistiques de carrière**, XP et niveaux (Mousse → Amiral), XP divisée par deux contre le bot.
+- **Paramètres** : effets sonores synthétisés (aucun fichier audio), langue français / anglais, changement de pseudo / mot de passe / photo, suppression du compte.
+- Garde l'écran allumé pendant une partie en ligne ; réduire la fenêtre = « absent » pour l'adversaire (2 min).
 
-## Compatible with the web version
+## Compatible avec la version web
 
-Networking reproduces PeerJS 1.5 exactly: matchmaking through the public PeerJS service, a direct WebRTC link, BinaryPack messages split into 16,300-byte chunks. **A PC player can face a browser player** (private room, join, random opponent). The "Copy link" button gives the website's invite link.
+Le réseau reproduit exactement PeerJS 1.5 : mise en relation via le service PeerJS public, lien WebRTC direct, messages BinaryPack découpés en morceaux de 16 300 octets. **Un joueur sur PC peut affronter un joueur dans le navigateur** (salon privé, rejoindre, adversaire aléatoire). Le bouton « Copier le lien » donne le lien d'invitation du site web.
 
-> Compatibility was tested with the `index.html` of commit `2c707c6` (both directions: Rust host ↔ web client and web host ↔ Rust client).
+> Compatibilité testée avec l'`index.html` du commit `2c707c6` (dans les deux sens : hôte Rust ↔ client web et hôte web ↔ client Rust).
 
-## Data
+## Données
 
-Accounts and settings: `%APPDATA%\C02 Naval\` (one JSON file per account, same format as the web version).
-The `C02NAVAL_DATA` environment variable changes this folder (portable version on a USB stick, for example).
-`C02NAVAL_DEBUG=1` writes a network log (`net.log`) to this folder.
-`C02NAVAL_NO_UPDATE=1` disables the update check (development).
+Comptes et paramètres : `%APPDATA%\C02 Naval\` (un fichier JSON par compte, même format que la version web).
+La variable d'environnement `C02NAVAL_DATA` change ce dossier (version portable sur clé USB, par exemple).
+`C02NAVAL_DEBUG=1` écrit un journal réseau (`net.log`) dans ce dossier.
+`C02NAVAL_NO_UPDATE=1` désactive la vérification des mises à jour (développement).
 
-## Building
+## Compilation
 
-Requirements: [Rust](https://rustup.rs) (stable, `x86_64-pc-windows-msvc` toolchain) and the Visual Studio C++ build tools.
+Prérequis : [Rust](https://rustup.rs) (stable, chaîne `x86_64-pc-windows-msvc`) et les outils de compilation C++ de Visual Studio.
 
 ```bash
 cd rust
 cargo build --release
 ```
 
-The executable: `rust/target/release/c02-naval.exe` (icon built in, no console window).
+L'exécutable : `rust/target/release/c02-naval.exe` (icône intégrée, sans fenêtre de console).
 
-Tests: `cargo test --release` (BinaryPack format, PBKDF2, valid random fleet, the bot finishes a game).
+Tests : `cargo test --release` (format BinaryPack, PBKDF2, flotte aléatoire valide, le bot termine une partie).
 
-## Code layout
+## Organisation du code
 
-| File | Role |
+| Fichier | Rôle |
 |---|---|
-| `src/main.rs` | Window, icon |
-| `src/app.rs` | State and logic (accounts, matchmaking, placement, game, timers) |
-| `src/ui.rs` | Screens (egui) |
-| `src/theme.rs` | Colors, fonts (Segoe UI, Bahnschrift), custom widgets |
-| `src/game.rs` | Rules, shot resolution, tactical bot |
-| `src/net.rs` | PeerJS signaling + WebRTC (`webrtc` crate) |
-| `src/binarypack.rs` | PeerJS BinaryPack format |
-| `src/accounts.rs` | Accounts, passwords, photos, settings |
-| `src/sound.rs` | Sound synthesis (cpal) |
-| `src/i18n.rs` | French / English text |
-| `src/update.rs` | Mandatory update from GitHub releases |
-| `tools/` | Test scripts (window capture, simulated clicks) |
+| `src/main.rs` | Fenêtre, icône |
+| `src/app.rs` | État et logique (comptes, mise en relation, placement, partie, chronomètres) |
+| `src/ui.rs` | Écrans (egui) |
+| `src/theme.rs` | Couleurs, polices (Segoe UI, Bahnschrift), widgets personnalisés |
+| `src/game.rs` | Règles, résolution des tirs, bot tactique |
+| `src/net.rs` | Signalisation PeerJS + WebRTC (crate `webrtc`) |
+| `src/binarypack.rs` | Format BinaryPack de PeerJS |
+| `src/accounts.rs` | Comptes, mots de passe, photos, paramètres |
+| `src/sound.rs` | Synthèse sonore (cpal) |
+| `src/i18n.rs` | Textes français / anglais |
+| `src/update.rs` | Mise à jour obligatoire depuis les releases GitHub |
+| `tools/` | Scripts de test (capture de fenêtre, clics simulés) |
