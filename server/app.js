@@ -10,7 +10,7 @@ const STAT_KEYS = ['games', 'wins', 'losses', 'interrupted', 'streak', 'bestStre
 const emptyStats = () => ({ games: 0, wins: 0, losses: 0, interrupted: 0, streak: 0, bestStreak: 0,
   shots: 0, hits: 0, sunk: 0, upgrades: 0, fastestWin: null, timePlayed: 0 });
 const RESERVED = new Set(['admin', 'administrateur', 'administrator', 'root', 'system', 'moderator', 'moderateur', 'support', 'c02', 'c02naval', 'bot', 'invite', 'guest', 'null', 'undefined']);
-/* Formule d'XP (identique dans index.html) : participation/victoire + touchés + bateaux coulés
+/* Formule d'XP (identique dans js/profile.js) : participation/victoire + touchés + bateaux coulés
    + précision (tirs au but / tirs) + rapidité en cas de victoire (60 XP avant 3 min, dégressif, 0 après 15 min). */
 const clamp01 = x => Math.min(1, Math.max(0, x));
 function xpParts({ win, shots, hits, sunk, duration, half }) {
