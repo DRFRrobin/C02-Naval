@@ -90,7 +90,7 @@ test('résultat de partie : le serveur calcule l\'XP et les stats', async () => 
   const { body: { token } } = await reg('Joueur1');
   const r = await call('POST', '/api/result', good, token);
   assert.equal(r.status, 200);
-  assert.equal(r.body.gain, 100 + 17 * 5 + 5 * 20 + Math.round(17 / 30 * 50));
+  assert.equal(r.body.gain, 100 + 85 + 100 + 57 + 50);   // base + touchés + coulés + précision + rapidité
   assert.equal(r.body.profile.xp, r.body.gain);
   assert.deepEqual([r.body.profile.stats.games, r.body.profile.stats.wins, r.body.profile.stats.fastestWin], [1, 1, 30]);
   // le client ne peut pas imposer un gain
@@ -102,7 +102,7 @@ test('anti-triche : résultats invraisemblables refusés', async () => {
   app.limiter.reset();
   const { body: { token } } = await reg('Tricheur');
   const bads = [{ ...good, hits: 40, shots: 30 }, { ...good, sunk: 13 }, { ...good, shots: 9999 }, { ...good, duration: 1 },
-    { ...good, win: 'oui' }, { ...good, hits: -1 }, { ...good, sunk: 6, hits: 5 }, { ...good, win: true, hits: 0, sunk: 0, shots: 3 }];
+    { ...good, win: 'oui' }, { ...good, hits: -1 }, { ...good, sunk: 6, hits: 5 }, { ...good, win: true, hits: 0, sunk: 0, shots: 3 }, { ...good, shots: 100, hits: 17, duration: 100 }];
   for (const b of bads) assert.equal((await call('POST', '/api/result', b, token)).status, 400, JSON.stringify(b));
   assert.equal((await call('POST', '/api/result', good)).status, 401);
 });
@@ -111,7 +111,7 @@ test('victoire contre un bot : gain divisé par deux', async () => {
   app.limiter.reset();
   const { body: { token } } = await reg('Bot1');
   const r = await call('POST', '/api/result', { ...good, bot: true }, token);
-  assert.equal(r.body.gain, Math.round((100 + 85 + 100 + Math.round(17 / 30 * 50)) / 2));
+  assert.equal(r.body.gain, Math.round((100 + 85 + 100 + 57 + 50) / 2));
 });
 
 test('import d\'un profil local : valeurs invraisemblables bornées', async () => {
@@ -173,4 +173,15 @@ test('un pseudo différent par la casse unicode (NFKC) reste unique', async () =
   app.limiter.reset();
   await reg('Ｕnique');           // « Ｕ » pleine chasse
   assert.equal((await reg('Unique')).body.error, 'pseudo_taken');
+});
+
+test('XP : la précision et la rapidité font varier le gain', () => {
+  const { xpParts } = require('../server/app');
+  const g = o => xpParts({ win: true, shots: 40, hits: 17, sunk: 5, duration: 300, half: false, ...o }).gain;
+  assert.ok(g({ shots: 20 }) > g({ shots: 60 }), 'plus précis = plus d\'XP');
+  assert.ok(g({ duration: 150 }) > g({ duration: 600 }), 'plus rapide = plus d\'XP');
+  assert.ok(g({ duration: 600 }) > g({ duration: 1200 }));
+  assert.equal(g({ duration: 1200 }), g({ duration: 5000 }), 'bonus de temps nul après 15 min');
+  assert.equal(xpParts({ win: false, shots: 30, hits: 10, sunk: 1, duration: 100, half: false }).parts.time, 0, 'pas de bonus de temps en cas de défaite');
+  assert.ok(xpParts({ win: true, shots: 17, hits: 17, sunk: 5, duration: 150, half: false }).gain <= 700);
 });
