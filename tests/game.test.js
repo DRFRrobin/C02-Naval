@@ -509,3 +509,16 @@ test('compte en ligne : inscription, XP calculée par le serveur, connexion sur 
   await A.ctx.close(); await B.ctx.close();
   await new Promise(r => api.server.close(r));
 });
+
+test('compte en ligne : serveur injoignable => repli automatique sur le pseudo local', async () => {
+  const ctx = await newContext();
+  await ctx.addInitScript(() => { window.C02_API = 'http://127.0.0.1:1'; });
+  const pg = await ctx.newPage(); pg.on('dialog', d => d.accept());
+  await pg.goto(base);
+  await pg.waitForSelector('#loginPane', { state: 'visible', timeout: 10000 });
+  assert.ok(!(await pg.isVisible('#cloudPane')));
+  assert.match(await pg.textContent('#authMsg'), /indisponibles|unavailable/);
+  await pg.fill('#suName', 'Hors-ligne'); await pg.click('#btnPlay');
+  await pg.waitForSelector('#dash.active');
+  await ctx.close();
+});

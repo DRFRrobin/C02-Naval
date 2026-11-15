@@ -702,6 +702,7 @@ const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 const I18N = {
   fr: {
     tagline: 'Bataille navale à deux, sur PC ou téléphone.',
+    apiDown: 'Les comptes en ligne sont momentanément indisponibles : tu peux jouer avec un pseudo local.',
     tabLogin: 'Connexion', tabSignup: 'Créer un compte', account: 'Compte', password: 'Mot de passe',
     passwordConfirm: 'Confirmer le mot de passe', pseudo: 'Pseudo (2 à 16 caractères)', btnLogin: 'Se connecter',
     btnSignup: 'Créer le compte', guest: 'Jouer en invité (sans XP)',
@@ -870,6 +871,7 @@ const I18N = {
     bkBad: 'Wrong passphrase or corrupted backup.', bkFmt: 'This is not a valid C02 Naval backup.',
     bkNewer: 'A profile "{name}" already exists here with more progress. Overwrite it with the backup?',
     bkOk: 'Profile "{name}" imported.', bkKept: 'Your local profile is more advanced: nothing was changed.',
+    apiDown: 'Online accounts are temporarily unavailable: you can play with a local username.',
     tabLogin: 'Sign in', tabReg: 'Create account', password: 'Password', btnLogin: 'Sign in', btnRegister: 'Create my account',
     cloudNote: 'Your username is unique and your profile follows you on all your devices. No e-mail required.', goLocal: 'Play without an account (local username)', goCloud: 'Sign in with an account',
     e_bad_credentials: 'Wrong username or password.', e_locked: 'Too many attempts: account locked for {min} min.', e_pseudo_taken: 'This username is already taken.',
@@ -1273,7 +1275,7 @@ const nameTaken = (name, exceptId) => Object.values(accounts).some(a => a.id !==
 
 /* ---------- Comptes en ligne (API sur le NAS) ---------- */
 const API_URL = (typeof window.C02_API === 'string' ? window.C02_API : 'https://api.c02.app').replace(/\/+$/, '');
-let authMode = 'login', cloudPaneOn = true, syncing = false, syncTimer = null;
+let authMode = 'login', cloudPaneOn = true, syncing = false, syncTimer = null, apiUp = null;
 async function api(method, path, body, tok) {
   let r;
   try {
@@ -1283,6 +1285,13 @@ async function api(method, path, body, tok) {
   let j = null; try { j = await r.json(); } catch (e) {}
   if (!r.ok) throw { code: (j && j.error) || 'server_error', status: r.status, retryAfter: j && j.retryAfter };
   return j;
+}
+// API injoignable (pas encore installée, NAS éteint…) : on bascule sur le pseudo local au lieu d'afficher une erreur.
+async function probeApi() {
+  if (!API_URL) return;
+  try { const r = await fetch(API_URL + '/api/health', { signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined }); apiUp = r.ok; }
+  catch (e) { apiUp = false; }
+  if (!apiUp && $('auth').classList.contains('active') && cloudPaneOn) { setAuthPane(false); msg('authMsg', t('apiDown')); }
 }
 function apiErr(e) {
   const k = 'e_' + (e && e.code);
@@ -1364,7 +1373,8 @@ async function cloudChangePassword() {
 /* ---------- Écran de connexion ---------- */
 function openAuth() {
   loadAccounts();
-  setAuthPane(cloudPaneOn);
+  setAuthPane(cloudPaneOn && apiUp !== false);
+  if (apiUp === null) probeApi();
   const accs = Object.values(accounts).filter(a => !a.cloud).sort((a, b) => (b.lastLogin || '').localeCompare(a.lastLogin || ''));
   $('accBox').style.display = accs.length ? '' : 'none';
   const list = $('accPick'); list.innerHTML = '';
@@ -2792,7 +2802,7 @@ $('cPass').onkeydown = $('cName').onkeydown = e => { if (e.key === 'Enter') clou
 $('tabLogin').onclick = () => setAuthMode('login');
 $('tabReg').onclick = () => setAuthMode('reg');
 $('btnLocalMode').onclick = () => setAuthPane(false);
-$('btnCloudMode').onclick = () => setAuthPane(true);
+$('btnCloudMode').onclick = () => { setAuthPane(true); apiUp = null; msg('authMsg', ''); probeApi(); };
 $('btnPw').onclick = cloudChangePassword;
 $('suName').addEventListener('keydown', e => { if (e.key === 'Enter') doPlay(); });
 
