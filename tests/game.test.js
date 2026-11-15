@@ -366,6 +366,23 @@ test('service worker : le jeu s\'ouvre hors ligne après une première visite', 
   await ctx.close();
 });
 
+test('iPhone en mode application : l\'interface ne passe pas sous la Dynamic Island', async () => {
+  const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+  const top = async (viewport, standalone, ua) => {
+    const ctx = await browser.newContext({ serviceWorkers: 'block', userAgent: ua, viewport, hasTouch: true });
+    await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
+    if (standalone) await ctx.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { value: true }); });
+    const pg = await newPage(ctx);
+    const v = await pg.evaluate(() => parseFloat(getComputedStyle(document.getElementById('app')).paddingTop));
+    await ctx.close(); return v;
+  };
+  assert.ok(await top({ width: 393, height: 852 }, true, UA) >= 59, 'iPhone récent (Dynamic Island) : au moins 59 px en haut');
+  const small = await top({ width: 375, height: 667 }, true, UA);
+  assert.ok(small >= 20 && small < 40, 'iPhone SE : barre d\'état seule, ' + small);
+  assert.ok(await top({ width: 393, height: 852 }, false, UA) <= 16, 'dans Safari : espacement normal');
+  assert.ok(await top({ width: 393, height: 852 }, true, 'Mozilla/5.0 (Linux; Android 14) Chrome/120 Mobile Safari/537.36') <= 16, 'Android : inchangé');
+});
+
 /* ---------------- Interface ---------------- */
 test('responsive : aucun débordement horizontal à 320 px (tous thèmes)', async () => {
   const ctx = await newContext(); const pg = await newPage(ctx, { width: 320, height: 640 });
