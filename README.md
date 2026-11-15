@@ -33,6 +33,8 @@ Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qu
 - XP et niveaux (de Mousse à Amiral), statistiques de carrière : temps joué, victoires, défaites, taux, précision, séries…
 - Le profil (pseudo, avatar, XP, statistiques) est enregistré **dans le navigateur de l'appareil** : il ne se synchronise pas entre PC et téléphone, et effacer les données du site l'efface. Taper un pseudo déjà utilisé sur l'appareil rouvre ce profil ; aucun mot de passe ne le protège.
 - Contre le bot, l'XP gagnée est divisée par deux.
+- **XP d'une partie** : participation (30) ou victoire (100) + 5 par touché + 20 par bateau coulé + bonus de **précision** (jusqu'à 100 en victoire, 30 en défaite) + bonus de **rapidité** en victoire (60 XP si la partie dure moins de 3 min, dégressif jusqu'à 0 à 15 min). Le détail s'affiche en fin de partie avec une animation de la barre d'XP et du passage de niveau.
+- **Revanche** : à la fin d'une partie, un bouton relance une manche avec le même adversaire (contre un joueur, les deux doivent accepter ; le premier tir alterne). Contre le bot, la nouvelle manche démarre aussitôt.
 
 ## Comptes en ligne (optionnel)
 

@@ -10,6 +10,15 @@ const STAT_KEYS = ['games', 'wins', 'losses', 'interrupted', 'streak', 'bestStre
 const emptyStats = () => ({ games: 0, wins: 0, losses: 0, interrupted: 0, streak: 0, bestStreak: 0,
   shots: 0, hits: 0, sunk: 0, upgrades: 0, fastestWin: null, timePlayed: 0 });
 const RESERVED = new Set(['admin', 'administrateur', 'administrator', 'root', 'system', 'moderator', 'moderateur', 'support', 'c02', 'c02naval', 'bot', 'invite', 'guest', 'null', 'undefined']);
+/* Formule d'XP (identique dans index.html) : participation/victoire + touchés + bateaux coulés
+   + précision (tirs au but / tirs) + rapidité en cas de victoire (60 XP avant 3 min, dégressif, 0 après 15 min). */
+const clamp01 = x => Math.min(1, Math.max(0, x));
+function xpParts({ win, shots, hits, sunk, duration, half }) {
+  const acc = shots ? hits / shots : 0;
+  const parts = { base: win ? 100 : 30, hits: hits * 5, sunk: sunk * 20, acc: Math.round(acc * (win ? 100 : 30)), time: win ? Math.round(60 * clamp01((900 - duration) / 720)) : 0 };
+  const sum = parts.base + parts.hits + parts.sunk + parts.acc + parts.time;
+  return { parts, gain: half ? Math.round(sum / 2) : sum };
+}
 const SESSION_MS = 60 * 24 * 3600 * 1000;
 const MIN_RESULT_GAP_MS = 15000;
 
@@ -196,9 +205,8 @@ function createApp(opts = {}) {
       const upgrades = int(body.upgrades, 30), duration = int(body.duration, 7200);
       if (hits > shots || sunk > hits || duration < 5 || (body.win && hits < 1)) throw new HttpError(400, 'invalid_result');
       const half = body.bot === true || body.std !== true;
-      const acc = shots ? hits / shots : 0;
-      let gain = (body.win ? 100 : 30) + hits * 5 + sunk * 20 + (body.win ? Math.round(acc * 50) : 0);
-      if (half) gain = Math.round(gain / 2);
+      if (duration < shots * 1.5) throw new HttpError(400, 'invalid_result');   // impossible de tirer aussi vite : durée falsifiée
+      const { gain } = xpParts({ win: body.win, shots, hits, sunk, duration, half });
       const s = { ...emptyStats(), ...JSON.parse(user.stats) };
       s.games++; s.shots += shots; s.hits += hits; s.sunk += sunk; s.upgrades += upgrades; s.timePlayed += duration;
       if (body.win) { s.wins++; s.streak++; s.bestStreak = Math.max(s.bestStreak, s.streak); if (shots > 0 && (!s.fastestWin || shots < s.fastestWin)) s.fastestWin = shots; }
@@ -269,4 +277,4 @@ function createApp(opts = {}) {
   return { server, limiter };
 }
 
-module.exports = { createApp };
+module.exports = { createApp, xpParts };

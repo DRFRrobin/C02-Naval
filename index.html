@@ -251,8 +251,22 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box
 .modal h2{font-size:22px;font-weight:800;margin-bottom:6px}
 .modal .sub{color:var(--muted);font-size:14px;margin:0 0 12px}
 .big{font-size:3rem}
-.xpgain{font:700 1.5rem var(--num);color:var(--yellow);margin:8px 0 4px}
-.lvlup{color:var(--green);font-weight:700;margin:4px 0}
+.xpgain{font:700 1.7rem var(--num);color:var(--yellow);margin:8px 0 4px}
+.lvlup{color:var(--green);font-weight:700;margin:4px 0;animation:pop .7s cubic-bezier(.2,1.6,.4,1) both}
+.xplist{list-style:none;margin:10px auto 0;padding:0;max-width:280px;text-align:left;font-size:13px}
+.xplist li{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:var(--muted);opacity:0;animation:slidein .4s ease forwards}
+.xplist li b{color:var(--text);font-family:var(--num)}
+.xplist li.zero b{color:var(--muted);font-weight:400}
+#endXp .xpbar i{transition:width .9s cubic-bezier(.2,.8,.2,1)}
+#endXp .xpbar.flash{animation:glow .8s ease}
+#endXp .xpbar i.snap{transition:none}
+#end.show .big{animation:pop .8s cubic-bezier(.2,1.6,.4,1) both}
+#rematchNote{color:var(--sky);font-size:13px;min-height:18px;margin:6px 0 0}
+@keyframes pop{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes slidein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 rgba(56,189,248,0)}50%{box-shadow:0 0 18px rgba(56,189,248,.9)}}
+@media (prefers-reduced-motion:reduce){.xplist li,.lvlup,#end.show .big{animation:none;opacity:1}#endXp .xpbar i{transition:none}}
+.xpbar i{transition:width .9s cubic-bezier(.2,.8,.2,1)}
 .endnote{color:var(--muted);font-size:12px;margin:2px 0 8px}
 .opt{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 14px;background:var(--card2);border:1px solid var(--border);border-radius:12px;color:var(--text);cursor:pointer;font:inherit}
 .opt:hover{border-color:var(--sky)}
@@ -687,7 +701,9 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
     <h2 id="endTitle"></h2>
     <p id="endText" class="sub"></p>
     <div id="endXp"></div>
-    <button class="btn primary wide" style="margin-top:12px" onclick="location.reload()" data-i18n="newGame"></button>
+    <button id="btnRematch" class="btn primary wide" style="margin-top:12px" type="button"><i class="fa-solid fa-rotate-right"></i><span data-i18n="rematch"></span></button>
+    <p id="rematchNote"></p>
+    <button id="btnNewGame" class="btn wide" style="margin-top:8px" type="button" data-i18n="newGame"></button>
     <button id="btnSeeGrids" class="btn ghost wide" data-i18n="seeGrids"></button>
   </div>
 </div>
@@ -826,6 +842,8 @@ const I18N = {
     win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', winForfeit: "L'adversaire a abandonné la partie.", loseText: 'Toute ta flotte a été coulée.',
     endStats: p => `${pl(p.shots, 'tir', 'tirs')}, ${p.acc} % de précision.`,
     lostTitle: 'Connexion perdue', lostText: "La liaison avec l'adversaire est coupée. La partie est arrêtée.",
+    rematch: 'Revanche', rematchWait: 'En attente de {name}…', rematchOpp: '{name} propose une revanche !', rematchGone: "L'adversaire a quitté la partie.",
+    xpBase1: 'Victoire', xpBase0: 'Participation', xpHits: 'Touchés', xpSunk: 'Bateaux coulés', xpAcc: 'Précision', xpTime: 'Rapidité',
     newGame: 'Nouvelle partie', seeGrids: 'Voir les grilles', xpGuest: "Joue avec un compte pour gagner de l'XP.",
     levelUp: 'Niveau {n} : {rank} !', botXp: "XP réduite de moitié contre le bot.",
     quit: 'Quitter', quitConfirm: 'Quitter la partie ? Elle sera comptée comme interrompue.',
@@ -959,6 +977,8 @@ const I18N = {
     win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', winForfeit: 'The opponent left the game.', loseText: 'Your whole fleet was sunk.',
     endStats: p => `${pl(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
     lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
+    rematch: 'Rematch', rematchWait: 'Waiting for {name}…', rematchOpp: '{name} wants a rematch!', rematchGone: 'Your opponent left the game.',
+    xpBase1: 'Victory', xpBase0: 'Participation', xpHits: 'Hits', xpSunk: 'Ships sunk', xpAcc: 'Accuracy', xpTime: 'Speed',
     newGame: 'New game', seeGrids: 'View grids', xpGuest: 'Play with an account to earn XP.',
     levelUp: 'Level {n}: {rank}!', botXp: 'XP halved against the bot.',
     quit: 'Quit', quitConfirm: 'Quit the game? It will count as interrupted.',
@@ -1433,7 +1453,9 @@ function renderDash() {
     $('tbBadge').textContent = t('badge', { n: l });
     $('tbXp').textContent = `${a.xp - lo} / ${hi - lo}`;
     $('tbLevel').textContent = t('levelN', { n: l }) + ' · ' + rankOf(l);
-    $('tbXpFill').style.width = Math.round((a.xp - lo) / (hi - lo) * 100) + '%';
+    const pctXp = Math.round((a.xp - lo) / (hi - lo) * 100) + '%';
+    if (!$('dash').classList.contains('active')) $('tbXpFill').style.width = '0%';   // la barre se remplit à l'ouverture du tableau de bord
+    requestAnimationFrame(() => requestAnimationFrame(() => { $('tbXpFill').style.width = pctXp; }));
   }
   document.querySelectorAll('.tabsnav [data-pane]').forEach(b => b.classList.toggle('on', b.dataset.pane === pane));
   document.querySelectorAll('#dash .pane').forEach(e => e.classList.toggle('active', e.id === 'pane-' + pane));
@@ -1705,14 +1727,22 @@ function renderThemes() {
 }
 
 /* ---------- Enregistrement des parties ---------- */
+// Formule d'XP — identique à celle du serveur (server/app.js) : le serveur fait foi pour les comptes en ligne.
+const clamp01 = x => Math.min(1, Math.max(0, x));
+function xpParts(win, shots, hits, sunk, duration, half) {
+  const acc = shots ? hits / shots : 0;
+  const parts = { base: win ? 100 : 30, hits: hits * 5, sunk: sunk * 20, acc: Math.round(acc * (win ? 100 : 30)), time: win ? Math.round(60 * clamp01((900 - duration) / 720)) : 0 };
+  const sum = parts.base + parts.hits + parts.sunk + parts.acc + parts.time;
+  return { parts, gain: half ? Math.round(sum / 2) : sum };
+}
 function recordGame(win) {
   loadAccounts();
   const a = me(); if (!a) return null;
   const m = S.match, s = a.stats = { ...emptyStats(), ...a.stats };
-  const acc = m.shots ? m.hits / m.shots : 0;
-  let gain = (win ? 100 : 30) + m.hits * 5 + m.sunk * 20 + (win ? Math.round(acc * 50) : 0);
-  if (S.vsBot || !isStdRules(CFG)) gain = Math.round(gain / 2);
-  const before = levelOf(a.xp);
+  const shots = Math.min(m.shots, 500), hits = Math.min(m.hits, shots), sunk = Math.min(m.sunk, hits, 12);
+  const dur = Math.min(7200, Math.max(5, m.start ? Math.round((Date.now() - m.start) / 1000) : 5));
+  const { parts, gain } = xpParts(win, shots, hits, sunk, dur, S.vsBot || !isStdRules(CFG));
+  const before = levelOf(a.xp), xpBefore = a.xp;
   a.xp += gain;
   s.games++; s.shots += m.shots; s.hits += m.hits; s.sunk += m.sunk; s.upgrades += m.upgrades;
   s.timePlayed += m.start ? Math.round((Date.now() - m.start) / 1000) : 0;
@@ -1722,11 +1752,9 @@ function recordGame(win) {
   } else { s.losses++; s.streak = 0; }
   saveAccount(a);
   if (a.cloud) {   // le serveur recalcule l'XP lui-même : on lui envoie seulement ce qui s'est passé
-    const shots = Math.min(m.shots, 500), hits = Math.min(m.hits, shots), sunk = Math.min(m.sunk, hits, 12);
-    queueResult(a, 'r', { win: !!win, shots, hits, sunk, upgrades: Math.min(m.upgrades, 30),
-      duration: Math.min(7200, Math.max(5, m.start ? Math.round((Date.now() - m.start) / 1000) : 5)), bot: !!S.vsBot, std: isStdRules(CFG) });
+    queueResult(a, 'r', { win: !!win, shots, hits, sunk, upgrades: Math.min(m.upgrades, 30), duration: dur, bot: !!S.vsBot, std: isStdRules(CFG) });
   }
-  return { gain, level: levelOf(a.xp), up: levelOf(a.xp) > before };
+  return { gain, parts, xpBefore, levelBefore: before, level: levelOf(a.xp), up: levelOf(a.xp) > before };
 }
 function recordInterrupted() {
   if (S.phase !== 'game') return;
@@ -1937,10 +1965,8 @@ function setupConn(conn, onFail) {
   conn.on('close', closed);
   conn.on('error', closed);
 }
-function onConnected() {
-  S.connected = true;
-  clearTimeout(S.joinTimer); clearInterval(S.mmTimer);
-  $('joinModal').classList.remove('show');
+function startHeartbeat() {
+  clearInterval(S.hb);
   S.lastSeen = Date.now();
   S.hb = setInterval(() => {
     send({ t: 'ping', a: S.rxn });
@@ -1948,6 +1974,12 @@ function onConnected() {
     // Adversaire parti dans une autre appli ou écran éteint : on lui laisse plus de temps.
     if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) connDown();
   }, HEARTBEAT_MS);
+}
+function onConnected() {
+  S.connected = true;
+  clearTimeout(S.joinTimer); clearInterval(S.mmTimer);
+  $('joinModal').classList.remove('show');
+  startHeartbeat();
   // Créneau aléatoire : on le libère pour le prochain joueur (la liaison directe reste ouverte).
   // L'hôte ouvre en plus un point de rendez-vous privé pour une éventuelle reprise après coupure.
   if (S.kind === 'random' && S.peer) try { S.peer.disconnect(); } catch (e) {}
@@ -1979,6 +2011,7 @@ function flushOutbox(theirRx) {
 
 /* ---------- Reprise après coupure (45 s) ---------- */
 function connDown() {
+  if (S.phase === 'over' && S.connected && !S.lost && !S.vsBot) { S.oppGone = true; renderRematch(); return; }   // il a quitté l'écran de fin
   if (!S.connected || S.lost || S.phase === 'over' || S.vsBot || S.reconnecting) return;
   if (!S.sid || (!S.isHost && !S.hostId)) return lost();   // adversaire sans reprise possible
   S.reconnecting = true; S.reconDeadline = Date.now() + RECONNECT_MS;
@@ -2048,6 +2081,7 @@ function lost() {
   $('endTitle').textContent = t('lostTitle');
   $('endText').textContent = t('lostText');
   $('endXp').innerHTML = '';
+  renderRematch();
   $('end').classList.add('show');
   if ($('game').classList.contains('active')) renderGame();
 }
@@ -2110,6 +2144,8 @@ function onData(m) {
       if (!S.connected) onConnected(); else renderVs();
       break;
     case 'busy': if (!S.connected && S.onReject) S.onReject(true); break;
+    case 'rematch': S.rematchOpp = true; if (S.phase === 'over') { if (S.rematchMe) startRematch(); else renderRematch(); } break;
+    case 'bye': S.oppGone = true; if (S.phase === 'over') renderRematch(); break;
     case 'away': S.oppAway = true; showAway(); break;
     case 'back': S.oppAway = false; showAway(); break;
     case 'ready': S.oppReady = true; renderPlace(); maybeStart(); break;
@@ -2475,11 +2511,12 @@ function renderPlace() {
 function maybeStart() {
   if (S.phase !== 'place' || !S.meReady || !S.oppReady) return;
   S.phase = 'game';
-  S.myTurn = S.isHost; S.turnStart = Date.now();
+  S.myTurn = S.isHost !== ((S.rounds || 0) % 2 === 1); S.turnStart = Date.now();
   S.match.start = Date.now();
   startTurnTimer();
   showView('game');
-  setLog(t(S.isHost ? 'startHost' : 'startGuest'));
+  setLog(t(S.myTurn ? 'startHost' : 'startGuest'));
+  if (S.vsBot && !S.myTurn && S.bot) S.bot.later(() => S.bot.move(), 900);   // revanche : le bot ouvre le feu
   Snd.play(S.myTurn ? 'turn' : 'start');
   renderGame();
 }
@@ -2707,16 +2744,85 @@ function endGame(win, forfeit) {
   $('endText').textContent = t(forfeit ? 'winForfeit' : win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
   const r = recordGame(win);
   if (r) {
-    const a = me(), l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
-    $('endXp').innerHTML = `<div class="xpgain">+${r.gain} XP</div>`
-      + (r.up ? `<div class="lvlup">⬆ ${esc(t('levelUp', { n: r.level, rank: rankOf(r.level) }))}</div>` : '')
+    const a = me(), l0 = r.levelBefore, lo0 = xpFor(l0), hi0 = xpFor(l0 + 1), l = r.level, lo = xpFor(l), hi = xpFor(l + 1);
+    const half = S.vsBot || !isStdRules(CFG);
+    const rows = [['xpBase' + (win ? 1 : 0), r.parts.base], ['xpHits', r.parts.hits], ['xpSunk', r.parts.sunk], ['xpAcc', r.parts.acc], ['xpTime', r.parts.time]];
+    $('endXp').innerHTML = `<ul class="xplist">${rows.map(([k, v], i) => `<li class="${v ? '' : 'zero'}" style="animation-delay:${0.9 + i * 0.18}s"><span>${esc(t(k))}</span><b>${v ? '+' + v : '—'}</b></li>`).join('')}</ul>`
+      + `<div class="xpgain" id="xpGainN">+0 XP</div><div id="lvlBox"></div>`
       + (S.vsBot ? `<div class="endnote">${esc(t('botXp'))}</div>` : !isStdRules(CFG) ? `<div class="endnote">${esc(t('customXp'))}</div>` : '')
-      + `<div class="xpbar"><i style="width:${Math.round((a.xp - lo) / (hi - lo) * 100)}%"></i></div>`
-      + `<div class="xprow"><span>XP: <b>${a.xp - lo} / ${hi - lo}</b></span><span>${esc(t('levelN', { n: l }))}</span></div>`;
+      + `<div class="xpbar" id="endBar"><i id="endFill" style="width:${Math.round((r.xpBefore - lo0) / (hi0 - lo0) * 100)}%"></i></div>`
+      + `<div class="xprow"><span>XP: <b id="endXpTxt">${r.xpBefore - lo0} / ${hi0 - lo0}</b></span><span id="endLvl">${esc(t('levelN', { n: l0 }))}</span></div>`;
+    animateXp(r, { l0, lo0, hi0, l, lo, hi, a, half });
   } else $('endXp').innerHTML = `<p class="endnote">${esc(t('xpGuest'))}</p>`;
+  renderRematch();
   setTimeout(() => Snd.play(win ? 'win' : 'lose'), 600);
   setTimeout(() => $('end').classList.add('show'), 700);
   renderGame();
+}
+
+// Animation de fin de partie : compteur d'XP, barre qui se remplit, passage de niveau.
+function animateXp(r, d) {
+  const t0 = Date.now() + 1900, fill = $('endFill'), bar = $('endBar');
+  const num = $('xpGainN');
+  const tick = () => {
+    const k = clamp01((Date.now() - t0) / 900);
+    if (!num.isConnected) return;
+    num.textContent = '+' + Math.round(r.gain * (1 - Math.pow(1 - k, 3))) + ' XP';
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  setTimeout(() => requestAnimationFrame(tick), 1900);
+  const txt = (xp, lo, hi) => { const e = $('endXpTxt'); if (e) e.textContent = `${xp - lo} / ${hi - lo}`; };
+  const pct = (xp, lo, hi) => Math.round((xp - lo) / (hi - lo) * 100) + '%';
+  setTimeout(() => {
+    if (!fill.isConnected) return;
+    if (r.up) {
+      fill.style.width = '100%'; txt(d.hi0, d.lo0, d.hi0);
+      setTimeout(() => {
+        if (!fill.isConnected) return;
+        bar.classList.add('flash'); Snd.play('upgrade');
+        $('lvlBox').innerHTML = `<div class="lvlup">⬆ ${esc(t('levelUp', { n: d.l, rank: rankOf(d.l) }))}</div>`;
+        $('endLvl').textContent = t('levelN', { n: d.l });
+        fill.classList.add('snap'); fill.style.width = '0%'; void fill.offsetWidth; fill.classList.remove('snap');
+        fill.style.width = pct(d.a.xp, d.lo, d.hi); txt(d.a.xp, d.lo, d.hi);
+      }, 1000);
+    } else { fill.style.width = pct(d.a.xp, d.lo, d.hi); txt(d.a.xp, d.lo, d.hi); }
+  }, 2000);
+}
+
+/* ---------- Revanche ---------- */
+function resetRound() {
+  clearInterval(S.turnTimer);
+  S.ships = LENS.map((len, i) => ({ i, len, cells: null, shield: 'none' }));
+  Object.assign(S, { sel: 0, horiz: true, preview: null, lifted: null, drag: null, meReady: false, oppReady: false, myTurn: false, waiting: false, mode: 'shot',
+    enemy: Array(N * N).fill(null), incoming: Array(N * N).fill(null), enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
+    pendingAct: null, oppUsed: 0, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 }, rematchMe: false, rematchOpp: false });
+  msg('placeMsg', '');
+}
+function renderRematch() {
+  const b = $('btnRematch'), n = $('rematchNote'), nm = S.opp ? S.opp.name : '';
+  if (S.lost || !S.connected) { b.style.display = 'none'; n.textContent = ''; return; }
+  b.style.display = '';
+  b.disabled = !!S.oppGone || !!S.rematchMe;
+  n.textContent = S.oppGone ? t('rematchGone') : S.rematchMe ? t('rematchWait', { name: nm }) : S.rematchOpp ? t('rematchOpp', { name: nm }) : '';
+}
+function askRematch() {
+  if (S.phase !== 'over' || S.lost || S.oppGone || S.rematchMe) return;
+  if (S.vsBot) return startRematch();
+  S.rematchMe = true; send({ t: 'rematch' }); renderRematch(); Snd.play('click');
+  if (S.rematchOpp) startRematch();
+}
+function startRematch() {
+  if (S.phase !== 'over' || S.lost) return;
+  $('end').classList.remove('show');
+  S.rounds = (S.rounds || 0) + 1;      // le premier tir alterne d'une manche à l'autre
+  resetRound();
+  if (S.vsBot) S.bot = new Bot(); else startHeartbeat();
+  enterPlacement();
+  if (S.vsBot) S.bot.start();
+}
+function leaveToMenu() {
+  if (S.connected && !S.vsBot && !S.lost) send({ t: 'bye' });
+  setTimeout(() => location.reload(), 120);
 }
 
 /* ---------- Affichage de la partie ---------- */
@@ -2871,6 +2977,8 @@ $('btnReady').onclick = setReady;
 document.querySelectorAll('.btnQuit').forEach(b => { b.onclick = quitGame; });
 document.querySelectorAll('#modes button').forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
 $('btnSeeGrids').onclick = () => $('end').classList.remove('show');
+$('btnRematch').onclick = askRematch;
+$('btnNewGame').onclick = leaveToMenu;
 
 // Raccourcis clavier pendant le placement (PC) : R pivote, Entrée pose, Suppr retire.
 document.addEventListener('keydown', e => {

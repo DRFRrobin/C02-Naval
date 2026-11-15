@@ -522,3 +522,67 @@ test('compte en ligne : serveur injoignable => repli automatique sur le pseudo l
   await pg.waitForSelector('#dash.active');
   await ctx.close();
 });
+
+/* ---------------- Revanche, animations et XP selon précision / rapidité ---------------- */
+test('formule d\'XP : le jeu et le serveur donnent exactement le même résultat', async () => {
+  const { xpParts } = require('../server/app');
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  const cases = [];
+  for (const win of [true, false]) for (const half of [true, false]) for (const [shots, hits, sunk] of [[0, 0, 0], [17, 17, 5], [40, 17, 5], [100, 30, 3]])
+    for (const duration of [5, 150, 400, 900, 3000]) cases.push({ win, half, shots, hits, sunk, duration });
+  const got = await pg.evaluate(cs => cs.map(c => xpParts(c.win, c.shots, c.hits, c.sunk, c.duration, c.half).gain), cases);
+  assert.deepEqual(got, cases.map(c => xpParts(c).gain));
+  await ctx.close();
+});
+
+test('revanche contre le bot : nouvelle manche immédiate, le premier tir alterne', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; settings.skill = 0; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000); await startAuto(pg);
+  await phase(pg, 'over', 60000);
+  // détail de l'XP affiché : 5 lignes, puis compteur animé jusqu'au gain réel
+  await pg.waitForSelector('#end.show');
+  assert.equal(await pg.locator('.xplist li').count(), 5);
+  await pg.waitForFunction(() => /^\+[1-9]\d* XP$/.test($('xpGainN').textContent) && $('xpGainN').textContent !== '+0 XP', null, { timeout: 8000 });
+  await pg.click('#btnRematch');
+  await phase(pg, 'place', 5000);
+  assert.deepEqual(await pg.evaluate(() => [S.match.shots, S.enemy.every(v => v === null), S.ships.every(s => !s.cells), $('end').classList.contains('show'), S.rounds]), [0, true, true, false, 1]);
+  await ready(pg); await phase(pg, 'game', 8000);
+  assert.equal(await pg.evaluate(() => S.myTurn), false, 'le bot commence la 2e manche');
+  await startAuto(pg); await phase(pg, 'over', 60000);
+  assert.equal(await pg.evaluate(() => me().stats.games), 2);
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
+test('revanche entre deux joueurs : les deux doivent accepter', async () => {
+  const ctx = await newContext();
+  const [A, B] = await hostAndJoin(ctx);
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  await startAuto(A); await startAuto(B);
+  await bothOver(A, B);
+  await Promise.all([A, B].map(p => p.evaluate(() => clearInterval(window.__auto))));   // sinon l'ancien tireur automatique jouerait à la place du test
+  await A.click('#btnRematch');
+  await A.waitForFunction(() => $('rematchNote').textContent.length > 0);
+  await B.waitForFunction(() => /revanche|rematch/i.test($('rematchNote').textContent), null, { timeout: 5000 });
+  assert.equal(await A.evaluate(() => S.phase), 'over', 'pas de départ tant que l\'autre n\'a pas accepté');
+  await B.click('#btnRematch');
+  await phase(A, 'place', 5000); await phase(B, 'place', 5000);
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  assert.deepEqual([await A.evaluate(() => [S.myTurn, S.isHost, S.rounds]), await B.evaluate(() => [S.myTurn, S.isHost, S.rounds])], [[false, true, 1], [true, false, 1]], 'celui qui jouait en second commence');
+  await startAuto(A); await startAuto(B);
+  await bothOver(A, B); await assertConsistentEnd(A, B);
+  assert.deepEqual([...A.errors, ...B.errors], []);
+  await ctx.close();
+});
+
+test('revanche : impossible si l\'adversaire est parti', async () => {
+  const ctx = await newContext();
+  const [A, B] = await hostAndJoin(ctx);
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  await startAuto(A); await startAuto(B);
+  await bothOver(A, B);
+  await B.click('#btnNewGame');
+  await A.waitForFunction(() => $('btnRematch').disabled && /quitt|left/i.test($('rematchNote').textContent), null, { timeout: 5000 });
+  await ctx.close();
+});
