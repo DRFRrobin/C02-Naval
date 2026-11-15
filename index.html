@@ -61,9 +61,9 @@ h1,h2,h3{margin:0}
 .muted{color:var(--muted)}
 .msg{min-height:1.4em;text-align:center;margin:10px 0;font-size:.92rem;color:var(--muted)}
 .msg.err{color:var(--err)}.msg.ok{color:var(--green)}
-input,select{width:100%;background:var(--input);border:1px solid var(--border2);border-radius:10px;color:var(--text);
+input,select,textarea{font-family:inherit;resize:vertical;width:100%;background:var(--input);border:1px solid var(--border2);border-radius:10px;color:var(--text);
   padding:12px 14px;font:16px var(--font);margin-top:8px}
-input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
 .field-label{display:block;font-size:13px;color:var(--muted);margin-top:14px}
 
 /* Boutons */
@@ -520,6 +520,23 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
             <button id="btnSaveProfile" class="btn grad wide" style="margin-top:16px" data-i18n="save"></button>
             <p id="setMsg" class="msg"></p>
           </div>
+          <div class="set-block" id="backupBlock">
+            <b><i class="fa-solid fa-cloud-arrow-up"></i><span data-i18n="bkT"></span></b><small data-i18n="bkD"></small>
+            <label class="field-label" for="bkPass" data-i18n="bkPass"></label>
+            <input id="bkPass" type="password" autocomplete="new-password" spellcheck="false">
+            <div class="row" style="margin-top:12px">
+              <button id="btnBkFile" class="btn"><i class="fa-solid fa-file-arrow-down"></i><span data-i18n="bkFile"></span></button>
+              <button id="btnBkCopy" class="btn"><i class="fa-solid fa-copy"></i><span data-i18n="bkCopy"></span></button>
+            </div>
+            <label class="field-label" for="bkCode" data-i18n="bkImportL"></label>
+            <textarea id="bkCode" rows="3" spellcheck="false" autocomplete="off" autocapitalize="off" data-ph="bkCodePh" style="width:100%"></textarea>
+            <div class="row" style="margin-top:12px">
+              <button id="btnBkPick" class="btn"><i class="fa-solid fa-folder-open"></i><span data-i18n="bkPick"></span></button>
+              <button id="btnBkImport" class="btn grad"><i class="fa-solid fa-file-import"></i><span data-i18n="bkImport"></span></button>
+            </div>
+            <input id="bkFile" type="file" accept=".c02save,.txt,text/plain" hidden>
+            <p id="bkMsg" class="msg"></p>
+          </div>
           <div class="set-row">
             <i class="fa-solid fa-trash-can" style="color:var(--red)"></i>
             <div><b data-i18n="deleteT"></b><small data-i18n="deleteD"></small></div>
@@ -690,6 +707,14 @@ const I18N = {
     newPass: 'Nouveau mot de passe (laisser vide pour conserver)', save: 'Enregistrer les modifications',
     saved: 'Modifications enregistrées.', nothingChanged: 'Aucune modification.',
     deleteT: 'Supprimer le compte', deleteD: 'Efface le compte, son XP et ses statistiques.', deleteBtn: 'Supprimer',
+    bkT: 'Transférer / sauvegarder ma progression', bkD: 'Exporte ton profil (XP, niveau, statistiques) dans un fichier chiffré pour le retrouver sur un autre appareil. Rien ne passe par un serveur.',
+    bkPass: 'Phrase secrète (8 caractères minimum — à retenir, elle n\'est stockée nulle part)', bkFile: 'Télécharger le fichier', bkCopy: 'Copier le code',
+    bkImportL: 'Importer une sauvegarde (code ou fichier)', bkCodePh: 'Colle ici le code C02S1.…', bkPick: 'Choisir un fichier', bkImport: 'Importer',
+    bkNeedPass: 'Choisis une phrase secrète d\'au moins 8 caractères.', bkNeedCode: 'Colle un code ou choisis un fichier.',
+    bkDone: 'Sauvegarde créée. Garde la phrase secrète : sans elle, le fichier est illisible.', bkCopied: 'Code copié. Garde la phrase secrète.',
+    bkBad: 'Phrase secrète incorrecte ou sauvegarde corrompue.', bkFmt: 'Ce n\'est pas une sauvegarde C02 Naval valide.',
+    bkNewer: 'Un profil « {name} » existe déjà ici avec plus de progression. L\'écraser par la sauvegarde ?',
+    bkOk: 'Profil « {name} » importé.', bkKept: 'Ton profil local est plus avancé : rien n\'a été modifié.',
     deleteConfirm: 'Supprimer définitivement le compte « {name} », son XP et ses statistiques ?',
     errPseudoLen: 'Le pseudo doit faire entre 2 et 16 caractères.', errPseudoTaken: 'Ce pseudo existe déjà sur cet appareil.',
     errPassLen: 'Le mot de passe doit faire au moins 4 caractères.', errPassMatch: 'Les mots de passe ne correspondent pas.',
@@ -806,6 +831,14 @@ const I18N = {
     newPass: 'New password (leave empty to keep)', save: 'Save changes',
     saved: 'Changes saved.', nothingChanged: 'Nothing to change.',
     deleteT: 'Delete account', deleteD: 'Erases the account, its XP and statistics.', deleteBtn: 'Delete',
+    bkT: 'Transfer / back up my progress', bkD: 'Export your profile (XP, level, statistics) to an encrypted file to restore it on another device. Nothing goes through a server.',
+    bkPass: 'Passphrase (8 characters minimum — remember it, it is stored nowhere)', bkFile: 'Download file', bkCopy: 'Copy code',
+    bkImportL: 'Import a backup (code or file)', bkCodePh: 'Paste the C02S1.… code here', bkPick: 'Choose a file', bkImport: 'Import',
+    bkNeedPass: 'Choose a passphrase of at least 8 characters.', bkNeedCode: 'Paste a code or choose a file.',
+    bkDone: 'Backup created. Keep the passphrase: without it the file is unreadable.', bkCopied: 'Code copied. Keep the passphrase.',
+    bkBad: 'Wrong passphrase or corrupted backup.', bkFmt: 'This is not a valid C02 Naval backup.',
+    bkNewer: 'A profile "{name}" already exists here with more progress. Overwrite it with the backup?',
+    bkOk: 'Profile "{name}" imported.', bkKept: 'Your local profile is more advanced: nothing was changed.',
     deleteConfirm: 'Permanently delete the account "{name}", its XP and statistics?',
     errPseudoLen: 'Username must be 2 to 16 characters long.', errPseudoTaken: 'This username already exists on this device.',
     errPassLen: 'Password must be at least 4 characters long.', errPassMatch: 'Passwords do not match.',
@@ -1411,6 +1444,91 @@ function saveProfile() {
   saveAccount(a);
   renderDash();
   msg('setMsg', t('saved'), 'ok');
+}
+// ===== Sauvegarde chiffrée du profil (transfert entre appareils) =====
+// PBKDF2-SHA256 (600 000 itérations) -> AES-256-GCM : confidentialité + intégrité, sans aucun serveur.
+const BK_MAGIC = 'C02S1.';
+const b64e = u => { let s = ''; u.forEach(c => s += String.fromCharCode(c)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const b64d = str => { const b = atob(str.replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+async function bkKey(pass, salt, usage) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass.normalize('NFKC')), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, [usage]);
+}
+async function encryptBackup(obj, pass) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await bkKey(pass, salt, 'encrypt'), new TextEncoder().encode(JSON.stringify(obj))));
+  const out = new Uint8Array(28 + ct.length); out.set(salt); out.set(iv, 16); out.set(ct, 28);
+  return BK_MAGIC + b64e(out);
+}
+async function decryptBackup(code, pass) {
+  code = String(code || '').trim();
+  if (!code.startsWith(BK_MAGIC)) throw new Error('fmt');
+  let raw; try { raw = b64d(code.slice(BK_MAGIC.length).replace(/\s+/g, '')); } catch (e) { throw new Error('fmt'); }
+  if (raw.length < 45 || raw.length > 20000) throw new Error('fmt');
+  let plain; try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(16, 28) }, await bkKey(pass, raw.slice(0, 16), 'decrypt'), raw.slice(28)); } catch (e) { throw new Error('bad'); }
+  let o; try { o = JSON.parse(new TextDecoder().decode(plain)); } catch (e) { throw new Error('fmt'); }
+  return sanitizeBackup(o);
+}
+// Ne jamais faire confiance au contenu importé : on reconstruit un profil propre.
+function sanitizeBackup(o) {
+  if (!o || o.v !== 1 || typeof o.name !== 'string') throw new Error('fmt');
+  const name = o.name.trim().replace(/\s+/g, ' ');
+  if (name.length < 2 || name.length > 16) throw new Error('fmt');
+  const num = (v, max) => (Number.isFinite(v) ? Math.min(Math.max(Math.floor(v), 0), max) : 0);
+  const st = { ...emptyStats() }, src = o.stats && typeof o.stats === 'object' ? o.stats : {};
+  for (const k of Object.keys(st)) {
+    if (k === 'fastestWin') st[k] = Number.isFinite(src[k]) && src[k] >= 0 ? Math.min(Math.floor(src[k]), 1e7) : null;
+    else st[k] = num(src[k], 1e9);
+  }
+  return { name, emoji: validEmoji(o.emoji) ? o.emoji : null, xp: num(o.xp, 1e9), created: num(o.created, 4e12) || Date.now(), stats: st };
+}
+function bkPass() {
+  const p = $('bkPass').value;
+  if (p.length < 8) { msg('bkMsg', t('bkNeedPass'), true); return null; }
+  return p;
+}
+async function bkCreate() {
+  loadAccounts(); const a = me(); const p = bkPass(); if (!a || !p) return null;
+  msg('bkMsg', '…');
+  return encryptBackup({ v: 1, name: a.name, emoji: a.emoji || null, xp: a.xp, created: a.created, stats: a.stats, at: Date.now() }, p);
+}
+async function bkExportFile() {
+  const code = await bkCreate(); if (!code) return;
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' }));
+  link.download = 'c02-naval-' + me().name.replace(/[^\w-]+/g, '_') + '.c02save';
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  msg('bkMsg', t('bkDone'), 'ok');
+}
+async function bkExportCopy() {
+  const code = await bkCreate(); if (!code) return;
+  $('bkCode').value = code;
+  try { await navigator.clipboard.writeText(code); msg('bkMsg', t('bkCopied'), 'ok'); }
+  catch (e) { $('bkCode').select(); msg('bkMsg', t('bkDone'), 'ok'); }
+}
+async function bkImport() {
+  const code = $('bkCode').value.trim();
+  if (!code) return msg('bkMsg', t('bkNeedCode'), true);
+  const p = bkPass(); if (!p) return;
+  msg('bkMsg', '…');
+  let d;
+  try { d = await decryptBackup(code, p); } catch (e) { return msg('bkMsg', t(e.message === 'bad' ? 'bkBad' : 'bkFmt'), true); }
+  loadAccounts();
+  // Profil de même pseudo déjà présent : on garde le plus avancé (XP puis parties jouées).
+  const cur = Object.values(accounts).find(x => x.name.toLowerCase() === d.name.toLowerCase());
+  if (cur) {
+    const ahead = cur.xp > d.xp || (cur.xp === d.xp && (cur.stats?.games || 0) >= d.stats.games);
+    if (ahead && !confirm(t('bkNewer', { name: cur.name }))) return msg('bkMsg', t('bkKept'));
+    Object.assign(cur, { emoji: d.emoji || cur.emoji, xp: d.xp, created: Math.min(cur.created || d.created, d.created), stats: d.stats });
+    saveAccount(cur); setSession(cur.id);
+  } else {
+    const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    saveAccount({ id, name: d.name, emoji: d.emoji, xp: d.xp, created: d.created, lastLogin: Date.now(), stats: d.stats });
+    setSession(id);
+  }
+  $('bkCode').value = ''; $('bkPass').value = '';
+  renderDash(); msg('bkMsg', t('bkOk', { name: d.name }), 'ok');
 }
 function deleteAccount() {
   const a = me(); if (!a) return;
@@ -2550,6 +2668,11 @@ $('langSel').onchange = e => setLang(e.target.value);
 $('langMini').onchange = e => setLang(e.target.value);
 $('btnSaveProfile').onclick = saveProfile;
 $('btnDelete').onclick = deleteAccount;
+$('btnBkFile').onclick = bkExportFile;
+$('btnBkCopy').onclick = bkExportCopy;
+$('btnBkImport').onclick = bkImport;
+$('btnBkPick').onclick = () => $('bkFile').click();
+$('bkFile').onchange = e => { const f = e.target.files[0]; if (!f || f.size > 30000) return; f.text().then(x => { $('bkCode').value = x.trim(); }); e.target.value = ''; };
 $('mRandom').onclick = () => { Snd.play('click'); findRandom(); };
 $('mBot').onclick = () => { Snd.play('click'); if (!settings.bot) return msg('dashMsg', t('botOff'), true); startBot(); };
 $('mJoin').onclick = () => { Snd.play('click'); openJoin(''); };
