@@ -15,6 +15,13 @@ Bataille navale dans le navigateur, sur PC ou téléphone. Sans installation, sa
 
 Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2 × 2), **Frappe en croix** (5 cases) ou **Bouclier** (annule le premier coup sur un de tes bateaux).
 
+**Pendant la partie :**
+- Sur téléphone, les boutons **Tir / Radar / Croix / Bouclier** restent fixés en bas de l'écran, sous le pouce ; sur ordinateur, ils sont sous la grille adverse.
+- **Radar et Frappe en croix se confirment** : un premier appui montre la zone visée, un second sur la même case tire (un appui ailleurs déplace la visée). Aucune amélioration gâchée par erreur.
+- **Bouclier** : une liste des bateaux encore protégeables apparaît à côté des boutons ; toucher un nom suffit (toucher le bateau dans « Ta flotte » marche toujours).
+
+**Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
+
 ## Règles personnalisables
 
 Onglet **Règles** du tableau de bord :
@@ -56,9 +63,9 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 ## Version et mises à jour
 
-Le numéro de version (`1.2.0`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+Le numéro de version (`1.2.1`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
 
-**Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `index.html` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
+**Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `js/main.js` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
 
 **Sons :** bruitages synthétisés (canon, explosion, éclaboussure, sonar, cloches, fanfare…) avec réverbération et compresseur ; le volume se règle dans Paramètres.
 
@@ -83,13 +90,15 @@ Effets sonores (synthétisés, sans fichier audio), langue (français / anglais)
 ## Fiabilité du multijoueur
 
 - **Reprise après coupure** : si le lien est perdu (changement de Wi-Fi, tunnel…), les deux joueurs voient « Reconnexion… » pendant 45 s au maximum. Les messages sont numérotés et renvoyés, la partie reprend là où elle s'était arrêtée, sans doublon ni perte. Si l'adversaire a quitté volontairement, c'est une victoire par forfait.
-- **Relais TURN** : sur les réseaux très fermés, ouvrir **Paramètres → Avancé** et saisir l'adresse d'un relais (`turn:serveur:3478` ou `turns:serveur:443?transport=tcp`), un identifiant et un mot de passe. Un compte gratuit chez un fournisseur (ExpressTURN, Metered…) suffit. Ces informations restent dans le navigateur. Pour l'activer pour tous les joueurs, renseigner la constante `MY_TURN` de `index.html`.
+- **Relais TURN** : sur les réseaux très fermés, ouvrir **Paramètres → Avancé** et saisir l'adresse d'un relais (`turn:serveur:3478` ou `turns:serveur:443?transport=tcp`), un identifiant et un mot de passe. Un compte gratuit chez un fournisseur (ExpressTURN, Metered…) suffit. Ces informations restent dans le navigateur. Pour l'activer pour tous les joueurs, renseigner la constante `MY_TURN` de `js/core.js`.
 
 ## Technique
 
-- Un seul fichier : `index.html` (HTML, CSS et JavaScript).
+- Site statique, sans étape de compilation : `index.html` (structure), `css/style.css` (apparence et thèmes) et le code dans `js/`, chargé dans cet ordre :
+  `i18n.js` (textes FR/EN), `core.js` (constantes, état, règles), `sound.js` (sons), `profile.js` (profil, comptes, XP, sauvegarde), `net.js` (réseau PeerJS, reprise après coupure), `bot.js` (IA), `place.js` (placement), `game.js` (partie, anti-triche, fin de partie), `main.js` (démarrage, version, mises à jour).
+  Ce sont des scripts classiques : les fonctions et constantes déclarées dans un fichier sont visibles dans les suivants.
 - Connexion pair-à-pair (WebRTC) avec [PeerJS](https://peerjs.com) 1.5.4. Le service public de PeerJS sert uniquement à mettre les navigateurs en relation.
-- Sur les réseaux très fermés, la connexion directe peut échouer : un relais TURN personnel peut être ajouté dans la constante `MY_TURN` de `index.html`.
+- Sur les réseaux très fermés, la connexion directe peut échouer : un relais TURN personnel peut être ajouté dans la constante `MY_TURN` de `js/core.js`.
 - Icônes Font Awesome 6, polices Inter et Orbitron (Google Fonts).
 
 ## Tests automatiques

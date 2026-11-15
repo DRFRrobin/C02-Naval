@@ -9,6 +9,8 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 
 const ROOT = path.join(__dirname, '..');
+// Code du jeu (index.html + fichiers js/), lu tel quel par quelques tests
+const SOURCE = () => ['index.html', ...fs.readdirSync(path.join(ROOT, 'js')).map(f => 'js/' + f)].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
 let server, base, browser;
 
 before(async () => {
@@ -16,7 +18,7 @@ before(async () => {
     const rel = req.url.split('?')[0] === '/' ? 'index.html' : decodeURIComponent(req.url.split('?')[0].slice(1));
     const full = path.resolve(ROOT, rel);
     if (!full.startsWith(ROOT + path.sep) || rel.startsWith('node_modules') || !fs.existsSync(full) || !fs.statSync(full).isFile()) { res.writeHead(404); return res.end(); }
-    const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+    const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
     res.writeHead(200, { 'content-type': types[path.extname(full)] || 'application/octet-stream' });
     res.end(fs.readFileSync(full));
   });
@@ -241,10 +243,89 @@ test('un adversaire ne peut pas tricher avec une amélioration non gagnée', asy
   const [A, B] = await hostAndJoin(ctx);
   await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
   // A (hôte) joue en premier : il envoie une « frappe en croix » sans en avoir gagné
-  await A.evaluate(() => { S.inv.cross = 1; S.mode = 'cross'; onEnemyTap(5, 5); });
+  await A.evaluate(() => { S.inv.cross = 1; S.mode = 'cross'; onEnemyTap(5, 5); onEnemyTap(5, 5); });   // viser puis confirmer
   await B.waitForFunction(() => S.myTurn, null, { timeout: 5000 });
   const hits = await B.evaluate(() => S.incoming.filter(Boolean).length);
   assert.equal(hits, 1, 'seule 1 case doit être touchée');
+  await ctx.close();
+});
+
+test('anti-triche : partie honnête, les deux grilles sont vérifiées', async () => {
+  const ctx = await newContext();
+  const [A, B] = await hostAndJoin(ctx);
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  assert.ok(await A.evaluate(() => /^[0-9a-f]{64}$/.test(S.oppCommit)), 'empreinte de la grille adverse reçue');
+  await startAuto(A); await startAuto(B);
+  await bothOver(A, B);
+  for (const p of [A, B]) await p.waitForFunction(() => S.verify === 'ok', null, { timeout: 8000 });
+  const loser = (await A.evaluate(() => S.win)) ? B : A;
+  assert.equal(await loser.evaluate(() => me().stats.losses), 1, 'la défaite est comptée');
+  assert.match(await loser.textContent('#verifyNote'), /vérifiée|checked/);
+  assert.deepEqual([...A.errors, ...B.errors], []);
+  await ctx.close();
+});
+
+test('anti-triche : un adversaire qui ment sur ses résultats est démasqué, la défaite n\'est pas comptée', async () => {
+  const ctx = await newContext();
+  const [A, B] = await hostAndJoin(ctx);
+  // B est modifié : il annonce « raté » à chaque tir reçu
+  await B.evaluate(() => { resolveOn = (ships, incoming, kind, cells) => ({ results: cells.map(([r, c]) => ({ r, c, v: kind === 'radar' ? 'empty' : 'miss' })), over: false }); });
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  await startAuto(A); await startAuto(B);
+  await bothOver(A, B);
+  await A.waitForFunction(() => S.verify === 'cheat', null, { timeout: 8000 });
+  assert.match(await A.textContent('#endTitle'), /Défaite|Defeat/);
+  assert.match(await A.textContent('#verifyNote'), /Triche|Cheating/);
+  const st = await A.evaluate(() => me().stats);
+  assert.equal(st.losses, 0); assert.equal(st.interrupted, 1);
+  await ctx.close();
+});
+
+test('Radar et Frappe en croix : un premier appui vise, un second confirme', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await pg.waitForFunction(() => S.myTurn && !S.waiting);
+  await pg.evaluate(() => { S.inv.radar = 1; setMode('radar'); onEnemyTap(3, 3); });
+  let st = await pg.evaluate(() => ({ waiting: S.waiting, inv: S.inv.radar, aim: $('enemyGrid').querySelectorAll('.cell.aim').length, hint: $('hint').textContent }));
+  assert.deepEqual([st.waiting, st.inv, st.aim], [false, 1, 4]);
+  assert.match(st.hint, /D4/);
+  await pg.evaluate(() => onEnemyTap(6, 6));   // un appui ailleurs déplace la visée
+  assert.equal(await pg.evaluate(() => S.aim.join()), '6,6');
+  await pg.evaluate(() => onEnemyTap(6, 6));
+  st = await pg.evaluate(() => ({ waiting: S.waiting || !S.myTurn, inv: S.inv.radar, aim: S.aim }));
+  assert.deepEqual(st, { waiting: true, inv: 0, aim: null });
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
+test('Bouclier : la liste des bateaux permet de le poser sans chercher sa flotte', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await pg.waitForFunction(() => S.myTurn && !S.waiting);
+  await pg.evaluate(() => { S.inv.shield = 1; setMode('shield'); });
+  assert.equal(await pg.locator('#shieldPick button').count(), 5);
+  await pg.locator('#shieldPick button').nth(1).click();
+  const r = await pg.evaluate(() => ({ sh: S.ships[1].shield, inv: S.inv.shield, my: S.myTurn, shown: $('shieldPick').classList.contains('show') }));
+  assert.deepEqual(r, { sh: 'active', inv: 0, my: false, shown: false });
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
+test('téléphone : les boutons d\'action restent fixés en bas pendant la partie', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  const r = await pg.evaluate(() => { const b = $('actBar').getBoundingClientRect(); return { pos: getComputedStyle($('actBar')).position, bottom: b.bottom, h: innerHeight }; });
+  assert.equal(r.pos, 'fixed'); assert.ok(Math.abs(r.bottom - r.h) <= 1, 'collée en bas');
+  // tout en bas de la page, la flotte n'est pas cachée par la barre
+  await pg.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  const clear = await pg.evaluate(() => $('myGrid').getBoundingClientRect().bottom <= $('actBar').getBoundingClientRect().top);
+  assert.ok(clear, 'la flotte reste visible au-dessus de la barre');
+  const over = await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  assert.ok(over <= 1, 'pas de débordement horizontal');
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  assert.equal(await pg.evaluate(() => getComputedStyle($('actBar')).position), 'static');
   await ctx.close();
 });
 
@@ -629,11 +710,11 @@ test('le texte du jeu n\'est pas sélectionnable, sauf les champs de saisie et l
 });
 
 /* ---------------- Version, mises à jour, sons ---------------- */
-test('numéro de version identique partout (package.json, index.html, version.json, service worker)', () => {
+test('numéro de version identique partout (package.json, js/main.js, version.json, service worker)', () => {
   const v = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
   assert.match(v, /^\d+\.\d+\.\d+$/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8')).version, v);
-  assert.equal(/const APP_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'))[1], v);
+  assert.equal(/const APP_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'js/main.js'), 'utf8'))[1], v);
   assert.ok(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8').includes(`'c02-naval-v${v}'`));
 });
 
@@ -674,7 +755,7 @@ test('mise à jour : hors ligne ou fichier illisible, le jeu fonctionne sans rie
 });
 
 test('sons : chaque son est défini, joue sans erreur, et le volume est réglable', async () => {
-  const names = new Set([...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/Snd\.play\('([a-z]+)'\)/g)].map(m => m[1]));
+  const names = new Set([...SOURCE().matchAll(/Snd\.play\('([a-z]+)'\)/g)].map(m => m[1]));
   ['win', 'lose', 'levelup', 'xp'].forEach(n => names.add(n));
   const ctx = await newContext(); const pg = await newPage(ctx);
   const r = await pg.evaluate(async list => {
