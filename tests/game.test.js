@@ -418,3 +418,35 @@ test('téléphone : onglets en bas de l\'écran, profil/XP en haut', async () =>
   assert.equal(pos, 'static');
   await ctx.close();
 });
+
+test('sauvegarde chiffrée : export puis import sur un autre appareil', async () => {
+  const c1 = await newContext(); const p1 = await newPage(c1, { width: 1000, height: 800 }, 'Capitaine');
+  await p1.evaluate(() => { loadAccounts(); const a = me(); a.xp = 450; a.stats.games = 12; a.stats.wins = 7; saveAccount(a); });
+  await p1.evaluate(() => { pane = 'settings'; renderDash(); });
+  await p1.fill('#bkPass', 'court');
+  await p1.click('#btnBkCopy');
+  assert.match(await p1.textContent('#bkMsg'), /8 (caract|characters)/);
+  await p1.fill('#bkPass', 'phrase secrète solide');
+  await p1.click('#btnBkCopy');
+  await p1.waitForFunction(() => $('bkCode').value.startsWith('C02S1.'), null, { timeout: 15000 });
+  const code = await p1.inputValue('#bkCode');
+  assert.ok(!code.includes('Capitaine') && !code.includes('450'), 'rien en clair dans le code');
+  // autre appareil = autre navigateur
+  const c2 = await newContext(); const p2 = await newPage(c2, { width: 1000, height: 800 }, 'Autre');
+  await p2.evaluate(() => { pane = 'settings'; renderDash(); });
+  await p2.fill('#bkCode', code);
+  await p2.fill('#bkPass', 'mauvaise phrase');
+  await p2.click('#btnBkImport');
+  await p2.waitForFunction(() => /incorrecte|Wrong/.test($('bkMsg').textContent), null, { timeout: 15000 });
+  await p2.fill('#bkPass', 'phrase secrète solide');
+  await p2.click('#btnBkImport');
+  await p2.waitForFunction(() => /import|Import/.test($('bkMsg').textContent) && me().name === 'Capitaine', null, { timeout: 15000 });
+  const r = await p2.evaluate(() => ({ xp: me().xp, g: me().stats.games, w: me().stats.wins }));
+  assert.deepEqual(r, { xp: 450, g: 12, w: 7 });
+  // code altéré : refusé (intégrité)
+  const bad = code.slice(0, -4) + (code.endsWith('AAAA') ? 'BBBB' : 'AAAA');
+  await p2.fill('#bkCode', bad); await p2.fill('#bkPass', 'phrase secrète solide');
+  await p2.click('#btnBkImport');
+  await p2.waitForFunction(() => /incorrecte|valide|Wrong|valid/.test($('bkMsg').textContent), null, { timeout: 15000 });
+  await c1.close(); await c2.close();
+});

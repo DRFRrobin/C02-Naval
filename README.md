@@ -32,6 +32,16 @@ Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qu
 - Le profil (pseudo, avatar, XP, statistiques) est enregistré **dans le navigateur de l'appareil** : il ne se synchronise pas entre PC et téléphone, et effacer les données du site l'efface. Taper un pseudo déjà utilisé sur l'appareil rouvre ce profil ; aucun mot de passe ne le protège.
 - Contre le bot, l'XP gagnée est divisée par deux.
 
+## Transférer sa progression sur un autre appareil
+
+Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase secrète (8 caractères minimum), puis télécharge le fichier `.c02save` ou copie le code `C02S1.…`. Sur l'autre appareil, colle le code (ou choisis le fichier), saisis la même phrase et clique sur *Importer*.
+
+- Chiffrement dans le navigateur : AES-256-GCM, clé dérivée de la phrase par PBKDF2-SHA256 (600 000 itérations), sel et IV aléatoires. Aucun serveur, rien n'est envoyé.
+- Le GCM authentifie le contenu : un code modifié ou une mauvaise phrase est refusé.
+- Le contenu importé est revalidé (types, bornes, avatar, pseudo) avant d'être enregistré.
+- Si un profil du même pseudo existe déjà, le plus avancé est conservé (confirmation avant d'écraser).
+- La sécurité repose sur la phrase secrète : plus elle est longue, mieux c'est. Ce n'est pas une synchronisation automatique : chaque transfert est manuel.
+
 ## Installer comme une application (iPhone, Android, PC)
 
 Le jeu est une application web installable : une fois ajoutée à l'écran d'accueil, elle s'ouvre en plein écran, avec son icône et sans barre d'adresse.
