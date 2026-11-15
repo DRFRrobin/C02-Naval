@@ -608,3 +608,22 @@ test('téléphone : portrait imposé (manifeste) et message si on le tourne en p
   assert.equal(await p2.evaluate(() => getComputedStyle($('rotateLock')).display), 'none');
   await ctx2.close();
 });
+
+test('le texte du jeu n\'est pas sélectionnable, sauf les champs de saisie et le code de salon', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 }, 'Selection');
+  const us = sel => pg.evaluate(s => getComputedStyle(document.querySelector(s)).userSelect, sel);
+  assert.equal(await us('body'), 'none');
+  assert.equal(await us('.mode-card h3'), 'none');
+  assert.equal(await us('#tbName'), 'none');
+  // un glissé sur le texte ne sélectionne rien
+  await pg.mouse.move(20, 150); await pg.mouse.down(); await pg.mouse.move(370, 400, { steps: 8 }); await pg.mouse.up();
+  assert.equal(await pg.evaluate(() => String(getSelection())), '');
+  await pg.keyboard.press('Control+A');
+  assert.equal(await pg.evaluate(() => String(getSelection())), '');
+  // les champs restent utilisables
+  await pg.evaluate(() => { pane = 'settings'; renderDash(); });
+  assert.equal(await pg.evaluate(() => getComputedStyle($('editName')).userSelect), 'text');
+  await pg.fill('#editName', 'Nouveau'); assert.equal(await pg.inputValue('#editName'), 'Nouveau');
+  assert.equal(await pg.evaluate(() => getComputedStyle($('codeBox')).userSelect), 'all');
+  await ctx.close();
+});
