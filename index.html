@@ -4,9 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#050d1b">
+<!-- Installable comme une application (écran d'accueil iPhone / Android) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="C02 Naval">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <meta name="description" content="C02 Naval : bataille navale à deux joueurs dans le navigateur, sur PC et téléphone.">
 <title>C02 Naval</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700&display=swap">
@@ -25,7 +33,12 @@
   --font:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --num:'Orbitron',ui-monospace,Consolas,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;touch-action:manipulation}
+html,body{margin:0;touch-action:manipulation;overscroll-behavior-y:none}
+html{-webkit-text-size-adjust:100%}
+.install-tip{display:none;align-items:center;gap:12px;background:var(--card2);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin:0 0 16px}
+.install-tip.show{display:flex}.install-tip>i{font-size:22px;color:var(--sky)}.install-tip div{flex:1;min-width:0;font-size:14px}.install-tip small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.install-tip .btn{min-height:40px;padding:0 14px}.install-tip .x{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:6px}
+.how{margin:10px 0 0;padding-left:20px;color:var(--text);font-size:14px;line-height:1.55}.how li{margin:4px 0}
 body{min-height:100vh;min-height:100dvh;color:var(--text);font-family:var(--font);background-color:var(--bg2);
   background-image:radial-gradient(1100px 650px at 28% -8%,var(--glow) 0%,transparent 62%),linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 55%,var(--bg3) 100%);
   background-attachment:fixed;-webkit-text-size-adjust:100%}
@@ -404,6 +417,12 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
     </header>
 
     <div id="pane-play" class="pane active">
+      <div id="installTip" class="install-tip" role="note">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+        <div><b data-i18n="instTipT"></b><small id="instTipD"></small></div>
+        <button id="btnInstTip" class="btn primary"></button>
+        <button id="btnInstTipX" class="x" aria-label="×">×</button>
+      </div>
       <div class="modes-grid">
         <button class="mode-card" id="mRandom"><span class="mode-ic ic-cyan"><i class="fa-solid fa-shuffle"></i></span><h3 data-i18n="mRandomT"></h3><p data-i18n="mRandomD"></p></button>
         <button class="mode-card" id="mBot"><span class="mode-ic ic-green"><i class="fa-solid fa-robot"></i></span><h3 data-i18n="mBotT"></h3><p data-i18n="mBotD"></p></button>
@@ -447,6 +466,10 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
         <div class="set-block">
           <b><i class="fa-solid fa-palette"></i><span data-i18n="themeT"></span></b><small data-i18n="themeD"></small>
           <div id="themeBox" class="themes"></div>
+        </div>
+        <div class="set-block" id="installBlock">
+          <b><i class="fa-solid fa-mobile-screen-button"></i><span data-i18n="instT"></span></b><small data-i18n="instD"></small>
+          <div id="instBody"></div>
         </div>
         <div class="set-block">
           <b><i class="fa-solid fa-network-wired"></i><span data-i18n="advT"></span></b><small data-i18n="advD"></small>
@@ -689,6 +712,12 @@ const I18N = {
     stReconnecting: 'Reconnexion…', reconnecting: "Connexion perdue : tentative de reconnexion (45 s max)…",
     rTimerT: 'Chronomètre de tour', rTimerD: "Temps limite par tour ; passé ce délai, un tir au hasard est joué. Limite aussi le placement à 90 s.",
     timerOff: 'Désactivé', timerN: '{n} s', autoShot: 'Temps écoulé : tir automatique.', placeLimit: 'Placement limité à {s} s.',
+    instT: "Installer l'application", instD: "Ajoute C02 Naval à l'écran d'accueil : il s'ouvre en plein écran, comme une vraie application.",
+    instTipT: "Installe le jeu sur ton téléphone", instTipHow: "Ajoute-le à l'écran d'accueil pour jouer en plein écran.",
+    instBtnHow: 'Comment ?', instBtnInstall: 'Installer', instDone: "✓ L'application est installée : tu l'utilises en plein écran.",
+    instIosS1: "Ouvre ce site dans <b>Safari</b>.", instIosS2: "Touche le bouton <b>Partager</b> <i class=\"fa-solid fa-arrow-up-from-bracket\"></i> (en bas de l'écran, ou en haut sur iPad).",
+    instIosS3: "Fais défiler et choisis <b>Sur l'écran d'accueil</b> <i class=\"fa-regular fa-square-plus\"></i>.", instIosS4: "Touche <b>Ajouter</b> : l'icône C02 Naval apparaît sur ton écran d'accueil.",
+    instGen: "Dans le menu de ton navigateur, choisis « Installer l'application » ou « Ajouter à l'écran d'accueil ».",
     advT: 'Avancé : relais TURN', advD: "Facultatif. Aide à se connecter sur les réseaux très fermés. Les identifiants restent dans ce navigateur.",
     turnUrlPh: 'turn:serveur:3478  ou  turns:serveur:443?transport=tcp', turnUserPh: 'Identifiant', turnCredPh: 'Mot de passe', turnSaved: 'Relais enregistré.',
     stMyTurn: 'À toi de jouer', stOppTurn: "Tour de l'adversaire", stFiring: 'Tir en cours', stOver: 'Partie terminée', stLost: 'Connexion perdue',
@@ -799,6 +828,12 @@ const I18N = {
     stReconnecting: 'Reconnecting…', reconnecting: 'Connection lost: trying to reconnect (45 s max)…',
     rTimerT: 'Turn timer', rTimerD: 'Time limit per turn; when it runs out, a random shot is fired. Also limits placement to 90 s.',
     timerOff: 'Off', timerN: '{n} s', autoShot: 'Time is up: automatic shot.', placeLimit: 'Placement limited to {s} s.',
+    instT: 'Install the app', instD: 'Add C02 Naval to your home screen: it opens full screen, like a real app.',
+    instTipT: 'Install the game on your phone', instTipHow: 'Add it to your home screen to play full screen.',
+    instBtnHow: 'How?', instBtnInstall: 'Install', instDone: '✓ The app is installed: you are using it full screen.',
+    instIosS1: 'Open this site in <b>Safari</b>.', instIosS2: 'Tap the <b>Share</b> button <i class=\"fa-solid fa-arrow-up-from-bracket\"></i> (at the bottom of the screen, or at the top on iPad).',
+    instIosS3: 'Scroll and choose <b>Add to Home Screen</b> <i class=\"fa-regular fa-square-plus\"></i>.', instIosS4: 'Tap <b>Add</b>: the C02 Naval icon appears on your home screen.',
+    instGen: 'In your browser menu, choose “Install app” or “Add to Home Screen”.',
     advT: 'Advanced: TURN relay', advD: 'Optional. Helps connecting on very restrictive networks. Credentials stay in this browser.',
     turnUrlPh: 'turn:server:3478  or  turns:server:443?transport=tcp', turnUserPh: 'Username', turnCredPh: 'Password', turnSaved: 'Relay saved.',
     stMyTurn: 'Your turn', stOppTurn: "Opponent's turn", stFiring: 'Firing…', stOver: 'Game over', stLost: 'Connection lost',
@@ -1204,11 +1239,45 @@ function renderDash() {
   if (pane === 'stats') renderStats();
   if (pane === 'settings') renderSettings();
   if (pane === 'rules') renderRules();
+  renderInstall();
   $('mBot').classList.toggle('off', !settings.bot);
   $('mBot').style.opacity = settings.bot ? '' : '.45';
   $('rulesSum').innerHTML = (isStdRules(RULES) ? esc(t('rSumStd')) : esc(t('rSumCustom', { size: RULES.size, n: RULES.fleet.length })))
     + ` — <a id="rulesLink">${esc(t('rEdit'))}</a>`;
   $('rulesLink').onclick = () => { pane = 'rules'; renderDash(); };
+}
+
+/* ---------- Installation comme application (écran d'accueil) ---------- */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+const TIP_KEY = STORE_KEY + '.installTipHidden';
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if ($('dash').classList.contains('active')) renderInstall(); });
+window.addEventListener('appinstalled', () => { installEvt = null; if ($('dash').classList.contains('active')) renderInstall(); });
+function iosSteps() { return `<ol class="how">${[1, 2, 3, 4].map(n => `<li>${t('instIosS' + n)}</li>`).join('')}</ol>`; }
+async function doInstall() {
+  if (!installEvt) return false;
+  const e = installEvt; installEvt = null;
+  try { e.prompt(); await e.userChoice; } catch (err) {}
+  renderInstall(); return true;
+}
+function renderInstall() {
+  const standalone = isStandalone();
+  let hidden = false; try { hidden = !!localStorage.getItem(TIP_KEY); } catch (e) {}
+  // bandeau sur l'onglet Jouer : seulement sur iPhone/iPad ou quand le navigateur propose l'installation
+  const canTip = !standalone && !hidden && (IS_IOS || !!installEvt);
+  $('installTip').classList.toggle('show', canTip);
+  if (canTip) {
+    $('instTipD').textContent = t('instTipHow');
+    $('btnInstTip').textContent = t(installEvt ? 'instBtnInstall' : 'instBtnHow');
+  }
+  // bloc dans les réglages
+  const b = $('instBody');
+  if (standalone) b.innerHTML = `<p class="msg ok" style="text-align:left">${esc(t('instDone'))}</p>`;
+  else if (installEvt) b.innerHTML = `<button id="btnInstall" class="btn primary wide" style="margin-top:12px"><i class="fa-solid fa-download"></i><span>${esc(t('instBtnInstall'))}</span></button>`;
+  else if (IS_IOS) b.innerHTML = iosSteps();
+  else b.innerHTML = `<p class="msg" style="text-align:left">${esc(t('instGen'))}</p>`;
+  const bi = $('btnInstall'); if (bi) bi.onclick = doInstall;
 }
 
 /* ---------- Écran « Règles » ---------- */
@@ -2429,6 +2498,11 @@ pg.addEventListener('pointercancel', () => { S.drag = null; });
 // Connexion
 $('btnPlay').onclick = doPlay;
 $('suName').addEventListener('keydown', e => { if (e.key === 'Enter') doPlay(); });
+
+// Installation
+$('btnInstTip').onclick = async () => { if (!(await doInstall())) { pane = 'settings'; renderDash(); } };
+$('btnInstTipX').onclick = () => { try { localStorage.setItem(TIP_KEY, '1'); } catch (e) {} renderInstall(); };
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
 
 // Tableau de bord
 document.querySelectorAll('.tabsnav [data-pane]').forEach(b => { b.onclick = () => { pane = b.dataset.pane; msg('setMsg', ''); Snd.play('click'); renderDash(); }; });

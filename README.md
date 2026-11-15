@@ -32,6 +32,16 @@ Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qu
 - Le profil (pseudo, avatar, XP, statistiques) est enregistré **dans le navigateur de l'appareil** : il ne se synchronise pas entre PC et téléphone, et effacer les données du site l'efface. Taper un pseudo déjà utilisé sur l'appareil rouvre ce profil ; aucun mot de passe ne le protège.
 - Contre le bot, l'XP gagnée est divisée par deux.
 
+## Installer comme une application (iPhone, Android, PC)
+
+Le jeu est une application web installable : une fois ajoutée à l'écran d'accueil, elle s'ouvre en plein écran, avec son icône et sans barre d'adresse.
+
+- **iPhone / iPad** : ouvrir le site dans **Safari**, toucher **Partager**, puis **Sur l'écran d'accueil** et **Ajouter**. Un bandeau dans le jeu et l'onglet *Paramètres → Installer l'application* rappellent ces étapes.
+- **Android / PC (Chrome, Edge)** : le jeu propose un bouton **Installer** (ou menu du navigateur → *Installer l'application*).
+- Après une première visite, le jeu s'ouvre aussi **hors ligne** (parties contre le bot ; le multijoueur reste évidemment en ligne). Les mises à jour du jeu arrivent automatiquement dès que le réseau est disponible.
+
+Fichiers : `manifest.webmanifest`, `sw.js` (service worker), `icons/` (icône iPhone 180×180, icônes 192/512 et icône adaptative Android). Le site doit être servi en **HTTPS** (c'est le cas sur GitHub Pages).
+
 ## Paramètres
 
 Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème de couleurs** (Océan, Nuit, Forêt, Crépuscule, Clair), pseudo, avatar.
