@@ -586,3 +586,25 @@ test('revanche : impossible si l\'adversaire est parti', async () => {
   await A.waitForFunction(() => $('btnRematch').disabled && /quitt|left/i.test($('rematchNote').textContent), null, { timeout: 5000 });
   await ctx.close();
 });
+
+test('téléphone : portrait imposé (manifeste) et message si on le tourne en paysage', async () => {
+  const man = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
+  assert.equal(man.orientation, 'portrait');
+  const ctx = await browser.newContext({ serviceWorkers: 'block', locale: 'fr-FR', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => { window.C02_API = ''; });
+  const pg = await ctx.newPage(); await pg.goto(base);
+  const shown = () => pg.evaluate(() => getComputedStyle($('rotateLock')).display !== 'none');
+  assert.equal(await shown(), false, 'portrait : pas de message');
+  await pg.setViewportSize({ width: 844, height: 390 });
+  assert.equal(await shown(), true, 'paysage sur téléphone : message affiché');
+  assert.match(await pg.textContent('#rotateLock'), /portrait/);
+  await pg.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await shown(), false, 'retour en portrait : le jeu réapparaît');
+  await ctx.close();
+  // PC / souris : jamais bloqué, même dans une fenêtre basse
+  const ctx2 = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 900, height: 400 } });
+  await ctx2.addInitScript(() => { window.C02_API = ''; });
+  const p2 = await ctx2.newPage(); await p2.goto(base);
+  assert.equal(await p2.evaluate(() => getComputedStyle($('rotateLock')).display), 'none');
+  await ctx2.close();
+});
