@@ -245,6 +245,14 @@ pub fn tr(lang: Lang, key: &str) -> &'static str {
         "back" => t!("Retour", "Back"),
         "photoPick" => t!("Choisir une photo", "Pick a picture"),
         "images" => t!("Images", "Images"),
+        "updChecking" => t!("Recherche de mises à jour…", "Checking for updates…"),
+        "updTitle" => t!("Mise à jour obligatoire", "Mandatory update"),
+        "updText" => t!("La version {to} est disponible (tu as la {from}). Elle s'installe automatiquement.", "Version {to} is available (you have {from}). It is being installed automatically."),
+        "updDownloading" => t!("Téléchargement… {pct}", "Downloading… {pct}"),
+        "updRestarting" => t!("Installation terminée : redémarrage…", "Update installed: restarting…"),
+        "updFailed" => t!("La mise à jour a échoué. Télécharge la nouvelle version sur la page des versions, puis remplace ce fichier.", "The update failed. Download the new version from the releases page, then replace this file."),
+        "updOpen" => t!("Ouvrir la page des versions", "Open the releases page"),
+        "updQuit" => t!("Quitter", "Quit"),
         _ => "?",
     }
 }
