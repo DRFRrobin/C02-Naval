@@ -5,7 +5,7 @@
   "description": "C02 Naval : bataille navale multijoueur dans le navigateur (PeerJS / WebRTC)",
   "scripts": {
     "start": "http-server . -p 8080 -c-1 -a 0.0.0.0",
-    "test": "node --test --test-concurrency=1 tests/game.test.js tests/cloud.test.js"
+    "test": "node --test --test-concurrency=1 tests/game.test.js"
   },
   "devDependencies": {
     "http-server": "^14.1.1",

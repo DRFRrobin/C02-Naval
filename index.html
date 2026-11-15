@@ -4,9 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#050d1b">
+<!-- Installable comme une application (écran d'accueil iPhone / Android) -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="C02 Naval">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <meta name="description" content="C02 Naval : bataille navale à deux joueurs dans le navigateur, sur PC et téléphone.">
 <title>C02 Naval</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@600;700&display=swap">
@@ -25,7 +33,12 @@
   --font:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --num:'Orbitron',ui-monospace,Consolas,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;touch-action:manipulation}
+html,body{margin:0;touch-action:manipulation;overscroll-behavior-y:none}
+html{-webkit-text-size-adjust:100%}
+.install-tip{display:none;align-items:center;gap:12px;background:var(--card2);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin:0 0 16px}
+.install-tip.show{display:flex}.install-tip>i{font-size:22px;color:var(--sky)}.install-tip div{flex:1;min-width:0;font-size:14px}.install-tip small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.install-tip .btn{min-height:40px;padding:0 14px}.install-tip .x{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:6px}
+.how{margin:10px 0 0;padding-left:20px;color:var(--text);font-size:14px;line-height:1.55}.how li{margin:4px 0}
 body{min-height:100vh;min-height:100dvh;color:var(--text);font-family:var(--font);background-color:var(--bg2);
   background-image:radial-gradient(1100px 650px at 28% -8%,var(--glow) 0%,transparent 62%),linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 55%,var(--bg3) 100%);
   background-attachment:fixed;-webkit-text-size-adjust:100%}
@@ -62,10 +75,6 @@ input:focus,select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3
   border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .av-up{width:64px;height:64px;flex:0 0 64px;border:2px dashed var(--sky);border-radius:14px;display:flex;align-items:center;
   justify-content:center;color:var(--dim);font-size:18px;cursor:pointer;overflow:hidden;background:rgba(0,0,0,.2);position:relative}
-.oauth{font-size:16px;font-weight:600;min-height:54px;border:1px solid var(--border2);background:transparent;border-radius:12px;gap:12px;margin-top:14px}
-.oauth:hover{background:var(--card2);border-color:var(--accent,var(--border2))}
-.oauth i{font-size:21px}.oauth.discord i{color:#7c8af5}.oauth svg{width:20px;height:20px;flex:none}
-.welcome{margin:22px 0 4px;font-size:28px;line-height:1.15}.welcome-sub{margin:0 0 10px;color:var(--muted,#9aa4b2);font-size:15px}
 .av-up{font-size:34px;line-height:1;padding:0;font-family:inherit}
 .av-up i{font-size:18px}
 .av-up.has{border-style:solid;border-color:var(--border2)}
@@ -370,61 +379,18 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
         <h1>C02 Naval</h1>
         <p data-i18n="tagline"></p>
       </div>
-      <div id="localAuth">
-      <div class="seg">
-        <button id="segLogin" class="on" data-i18n="tabLogin"></button>
-        <button id="segSignup" data-i18n="tabSignup"></button>
-      </div>
-      <div id="loginPane">
-        <span class="field-label" data-i18n="account"></span>
-        <div id="accPick" class="acc-pick"></div>
-        <label class="field-label" for="loginPass" data-i18n="password"></label>
-        <input id="loginPass" type="password" autocomplete="current-password">
-        <button id="btnLogin" class="btn primary wide" style="margin-top:16px"><i class="fa-solid fa-right-to-bracket"></i><span data-i18n="btnLogin"></span></button>
-      </div>
-      <div id="signupPane" style="display:none">
+      <div id="loginPane" style="margin-top:22px">
         <label class="field-label" for="suName" data-i18n="pseudo"></label>
-        <input id="suName" maxlength="16" autocomplete="username">
-        <label class="field-label" for="suPass" data-i18n="password"></label>
-        <input id="suPass" type="password" autocomplete="new-password">
-        <label class="field-label" for="suPass2" data-i18n="passwordConfirm"></label>
-        <input id="suPass2" type="password" autocomplete="new-password">
-        <button id="btnSignup" class="btn primary wide" style="margin-top:16px"><i class="fa-solid fa-user-plus"></i><span data-i18n="btnSignup"></span></button>
-      </div>
-      </div>
-      <div id="cloudPane" style="display:none">
-        <h2 class="welcome" data-i18n="signTitle"></h2>
-        <p class="welcome-sub" data-i18n="signSub"></p>
-        <button id="btnGoogle" class="btn wide oauth google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg><span data-i18n="signGoogle"></span></button>
-        <button id="btnDiscord" class="btn wide oauth discord"><i class="fa-brands fa-discord"></i><span data-i18n="signDiscord"></span></button>
-        <p class="msg" style="font-size:12.5px;margin:14px 0 4px" data-i18n="cloudNote"></p>
+        <input id="suName" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false">
+        <button id="btnPlay" class="btn primary wide" style="margin-top:16px"><i class="fa-solid fa-play"></i><span data-i18n="btnPlay"></span></button>
+        <div id="accBox" style="display:none">
+          <span class="field-label" data-i18n="recentPseudos"></span>
+          <div id="accPick" class="acc-pick"></div>
+        </div>
       </div>
       <p id="authMsg" class="msg"></p>
-      <button id="btnGuest" class="btn ghost wide" data-i18n="guest"></button>
-      <p id="localNote" class="msg" style="font-size:12px;margin:4px 0 0" data-i18n="localNote"></p>
+      <p class="msg" style="font-size:12px;margin:4px 0 0" data-i18n="localNote"></p>
       <div class="lang-mini"><select id="langMini" aria-label="Langue / Language"><option value="fr">Français</option><option value="en">English</option></select></div>
-    </div>
-  </section>
-
-  <!-- ===== Création du profil (première connexion en ligne) ===== -->
-  <section id="onboard" class="view">
-    <div class="auth">
-      <div class="brand">
-        <div class="logo"><i class="fa-solid fa-user-astronaut"></i></div>
-        <h1 data-i18n="obTitle"></h1>
-        <p data-i18n="obSub"></p>
-      </div>
-      <label class="field-label" for="obName" data-i18n="pseudo"></label>
-      <input id="obName" maxlength="16" autocomplete="nickname">
-      <span class="field-label" data-i18n="obEmoji"></span>
-      <div id="obEmojis" class="emoji-grid" style="margin-top:8px"></div>
-      <div id="obImportBox" style="display:none">
-        <label class="field-label" for="obImport" data-i18n="obImportT"></label>
-        <select id="obImport"></select>
-      </div>
-      <p id="obMsg" class="msg"></p>
-      <button id="btnCreateProfile" class="btn primary wide"><i class="fa-solid fa-flag-checkered"></i><span data-i18n="obCreate"></span></button>
-      <button id="btnObCancel" class="btn ghost wide" style="margin-top:8px" data-i18n="navLogout"></button>
     </div>
   </section>
 
@@ -451,6 +417,12 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
     </header>
 
     <div id="pane-play" class="pane active">
+      <div id="installTip" class="install-tip" role="note">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+        <div><b data-i18n="instTipT"></b><small id="instTipD"></small></div>
+        <button id="btnInstTip" class="btn primary"></button>
+        <button id="btnInstTipX" class="x" aria-label="×">×</button>
+      </div>
       <div class="modes-grid">
         <button class="mode-card" id="mRandom"><span class="mode-ic ic-cyan"><i class="fa-solid fa-shuffle"></i></span><h3 data-i18n="mRandomT"></h3><p data-i18n="mRandomD"></p></button>
         <button class="mode-card" id="mBot"><span class="mode-ic ic-green"><i class="fa-solid fa-robot"></i></span><h3 data-i18n="mBotT"></h3><p data-i18n="mBotD"></p></button>
@@ -495,6 +467,10 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
           <b><i class="fa-solid fa-palette"></i><span data-i18n="themeT"></span></b><small data-i18n="themeD"></small>
           <div id="themeBox" class="themes"></div>
         </div>
+        <div class="set-block" id="installBlock">
+          <b><i class="fa-solid fa-mobile-screen-button"></i><span data-i18n="instT"></span></b><small data-i18n="instD"></small>
+          <div id="instBody"></div>
+        </div>
         <div class="set-block">
           <b><i class="fa-solid fa-network-wired"></i><span data-i18n="advT"></span></b><small data-i18n="advD"></small>
           <input id="turnUrl" autocomplete="off" spellcheck="false" data-ph="turnUrlPh">
@@ -514,10 +490,6 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
             <b><i class="fa-solid fa-user-shield"></i><span data-i18n="editT"></span></b>
             <label class="field-label" for="editName" data-i18n="newPseudo"></label>
             <input id="editName" maxlength="16" autocomplete="username">
-            <div id="passBlock">
-              <label class="field-label" for="editPass" data-i18n="newPass"></label>
-              <input id="editPass" type="password" autocomplete="new-password" placeholder="••••••••">
-            </div>
             <button id="btnSaveProfile" class="btn grad wide" style="margin-top:16px" data-i18n="save"></button>
             <p id="setMsg" class="msg"></p>
           </div>
@@ -654,7 +626,6 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 'use strict';
 /* =========================================================
@@ -667,7 +638,7 @@ const I18N = {
     tabLogin: 'Connexion', tabSignup: 'Créer un compte', account: 'Compte', password: 'Mot de passe',
     passwordConfirm: 'Confirmer le mot de passe', pseudo: 'Pseudo (2 à 16 caractères)', btnLogin: 'Se connecter',
     btnSignup: 'Créer le compte', guest: 'Jouer en invité (sans XP)',
-    localNote: 'Les comptes sont enregistrés dans ce navigateur, sur cet appareil.',
+    localNote: 'Ton profil et tes statistiques sont enregistrés dans ce navigateur, sur cet appareil. Aucun mot de passe.', btnPlay: 'Jouer', recentPseudos: 'Pseudos de cet appareil',
     noAccounts: 'Aucun compte sur cet appareil : crée le tien !',
     navPlay: 'Jouer', navStats: 'Statistiques', navSettings: 'Paramètres', navLogout: 'Déconnexion',
     badge: 'NIV {n}', levelN: 'Niveau {n}', guestName: 'Invité', levelShort: 'niv. {n}',
@@ -688,12 +659,12 @@ const I18N = {
     emojiPick: 'Choisis ton avatar', emojiNote: 'Emojis adaptés aux 12 ans et plus (PEGI 12).',
     themeT: 'Thème', themeD: "Couleurs de l'interface",
     themeNames: { ocean: 'Océan', night: 'Nuit', forest: 'Forêt', sunset: 'Crépuscule', light: 'Clair' },
-    editT: 'Modifier le pseudo et/ou le mot de passe', newPseudo: 'Nouveau pseudo',
+    editT: 'Changer de pseudo', newPseudo: 'Nouveau pseudo',
     newPass: 'Nouveau mot de passe (laisser vide pour conserver)', save: 'Enregistrer les modifications',
     saved: 'Modifications enregistrées.', nothingChanged: 'Aucune modification.',
     deleteT: 'Supprimer le compte', deleteD: 'Efface le compte, son XP et ses statistiques.', deleteBtn: 'Supprimer',
     deleteConfirm: 'Supprimer définitivement le compte « {name} », son XP et ses statistiques ?',
-    errPseudoLen: 'Le pseudo doit faire entre 2 et 16 caractères.', errPseudoTaken: 'Ce pseudo est déjà pris.',
+    errPseudoLen: 'Le pseudo doit faire entre 2 et 16 caractères.', errPseudoTaken: 'Ce pseudo existe déjà sur cet appareil.',
     errPassLen: 'Le mot de passe doit faire au moins 4 caractères.', errPassMatch: 'Les mots de passe ne correspondent pas.',
     errPassWrong: 'Mot de passe incorrect.', errPickAcc: 'Choisis un compte.',
     errNoCrypto: "Ce navigateur ne peut pas protéger le mot de passe : ouvre le jeu en https (ou sur localhost).",
@@ -738,16 +709,15 @@ const I18N = {
     rulesInfo: p => `Règles : grille ${p.size} × ${p.size}, ${pl(p.n, 'bateau', 'bateaux')}${p.up ? '' : ', sans améliorations'}.`,
     botOff: "Le bot est désactivé dans les règles.", noBotMsg: "Personne n'a été trouvé et le bot est désactivé. Retour au menu…",
     customXp: 'XP réduite de moitié : règles personnalisées.',
-    signTitle: 'Bon retour', signSub: 'Connecte-toi à ton compte',
-    signGoogle: 'Continuer avec Google', signDiscord: 'Continuer avec Discord',
-    cloudNote: "Pas de mot de passe : tu te connectes avec ton compte. Seuls ton pseudo, ton emoji et tes statistiques sont enregistrés (ni ton nom, ni ta photo, ni ton e-mail).",
-    obTitle: 'Crée ton profil', obSub: 'Choisis ton pseudo et ton avatar.', obEmoji: 'Avatar', obImportT: 'Importer les stats d\'un ancien compte local',
-    obImportNone: 'Ne pas importer', obCreate: 'Commencer à jouer', saving: 'Enregistrement de la partie…',
-    saveFail: "Connexion perdue : l'XP de cette partie n'a pas pu être enregistrée.", errCloud: 'Service en ligne indisponible. Réessaie dans un instant.',
-    errEmoji: 'Avatar non autorisé.', xpLimited: 'Partie non comptabilisée : trop rapprochée de la précédente.',
     stReconnecting: 'Reconnexion…', reconnecting: "Connexion perdue : tentative de reconnexion (45 s max)…",
     rTimerT: 'Chronomètre de tour', rTimerD: "Temps limite par tour ; passé ce délai, un tir au hasard est joué. Limite aussi le placement à 90 s.",
     timerOff: 'Désactivé', timerN: '{n} s', autoShot: 'Temps écoulé : tir automatique.', placeLimit: 'Placement limité à {s} s.',
+    instT: "Installer l'application", instD: "Ajoute C02 Naval à l'écran d'accueil : il s'ouvre en plein écran, comme une vraie application.",
+    instTipT: "Installe le jeu sur ton téléphone", instTipHow: "Ajoute-le à l'écran d'accueil pour jouer en plein écran.",
+    instBtnHow: 'Comment ?', instBtnInstall: 'Installer', instDone: "✓ L'application est installée : tu l'utilises en plein écran.",
+    instIosS1: "Ouvre ce site dans <b>Safari</b>.", instIosS2: "Touche le bouton <b>Partager</b> <i class=\"fa-solid fa-arrow-up-from-bracket\"></i> (en bas de l'écran, ou en haut sur iPad).",
+    instIosS3: "Fais défiler et choisis <b>Sur l'écran d'accueil</b> <i class=\"fa-regular fa-square-plus\"></i>.", instIosS4: "Touche <b>Ajouter</b> : l'icône C02 Naval apparaît sur ton écran d'accueil.",
+    instGen: "Dans le menu de ton navigateur, choisis « Installer l'application » ou « Ajouter à l'écran d'accueil ».",
     advT: 'Avancé : relais TURN', advD: "Facultatif. Aide à se connecter sur les réseaux très fermés. Les identifiants restent dans ce navigateur.",
     turnUrlPh: 'turn:serveur:3478  ou  turns:serveur:443?transport=tcp', turnUserPh: 'Identifiant', turnCredPh: 'Mot de passe', turnSaved: 'Relais enregistré.',
     stMyTurn: 'À toi de jouer', stOppTurn: "Tour de l'adversaire", stFiring: 'Tir en cours', stOver: 'Partie terminée', stLost: 'Connexion perdue',
@@ -784,7 +754,7 @@ const I18N = {
     tabLogin: 'Log in', tabSignup: 'Sign up', account: 'Account', password: 'Password',
     passwordConfirm: 'Confirm password', pseudo: 'Username (2 to 16 characters)', btnLogin: 'Log in',
     btnSignup: 'Create account', guest: 'Play as guest (no XP)',
-    localNote: 'Accounts are stored in this browser, on this device.',
+    localNote: 'Your profile and statistics are saved in this browser, on this device. No password.', btnPlay: 'Play', recentPseudos: 'Usernames on this device',
     noAccounts: 'No account on this device yet: create yours!',
     navPlay: 'Play', navStats: 'Statistics', navSettings: 'Settings', navLogout: 'Log out',
     badge: 'LVL {n}', levelN: 'Level {n}', guestName: 'Guest', levelShort: 'lvl {n}',
@@ -805,12 +775,12 @@ const I18N = {
     emojiPick: 'Choose your avatar', emojiNote: 'Emojis suitable for ages 12+ (PEGI 12).',
     themeT: 'Theme', themeD: 'Interface colors',
     themeNames: { ocean: 'Ocean', night: 'Night', forest: 'Forest', sunset: 'Sunset', light: 'Light' },
-    editT: 'Change username and/or password', newPseudo: 'New username',
+    editT: 'Change username', newPseudo: 'New username',
     newPass: 'New password (leave empty to keep)', save: 'Save changes',
     saved: 'Changes saved.', nothingChanged: 'Nothing to change.',
     deleteT: 'Delete account', deleteD: 'Erases the account, its XP and statistics.', deleteBtn: 'Delete',
     deleteConfirm: 'Permanently delete the account "{name}", its XP and statistics?',
-    errPseudoLen: 'Username must be 2 to 16 characters long.', errPseudoTaken: 'This username is already taken.',
+    errPseudoLen: 'Username must be 2 to 16 characters long.', errPseudoTaken: 'This username already exists on this device.',
     errPassLen: 'Password must be at least 4 characters long.', errPassMatch: 'Passwords do not match.',
     errPassWrong: 'Wrong password.', errPickAcc: 'Pick an account.',
     errNoCrypto: 'This browser cannot protect the password: open the game over https (or on localhost).',
@@ -855,16 +825,15 @@ const I18N = {
     rulesInfo: p => `Rules: ${p.size} × ${p.size} grid, ${pl(p.n, 'ship', 'ships')}${p.up ? '' : ', no upgrades'}.`,
     botOff: 'The bot is disabled in the rules.', noBotMsg: 'No one was found and the bot is disabled. Back to the menu…',
     customXp: 'XP halved: custom rules.',
-    signTitle: 'Welcome back', signSub: 'Sign in to your account',
-    signGoogle: 'Continue with Google', signDiscord: 'Continue with Discord',
-    cloudNote: 'No password: you sign in with your account. Only your nickname, emoji and statistics are stored (not your name, photo or e-mail).',
-    obTitle: 'Create your profile', obSub: 'Pick your nickname and avatar.', obEmoji: 'Avatar', obImportT: 'Import stats from an old local account',
-    obImportNone: 'Do not import', obCreate: 'Start playing', saving: 'Saving the game…',
-    saveFail: "Connection lost: this game's XP could not be saved.", errCloud: 'Online service unavailable. Try again in a moment.',
-    errEmoji: 'Avatar not allowed.', xpLimited: 'Game not counted: too close to the previous one.',
     stReconnecting: 'Reconnecting…', reconnecting: 'Connection lost: trying to reconnect (45 s max)…',
     rTimerT: 'Turn timer', rTimerD: 'Time limit per turn; when it runs out, a random shot is fired. Also limits placement to 90 s.',
     timerOff: 'Off', timerN: '{n} s', autoShot: 'Time is up: automatic shot.', placeLimit: 'Placement limited to {s} s.',
+    instT: 'Install the app', instD: 'Add C02 Naval to your home screen: it opens full screen, like a real app.',
+    instTipT: 'Install the game on your phone', instTipHow: 'Add it to your home screen to play full screen.',
+    instBtnHow: 'How?', instBtnInstall: 'Install', instDone: '✓ The app is installed: you are using it full screen.',
+    instIosS1: 'Open this site in <b>Safari</b>.', instIosS2: 'Tap the <b>Share</b> button <i class=\"fa-solid fa-arrow-up-from-bracket\"></i> (at the bottom of the screen, or at the top on iPad).',
+    instIosS3: 'Scroll and choose <b>Add to Home Screen</b> <i class=\"fa-regular fa-square-plus\"></i>.', instIosS4: 'Tap <b>Add</b>: the C02 Naval icon appears on your home screen.',
+    instGen: 'In your browser menu, choose “Install app” or “Add to Home Screen”.',
     advT: 'Advanced: TURN relay', advD: 'Optional. Helps connecting on very restrictive networks. Credentials stay in this browser.',
     turnUrlPh: 'turn:server:3478  or  turns:server:443?transport=tcp', turnUserPh: 'Username', turnCredPh: 'Password', turnSaved: 'Relay saved.',
     stMyTurn: 'Your turn', stOppTurn: "Opponent's turn", stFiring: 'Firing…', stOver: 'Game over', stLost: 'Connection lost',
@@ -958,13 +927,6 @@ function peerOpts() {
   const extra = userTurn();
   return { debug: 0, config: { iceServers: extra ? [...ICE_SERVERS, extra] : ICE_SERVERS, sdpSemantics: 'unified-plan' } };
 }
-// Comptes et relais en ligne (Supabase). Laisser vide = mode local (comptes dans le navigateur, connexion directe PeerJS).
-// Voir docs/SUPABASE.md. La clé « anon » est publique par conception.
-const CLOUD_CFG = Object.assign({ url: 'https://clburoslawbdzqcjrknz.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsYnVyb3NsYXdiZHpxY2pya256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2OTEzNDYsImV4cCI6MjExMDI2NzM0Nn0.5WIJypeiogAlknZRSAhrfQEDXwQwN6d3iGsfd1fGSOU' }, window.C02_CONFIG || {});
-const sb = (CLOUD_CFG.url && CLOUD_CFG.key && window.supabase)
-  ? window.supabase.createClient(CLOUD_CFG.url, CLOUD_CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }, realtime: { params: { eventsPerSecond: 10 } } })
-  : null;
-const CLOUD = !!sb;
 const RECONNECT_MS = 45000, PLACE_LIMIT_MS = 90000, TIMER_CHOICES = [0, 15, 30, 60, 90];
 const SEQ = new Set(['ready', 'act', 'res', 'pass', 'quit']);   // messages numérotés (renvoyés après une coupure)
 
@@ -980,7 +942,7 @@ const S = {
   enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
   lastSeen: 0, hb: null, joinTimer: null, pendingAct: null, oppAway: false, wakeLock: null,
   mmTimer: null, mmStopped: false, onReject: null,
-  relay: CLOUD, ticket: null, sid: null, rid: null, hostId: null, txn: 0, rxn: 0, outbox: [], reconnecting: false, reconDeadline: 0, reconTimer: null,
+  sid: null, rid: null, hostId: null, txn: 0, rxn: 0, outbox: [], reconnecting: false, reconDeadline: 0, reconTimer: null,
   rpeer: null, gpeer: null, attempting: false, turnStart: 0, placeDeadline: 0, turnTimer: null,
   oppUsed: 0, opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
 };
@@ -1189,9 +1151,7 @@ function saveAccount(a) {
   accounts[a.id] = a;
   try { localStorage.setItem(ACC_PREFIX + a.id, JSON.stringify(a)); storageOk = true; } catch (e) { storageOk = false; }
 }
-let cloudProfile = null, cloudUid = null, cloudEntering = null, obEmoji = null;
-const GUEST_KEY = 'c02naval.v1.guest', JOIN_KEY = 'c02naval.v1.join';
-const me = () => (CLOUD ? cloudProfile : (curId ? accounts[curId] || null : null));
+const me = () => (curId ? accounts[curId] || null : null);
 function setSession(id) {
   curId = id; loggedIn = true;
   try {
@@ -1210,79 +1170,39 @@ function restoreSession() {
   if (id && accounts[id]) { curId = id; loggedIn = true; }
 }
 
-// Mot de passe : PBKDF2-SHA-256 salé (jamais stocké en clair).
-const b64e = u8 => btoa(String.fromCharCode(...u8));
-const b64d = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
-async function hashPass(pw, saltB64, iter = 120000) {
-  if (!window.crypto || !crypto.subtle) throw new Error('nocrypto');
-  const salt = saltB64 ? b64d(saltB64) : crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256);
-  return { salt: b64e(salt), hash: b64e(new Uint8Array(bits)), iter };
-}
 const nameTaken = (name, exceptId) => Object.values(accounts).some(a => a.id !== exceptId && a.name.toLowerCase() === name.toLowerCase());
 
-/* ---------- Écran de connexion ---------- */
-let authTab = 'login', pickedId = null;
-function openAuth(tab) {
-  $('localAuth').style.display = CLOUD ? 'none' : '';
-  $('cloudPane').style.display = CLOUD ? '' : 'none';
-  $('localNote').style.display = CLOUD ? 'none' : '';
-  if (CLOUD) { msg('authMsg', ''); return showView('auth'); }
+/* ---------- Écran de connexion : un simple pseudo, sans mot de passe ---------- */
+function openAuth() {
   loadAccounts();
-  authTab = tab || (Object.keys(accounts).length ? 'login' : 'signup');
   const accs = Object.values(accounts).sort((a, b) => (b.lastLogin || '').localeCompare(a.lastLogin || ''));
-  if (!pickedId || !accounts[pickedId]) pickedId = accs.length ? accs[0].id : null;
-  $('segLogin').classList.toggle('on', authTab === 'login');
-  $('segSignup').classList.toggle('on', authTab === 'signup');
-  $('loginPane').style.display = authTab === 'login' ? '' : 'none';
-  $('signupPane').style.display = authTab === 'signup' ? '' : 'none';
+  $('accBox').style.display = accs.length ? '' : 'none';
   const list = $('accPick'); list.innerHTML = '';
-  if (!accs.length) list.innerHTML = `<p class="msg" style="margin:6px 0">${esc(t('noAccounts'))}</p>`;
   accs.forEach(a => {
     const b = document.createElement('button');
-    b.className = 'acc' + (a.id === pickedId ? ' on' : '');
+    b.className = 'acc';
     b.innerHTML = `${avatarHTML(a.emoji, a.name)}<span><strong>${esc(a.name)}</strong><small>${esc(t('levelN', { n: levelOf(a.xp) }))} · ${a.xp} XP</small></span>`;
-    b.onclick = () => { pickedId = a.id; openAuth('login'); $('loginPass').focus(); };
+    b.onclick = () => { $('suName').value = a.name; doPlay(); };
     list.appendChild(b);
   });
-  $('btnLogin').disabled = !accs.length;
   showView('auth');
 }
-async function doLogin() {
-  loadAccounts();
-  const a = accounts[pickedId];
-  if (!a) return msg('authMsg', t('errPickAcc'), true);
-  if (a.pass) {
-    try {
-      const h = await hashPass($('loginPass').value, a.pass.salt, a.pass.iter);
-      if (h.hash !== a.pass.hash) { Snd.play('blocked'); return msg('authMsg', t('errPassWrong'), true); }
-    } catch (e) { return msg('authMsg', t('errNoCrypto'), true); }
-  }
-  a.lastLogin = new Date().toISOString(); saveAccount(a);
-  $('loginPass').value = '';
-  setSession(a.id);
-  openDash('play');
-  msg('dashMsg', a.pass ? t('welcome', { name: a.name }) : t('noPassHint'), a.pass ? 'ok' : true);
-}
-async function doSignup() {
+// Entre avec ce pseudo : le profil existe déjà sur cet appareil (on le reprend) ou il est créé.
+function doPlay() {
   loadAccounts();
   const name = $('suName').value.trim().replace(/\s+/g, ' ');
-  const pw = $('suPass').value, pw2 = $('suPass2').value;
-  if (name.length < 2 || name.length > 16) return msg('authMsg', t('errPseudoLen'), true);
-  if (nameTaken(name)) return msg('authMsg', t('errPseudoTaken'), true);
-  if (pw.length < 4) return msg('authMsg', t('errPassLen'), true);
-  if (pw !== pw2) return msg('authMsg', t('errPassMatch'), true);
-  let pass;
-  try { pass = await hashPass(pw); } catch (e) { return msg('authMsg', t('errNoCrypto'), true); }
-  const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  if (name.length < 2 || name.length > 16) { Snd.play('blocked'); return msg('authMsg', t('errPseudoLen'), true); }
   const now = new Date().toISOString();
-  const acc = { id, name, pass, emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], xp: 0, created: now, lastLogin: now, stats: emptyStats() };
-  saveAccount(acc);
-  $('suName').value = $('suPass').value = $('suPass2').value = '';
-  setSession(id);
+  let a = Object.values(accounts).find(x => x.name.toLowerCase() === name.toLowerCase());
+  const isNew = !a;
+  if (a) a.lastLogin = now;
+  else a = { id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], xp: 0, created: now, lastLogin: now, stats: emptyStats() };
+  saveAccount(a);
+  $('suName').value = '';
+  msg('authMsg', '');
+  setSession(a.id);
   openDash('play');
-  msg('dashMsg', storageOk ? t('welcome', { name }) : t('errStorage'), storageOk ? 'ok' : true);
+  msg('dashMsg', storageOk ? t('welcome', { name: a.name }) : t('errStorage'), storageOk ? 'ok' : true);
 }
 
 /* ---------- Tableau de bord ---------- */
@@ -1298,7 +1218,7 @@ function openDash(p) {
 function renderDash() {
   loadAccounts();
   const a = me();
-  if (!CLOUD && curId && !a) { clearSession(); openAuth(); return false; }   // compte supprimé ailleurs
+  if (curId && !a) { clearSession(); openAuth(); return false; }   // compte supprimé ailleurs
   // Barre du haut
   const up = $('avUp');
   up.classList.toggle('has', !!(a && validEmoji(a.emoji)));
@@ -1319,11 +1239,45 @@ function renderDash() {
   if (pane === 'stats') renderStats();
   if (pane === 'settings') renderSettings();
   if (pane === 'rules') renderRules();
+  renderInstall();
   $('mBot').classList.toggle('off', !settings.bot);
   $('mBot').style.opacity = settings.bot ? '' : '.45';
   $('rulesSum').innerHTML = (isStdRules(RULES) ? esc(t('rSumStd')) : esc(t('rSumCustom', { size: RULES.size, n: RULES.fleet.length })))
     + ` — <a id="rulesLink">${esc(t('rEdit'))}</a>`;
   $('rulesLink').onclick = () => { pane = 'rules'; renderDash(); };
+}
+
+/* ---------- Installation comme application (écran d'accueil) ---------- */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = () => navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+const TIP_KEY = STORE_KEY + '.installTipHidden';
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if ($('dash').classList.contains('active')) renderInstall(); });
+window.addEventListener('appinstalled', () => { installEvt = null; if ($('dash').classList.contains('active')) renderInstall(); });
+function iosSteps() { return `<ol class="how">${[1, 2, 3, 4].map(n => `<li>${t('instIosS' + n)}</li>`).join('')}</ol>`; }
+async function doInstall() {
+  if (!installEvt) return false;
+  const e = installEvt; installEvt = null;
+  try { e.prompt(); await e.userChoice; } catch (err) {}
+  renderInstall(); return true;
+}
+function renderInstall() {
+  const standalone = isStandalone();
+  let hidden = false; try { hidden = !!localStorage.getItem(TIP_KEY); } catch (e) {}
+  // bandeau sur l'onglet Jouer : seulement sur iPhone/iPad ou quand le navigateur propose l'installation
+  const canTip = !standalone && !hidden && (IS_IOS || !!installEvt);
+  $('installTip').classList.toggle('show', canTip);
+  if (canTip) {
+    $('instTipD').textContent = t('instTipHow');
+    $('btnInstTip').textContent = t(installEvt ? 'instBtnInstall' : 'instBtnHow');
+  }
+  // bloc dans les réglages
+  const b = $('instBody');
+  if (standalone) b.innerHTML = `<p class="msg ok" style="text-align:left">${esc(t('instDone'))}</p>`;
+  else if (installEvt) b.innerHTML = `<button id="btnInstall" class="btn primary wide" style="margin-top:12px"><i class="fa-solid fa-download"></i><span>${esc(t('instBtnInstall'))}</span></button>`;
+  else if (IS_IOS) b.innerHTML = iosSteps();
+  else b.innerHTML = `<p class="msg" style="text-align:left">${esc(t('instGen'))}</p>`;
+  const bi = $('btnInstall'); if (bi) bi.onclick = doInstall;
 }
 
 /* ---------- Écran « Règles » ---------- */
@@ -1412,8 +1366,6 @@ function renderSettings() {
   $('sndToggle').className = 'toggle ' + (settings.sound ? 'on' : 'off');
   $('sndToggle').textContent = settings.sound ? 'ON' : 'OFF';
   $('acctSettings').style.display = a ? '' : 'none';
-  $('passBlock').style.display = CLOUD ? 'none' : '';
-  $('btnPhotoDel').style.display = CLOUD ? 'none' : '';
   if (a) {
     if (document.activeElement !== $('editName')) $('editName').value = a.name;
     $('btnPhotoDel').disabled = !validEmoji(a.emoji);
@@ -1421,25 +1373,19 @@ function renderSettings() {
   renderThemes();
   if (document.activeElement !== $('turnUrl')) { $('turnUrl').value = settings.turnUrl || ''; $('turnUser').value = settings.turnUser || ''; $('turnCred').value = settings.turnCred || ''; }
 }
-async function saveProfile() {
-  if (CLOUD) return saveCloudProfile();
+function saveProfile() {
   loadAccounts();
   const a = me(); if (!a) return;
   const name = $('editName').value.trim().replace(/\s+/g, ' ');
-  const pw = $('editPass').value;
   if (name.length < 2 || name.length > 16) return msg('setMsg', t('errPseudoLen'), true);
   if (nameTaken(name, a.id)) return msg('setMsg', t('errPseudoTaken'), true);
-  if (pw && pw.length < 4) return msg('setMsg', t('errPassLen'), true);
-  if (name === a.name && !pw) return msg('setMsg', t('nothingChanged'));
-  if (pw) { try { a.pass = await hashPass(pw); } catch (e) { return msg('setMsg', t('errNoCrypto'), true); } }
+  if (name === a.name) return msg('setMsg', t('nothingChanged'));
   a.name = name;
   saveAccount(a);
-  $('editPass').value = '';
   renderDash();
   msg('setMsg', t('saved'), 'ok');
 }
 function deleteAccount() {
-  if (CLOUD) return deleteCloudAccount();
   const a = me(); if (!a) return;
   if (!confirm(t('deleteConfirm', { name: a.name }))) return;
   try { localStorage.removeItem(ACC_PREFIX + a.id); } catch (e) {}
@@ -1454,11 +1400,7 @@ function pickPhoto() {
   EMOJIS.forEach(e => {
     const b = document.createElement('button');
     b.type = 'button'; b.textContent = e; b.className = e === a.emoji ? 'on' : '';
-    b.onclick = () => {
-      Snd.play('click'); $('emojiModal').classList.remove('show');
-      if (CLOUD) { cloudUpdate(me().name, e).then(renderDash, () => msg('dashMsg', t('errCloud'), true)); return; }
-      loadAccounts(); const acc = me(); if (acc) { acc.emoji = e; saveAccount(acc); renderDash(); }
-    };
+    b.onclick = () => { loadAccounts(); const acc = me(); if (acc) { acc.emoji = e; saveAccount(acc); renderDash(); } Snd.play('click'); $('emojiModal').classList.remove('show'); };
     g.appendChild(b);
   });
   $('emojiModal').classList.add('show');
@@ -1470,7 +1412,6 @@ function renderThemes() {
 
 /* ---------- Enregistrement des parties ---------- */
 function recordGame(win) {
-  if (CLOUD) return me() ? recordGameCloud(win) : null;
   loadAccounts();
   const a = me(); if (!a) return null;
   const m = S.match, s = a.stats = { ...emptyStats(), ...a.stats };
@@ -1490,136 +1431,12 @@ function recordGame(win) {
 }
 function recordInterrupted() {
   if (S.phase !== 'game') return;
-  if (CLOUD) return recordInterruptedCloud();
   loadAccounts();
   const a = me(); if (!a) return;
   a.stats = { ...emptyStats(), ...a.stats };
   a.stats.interrupted++;
   a.stats.timePlayed += S.match.start ? Math.round((Date.now() - S.match.start) / 1000) : 0;
   saveAccount(a);
-}
-/* ---------- Comptes en ligne (Supabase : Google / Discord) ---------- */
-const rowToProfile = r => ({
-  id: r.id, name: r.name, emoji: r.emoji, xp: r.xp, created: r.created_at,
-  stats: { games: r.games, wins: r.wins, losses: r.losses, interrupted: r.interrupted, streak: r.streak, bestStreak: r.best_streak,
-    shots: r.shots, hits: r.hits, sunk: r.sunk, upgrades: r.upgrades, fastestWin: r.fastest_win, timePlayed: r.time_played },
-});
-const cloudErrText = e => {
-  const m = String((e && (e.message || e.code)) || e || '');
-  if (m.includes('name_taken')) return t('errPseudoTaken');
-  if (m.includes('name_invalid')) return t('errPseudoLen');
-  if (m.includes('emoji_invalid')) return t('errEmoji');
-  return t('errCloud');
-};
-async function cloudUpdate(name, emoji) {
-  const { data, error } = await sb.rpc('update_profile', { p_name: name, p_emoji: emoji });
-  if (error) throw error;
-  cloudProfile = rowToProfile(data);
-}
-async function saveCloudProfile() {
-  const a = me(); if (!a) return;
-  const name = $('editName').value.trim().replace(/\s+/g, ' ');
-  if (name.length < 2 || name.length > 16) return msg('setMsg', t('errPseudoLen'), true);
-  if (name === a.name) return msg('setMsg', t('nothingChanged'));
-  try { await cloudUpdate(name, a.emoji); } catch (e) { return msg('setMsg', cloudErrText(e), true); }
-  renderDash(); msg('setMsg', t('saved'), 'ok');
-}
-async function deleteCloudAccount() {
-  const a = me(); if (!a) return;
-  if (!confirm(t('deleteConfirm', { name: a.name }))) return;
-  try { const { error } = await sb.rpc('delete_account'); if (error) throw error; } catch (e) { return msg('setMsg', cloudErrText(e), true); }
-  await cloudSignOut();
-}
-async function cloudSignOut() {
-  cloudProfile = null; cloudUid = null; loggedIn = false;
-  try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
-  try { await sb.auth.signOut(); } catch (e) {}
-  openAuth();
-}
-async function recordGameCloud(win) {
-  const a = me(); if (!a) return null;
-  const m = S.match, before = levelOf(a.xp);
-  const { data, error } = await sb.rpc('record_game', {
-    p_win: !!win, p_shots: m.shots, p_hits: m.hits, p_sunk: m.sunk, p_upgrades: m.upgrades,
-    p_seconds: m.start ? Math.round((Date.now() - m.start) / 1000) : 0,
-    p_halved: !!(S.vsBot || !isStdRules(CFG)), p_interrupted: false,
-  });
-  if (error) throw error;
-  cloudProfile = rowToProfile(data.profile);
-  return { gain: data.gain, level: levelOf(cloudProfile.xp), up: levelOf(cloudProfile.xp) > before, limited: !!data.limited };
-}
-function recordInterruptedCloud() {
-  if (!me()) return;
-  const m = S.match;
-  sb.rpc('record_game', { p_interrupted: true, p_seconds: m.start ? Math.round((Date.now() - m.start) / 1000) : 0 }).then(r => { if (r && r.data) cloudProfile = rowToProfile(r.data.profile); }, () => {});
-}
-function startPaneFromHash() { return ['play', 'stats', 'rules', 'settings'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'play'; }
-async function cloudBoot() {
-  let session = null;
-  try { const r = await sb.auth.getSession(); session = r.data && r.data.session; } catch (e) {}
-  sb.auth.onAuthStateChange((ev, sess) => {
-    if (ev === 'SIGNED_OUT') { if (cloudUid) { cloudUid = null; cloudProfile = null; loggedIn = false; openAuth(); } }
-    else if (ev === 'SIGNED_IN' && sess && sess.user && sess.user.id !== cloudUid) setTimeout(() => cloudEnter(sess), 0);
-  });
-  if (session) return cloudEnter(session);
-  let guest = false; try { guest = !!sessionStorage.getItem(GUEST_KEY); } catch (e) {}
-  if (guest) { loggedIn = true; openDash(startPaneFromHash()); } else openAuth();
-}
-function cloudEnter(session) {
-  if (cloudEntering) return cloudEntering;
-  cloudEntering = (async () => {
-    const uid = session.user.id;
-    if (cloudUid === uid && cloudProfile) return;
-    let row = null, err = null;
-    try { const r = await sb.from('profiles').select('*').eq('id', uid).maybeSingle(); row = r.data; err = r.error; } catch (e) { err = e; }
-    if (err) { loggedIn = false; openAuth(); return msg('authMsg', t('errCloud'), true); }
-    cloudUid = uid; loggedIn = true;
-    try { sessionStorage.removeItem(GUEST_KEY); } catch (e) {}
-    if (!row) return openOnboard();
-    cloudProfile = rowToProfile(row);
-    openDash(startPaneFromHash());
-  })().finally(() => { cloudEntering = null; });
-  return cloudEntering;
-}
-async function cloudSignIn(provider) {
-  msg('authMsg', '');
-  try { if (pendingCode) sessionStorage.setItem(JOIN_KEY, pendingCode); } catch (e) {}
-  try {
-    const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo: location.origin + location.pathname } });
-    if (error) throw error;
-  } catch (e) { msg('authMsg', t('errCloud'), true); }
-}
-// Première connexion : choix du pseudo et de l'emoji, import éventuel d'un ancien compte local.
-function openOnboard() {
-  msg('obMsg', ''); $('btnCreateProfile').disabled = false;
-  if (!obEmoji) obEmoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-  const g = $('obEmojis'); g.innerHTML = '';
-  EMOJIS.forEach(e => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.textContent = e; b.className = e === obEmoji ? 'on' : '';
-    b.onclick = () => { obEmoji = e; g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); Snd.play('click'); };
-    g.appendChild(b);
-  });
-  loadAccounts();
-  const legacy = Object.values(accounts).filter(a => (a.xp || 0) > 0 || (a.stats && a.stats.games > 0));
-  $('obImportBox').style.display = legacy.length ? '' : 'none';
-  $('obImport').innerHTML = `<option value="">${esc(t('obImportNone'))}</option>` + legacy.map(a => `<option value="${esc(a.id)}">${esc(a.name)} · ${a.xp} XP</option>`).join('');
-  showView('onboard');
-}
-async function createCloudProfile() {
-  const name = $('obName').value.trim().replace(/\s+/g, ' ');
-  if (name.length < 2 || name.length > 16) return msg('obMsg', t('errPseudoLen'), true);
-  $('btnCreateProfile').disabled = true;
-  const { data, error } = await sb.rpc('create_profile', { p_name: name, p_emoji: obEmoji });
-  if (error || !data) { $('btnCreateProfile').disabled = false; return msg('obMsg', cloudErrText(error), true); }
-  let row = data;
-  const imp = $('obImport').value;
-  if (imp && accounts[imp]) {
-    try { const r = await sb.rpc('import_local', { p_stats: { xp: accounts[imp].xp, ...(accounts[imp].stats || {}) } }); if (r.data) row = r.data; } catch (e) {}
-  }
-  cloudProfile = rowToProfile(row);
-  openDash('play');
-  msg('dashMsg', t('welcome', { name }), 'ok');
 }
 function myIdentity() {
   const a = me();
@@ -1674,151 +1491,8 @@ function acceptConn(conn) {
   setupConn(conn, () => { S.conn = null; if (!S.connected) msg('lobbyMsg', t('waitingOpp')); });
 }
 
-/* =========================================================
-   Relais Realtime (Supabase) : les messages passent par un canal WebSocket (port 443),
-   ce qui fonctionne sur pratiquement tous les réseaux. RelayConn imite l'interface d'une
-   connexion PeerJS (on / send / close / open) : tout le reste du jeu (numérotation des
-   messages, reprise après coupure, règles…) est partagé avec le mode direct.
-   ========================================================= */
-const RELAY_PING_MS = 10000, RELAY_TIMEOUT_MS = 40000, RELAY_GRACE_MS = 2500, RELAY_REJOIN_MS = 8000;
-class RelayConn {
-  constructor(room, role) {
-    Object.assign(this, { room, role, h: {}, open: false, closed: false, joined: false, wasOpen: false, checked: false,
-      key: genCode() + genCode(), t0: Date.now(), graceTimer: null, lostAt: 0, ch: null });
-    this.connect();
-    this.netTimer = setTimeout(() => { if (!this.checked && !this.closed) this.emit('fatal', { type: 'network' }); }, 12000);
-  }
-  on(n, f) { (this.h[n] = this.h[n] || []).push(f); return this; }
-  emit(n, ...a) { (this.h[n] || []).slice().forEach(f => { try { f(...a); } catch (e) { console.error(e); } }); }
-  connect() {
-    if (this.closed) return;
-    if (this.ch) { try { sb.removeChannel(this.ch); } catch (e) {} }
-    const ch = this.ch = sb.channel('c02:' + this.room, { config: { broadcast: { self: false, ack: false }, presence: { key: this.key } } });
-    ch.on('broadcast', { event: 'm' }, ev => { if (this.ch === ch && !this.closed && ev && ev.payload) this.emit('data', ev.payload); });
-    ch.on('presence', { event: 'sync' }, () => { if (this.ch === ch) this.sync(); });
-    ch.subscribe(async status => {
-      if (this.ch !== ch || this.closed) return;
-      if (status === 'SUBSCRIBED') { this.joined = true; try { await ch.track({ role: this.role, t: this.t0 }); } catch (e) {} this.sync(); }
-      else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { this.joined = false; this.update(false); }
-    });
-  }
-  sync() {
-    if (this.closed || !this.ch) return;
-    const st = this.ch.presenceState();
-    const list = Object.entries(st).map(([k, v]) => ({ k, t: (v[0] && v[0].t) || 0, role: v[0] && v[0].role }))
-      .sort((a, b) => a.t - b.t || (a.k < b.k ? -1 : 1));
-    const mine = list.findIndex(e => e.k === this.key);
-    if (mine < 0) return;                                   // pas encore enregistré dans le salon
-    if (!this.checked) {
-      this.checked = true; clearTimeout(this.netTimer);
-      this.emit('ready');
-      if (this.role === 'guest' && !list.some(e => e.role === 'host')) return this.emit('fatal', { type: 'peer-unavailable' });
-      if (this.role === 'host' && list.some((e, i) => e.role === 'host' && i < mine)) return this.emit('fatal', { type: 'unavailable-id' });
-    }
-    if (mine >= 2) { this.emit('data', { t: 'busy' }); return this.close(); }   // salon déjà complet
-    this.update(this.joined && list.some((e, i) => e.k !== this.key && i < 2));
-  }
-  update(open) {
-    if (open) {
-      clearTimeout(this.graceTimer); this.graceTimer = null;
-      if (this.open) return;
-      this.open = true;
-      if (!this.wasOpen) { this.wasOpen = true; this.emit('open'); } else this.emit('back');
-    } else if (this.open) {
-      this.open = false; this.lostAt = Date.now();
-      this.graceTimer = setTimeout(() => { this.graceTimer = null; if (!this.open) this.emit('close'); }, RELAY_GRACE_MS);
-    } else if (!this.lostAt) this.lostAt = Date.now();
-  }
-  send(m) {
-    if (!this.open || this.closed || !this.ch) return;
-    try { const r = this.ch.send({ type: 'broadcast', event: 'm', payload: m }); if (r && r.catch) r.catch(() => {}); } catch (e) {}
-  }
-  // Salon quitté ou coupure trop longue : on se réabonne
-  rejoin() { if (!this.closed && !this.open) this.connect(); }
-  close() {
-    if (this.closed) return;
-    this.closed = true; this.open = false; clearTimeout(this.graceTimer); clearTimeout(this.netTimer);
-    try { if (this.ch) sb.removeChannel(this.ch); } catch (e) {}
-  }
-}
-function relayClose() { try { if (S.relay && S.conn && S.conn.close) S.conn.close(); } catch (e) {} }
-function onRelayBack(conn) {   // le lien est revenu : on échange l'état pour renvoyer les messages manquants
-  if (S.conn !== conn || !S.sid) return;
-  conn.send({ t: 'resume', sid: S.sid, rx: S.rxn });
-}
-function hostGameCloud() {
-  S.kind = 'host'; S.isHost = true; S.code = genCode(); S.phase = 'lobby';
-  applyConfig(RULES);
-  setupLobby('host');
-  $('codeBox').textContent = S.code;
-  const conn = new RelayConn(S.code, 'host');
-  conn.on('ready', () => { if (!S.connected) msg('lobbyMsg', t('waitingOpp')); });
-  conn.on('fatal', e => {
-    if (S.connected) return;
-    if (e.type === 'unavailable-id') { conn.close(); S.conn = null; return hostGameCloud(); }   // code déjà utilisé : on en tire un autre
-    msg('lobbyMsg', netErrorText(e), true);
-  });
-  setupConn(conn, () => { if (!S.connected) msg('lobbyMsg', t('waitingOpp')); });
-}
-function joinCloud(code) {
-  msg('joinMsg', t('connecting'));
-  $('btnJoin').disabled = true;
-  S.kind = 'join'; S.isHost = false; S.code = code;
-  applyConfig(DEFAULT_RULES);
-  let failed = false;
-  const fail = text => {
-    clearTimeout(S.joinTimer);
-    if (S.connected || failed) return;
-    failed = true;
-    try { conn.close(); } catch (e) {}
-    S.conn = null;
-    $('btnJoin').disabled = false;
-    msg('joinMsg', text, true);
-  };
-  const conn = new RelayConn(code, 'guest');
-  conn.on('fatal', e => fail(e.type === 'peer-unavailable' ? t('errNoGame') : netErrorText(e)));
-  setupConn(conn, busy => fail(busy ? t('errFull') : t('errJoinTimeout')));
-  S.joinTimer = setTimeout(() => fail(t('errJoinTimeout')), JOIN_TIMEOUT_MS);
-}
-function findRandomCloud() {
-  S.kind = 'random'; S.phase = 'lobby'; S.mmStopped = false;
-  applyConfig(DEFAULT_RULES);
-  setupLobby('random');
-  const deadline = Date.now() + MM_WAIT_MS;
-  const tick = () => {
-    if (S.connected) { clearInterval(S.mmTimer); $('lobbyCount').textContent = ''; return; }
-    const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-    $('lobbyCount').textContent = t('countdown', { s: left });
-    if (left <= 0) {
-      clearInterval(S.mmTimer);
-      stopSearch();
-      if (!settings.bot) { msg('lobbyMsg', t('noBotMsg'), true); setTimeout(() => location.reload(), 2500); return; }
-      msg('lobbyMsg', t('noOneFound'), 'ok');
-      setTimeout(() => startBot(true), 1000);
-    }
-  };
-  tick(); S.mmTimer = setInterval(tick, 250);
-  const attempt = async () => {
-    if (S.connected || S.mmStopped) return;
-    const ticket = genCode() + genCode(), room = genCode();
-    S.ticket = ticket;
-    let res;
-    try { res = await sb.rpc('matchmake', { p_ticket: ticket, p_room: room }); } catch (e) { res = { error: e }; }
-    if (S.connected || S.mmStopped) return;
-    if (!res || res.error || !res.data) { msg('lobbyMsg', t('errNet'), true); return setTimeout(attempt, 3000); }
-    S.isHost = res.data.role === 'host';
-    const conn = new RelayConn(res.data.room, S.isHost ? 'host' : 'guest');
-    const retry = ms => { if (S.connected || S.mmStopped) return; conn.close(); if (S.conn === conn) S.conn = null; setTimeout(attempt, ms); };
-    conn.on('ready', () => { if (S.isHost && !S.connected && !S.mmStopped) msg('lobbyMsg', t('waitingOpp')); });
-    conn.on('fatal', e => retry(e.type === 'peer-unavailable' ? 300 : 2000));   // l'hôte n'est plus là : on redemande un adversaire
-    setupConn(conn, () => retry(300));
-  };
-  attempt();
-}
-
 // Salon privé
 function hostGame() {
-  if (CLOUD) return hostGameCloud();
   if (!checkPeerLib('dashMsg')) return;
   S.kind = 'host'; S.isHost = true; S.code = genCode(); S.phase = 'lobby';
   applyConfig(RULES);
@@ -1845,11 +1519,10 @@ function openJoin(code) {
   setTimeout(() => $('codeInput').focus(), 50);
 }
 function joinGame() {
-  if (S.peer || (CLOUD && S.conn && !S.connected)) return;
+  if (S.peer) return;
   const code = $('codeInput').value.toUpperCase().replace(/\s+/g, '');
   if (code.length !== 6) return msg('joinMsg', t('errCodeLen'), true);
   if ([...code].some(ch => !ALPHA.includes(ch))) return msg('joinMsg', t('errCodeChars'), true);
-  if (CLOUD) return joinCloud(code);
   if (!checkPeerLib('joinMsg')) return;
   msg('joinMsg', t('connecting'));
   $('btnJoin').disabled = true;
@@ -1880,7 +1553,6 @@ function joinGame() {
 // Adversaire aléatoire : quelques « créneaux » publics. On essaie d'en occuper un (on attend),
 // et s'il est déjà pris, quelqu'un y attend : on le rejoint. Bot au bout de 45 s.
 function findRandom() {
-  if (CLOUD) return findRandomCloud();
   if (!checkPeerLib('dashMsg')) return;
   S.kind = 'random'; S.phase = 'lobby'; S.mmStopped = false;
   applyConfig(DEFAULT_RULES);
@@ -1907,7 +1579,6 @@ function stopSearch() {
   S.conn = null; S.peer = null;
   try { if (c) c.close(); } catch (e) {}
   try { if (p) p.destroy(); } catch (e) {}
-  if (CLOUD && S.ticket) { const tk = S.ticket; S.ticket = null; sb.rpc('leave_queue', { p_ticket: tk }).then(() => {}, () => {}); }
 }
 function trySlot(k) {
   if (S.connected || S.mmStopped) return;
@@ -1965,7 +1636,6 @@ function setupConn(conn, onFail) {
   };
   conn.on('close', closed);
   conn.on('error', closed);
-  conn.on('back', () => onRelayBack(conn));
 }
 function onConnected() {
   S.connected = true;
@@ -1976,12 +1646,12 @@ function onConnected() {
     send({ t: 'ping', a: S.rxn });
     if (S.reconnecting) { if (Date.now() > S.reconDeadline) lost(); return; }
     // Adversaire parti dans une autre appli ou écran éteint : on lui laisse plus de temps.
-    if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : (S.relay ? RELAY_TIMEOUT_MS : TIMEOUT_MS))) connDown();
-  }, S.relay ? RELAY_PING_MS : HEARTBEAT_MS);
+    if (Date.now() - S.lastSeen > (S.oppAway ? AWAY_TIMEOUT_MS : TIMEOUT_MS)) connDown();
+  }, HEARTBEAT_MS);
   // Créneau aléatoire : on le libère pour le prochain joueur (la liaison directe reste ouverte).
   // L'hôte ouvre en plus un point de rendez-vous privé pour une éventuelle reprise après coupure.
-  if (!S.relay && S.kind === 'random' && S.peer) try { S.peer.disconnect(); } catch (e) {}
-  if (!S.relay && S.kind === 'random' && S.isHost && S.rid && typeof Peer !== 'undefined') {
+  if (S.kind === 'random' && S.peer) try { S.peer.disconnect(); } catch (e) {}
+  if (S.kind === 'random' && S.isHost && S.rid && typeof Peer !== 'undefined') {
     try {
       const rp = new Peer(S.rid, peerOpts());
       S.rpeer = rp;
@@ -2010,19 +1680,15 @@ function flushOutbox(theirRx) {
 /* ---------- Reprise après coupure (45 s) ---------- */
 function connDown() {
   if (!S.connected || S.lost || S.phase === 'over' || S.vsBot || S.reconnecting) return;
-  if (!S.sid || (!S.relay && !S.isHost && !S.hostId)) return lost();   // adversaire sans reprise possible
+  if (!S.sid || (!S.isHost && !S.hostId)) return lost();   // adversaire sans reprise possible
   S.reconnecting = true; S.reconDeadline = Date.now() + RECONNECT_MS;
-  if (!S.relay) try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
+  try { if (S.conn && S.conn.close) S.conn.close(); } catch (e) {}
   clearInterval(S.reconTimer); S.reconTimer = setInterval(reconTick, 3000);
   renderConn(); reconTick();
 }
 function reconTick() {
   if (!S.reconnecting) return;
   if (Date.now() > S.reconDeadline) return lost();
-  if (S.relay) {   // relais : on se réabonne au salon si la coupure dure
-    if (S.conn && !S.conn.open && Date.now() - S.conn.lostAt > RELAY_REJOIN_MS) { S.conn.lostAt = Date.now(); S.conn.rejoin(); }
-    return;
-  }
   if (S.isHost) {   // l'hôte reste joignable : on s'assure que son point de rendez-vous est bien enregistré
     const pr = S.rpeer || S.peer;
     try { if (pr && pr.disconnected && !pr.destroyed) pr.reconnect(); } catch (e) {}
@@ -2076,7 +1742,6 @@ function lost() {
   if (!S.connected || S.lost || S.phase === 'over') return;
   recordInterrupted();
   S.lost = true; S.phase = 'over'; S.reconnecting = false;
-  relayClose();
   clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
   $('choice').classList.remove('show');
   $('endIcon').textContent = '📴';
@@ -2129,20 +1794,10 @@ function onData(m) {
   if (!m || typeof m !== 'object' || S.lost) return;
   if (Number.isInteger(m.n)) {            // message numéroté : on ignore les doublons (renvoi après coupure)
     if (m.n <= S.rxn) return;
-    if (m.n > S.rxn + 1) {                // trou : on redemande les messages manquants
-      if (S.relay && S.sid && S.conn) S.conn.send({ t: 'resume', sid: S.sid, rx: S.rxn });
-      return;
-    }
     S.rxn = m.n;
   }
   switch (m.t) {
     case 'ping': if (Number.isInteger(m.a)) S.outbox = S.outbox.filter(x => x.n > m.a); break;
-    case 'resume':   // relais : l'adversaire (re)vient, on renvoie ce qu'il n'a pas reçu
-      if (!S.relay || !S.sid || m.sid !== S.sid || !S.conn) break;
-      flushOutbox(Number.isInteger(m.rx) ? m.rx : 0);
-      if (!m.reply) S.conn.send({ t: 'resume', sid: S.sid, rx: S.rxn, reply: true });
-      if (S.reconnecting) { S.reconnecting = false; clearInterval(S.reconTimer); S.lastSeen = Date.now(); S.oppAway = false; renderConn(); }
-      break;
     case 'hello':
       S.opp = {
         name: String(m.name || '?').slice(0, 16),
@@ -2743,7 +2398,6 @@ function openChoice() {
 function endGame(win, forfeit) {
   S.phase = 'over'; S.reconnecting = false;
   clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
-  if (S.relay && S.connected) setTimeout(relayClose, 4000);   // libère la connexion (le dernier message a eu le temps d'arriver)
   S.myTurn = false; S.waiting = false;
   if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
@@ -2751,22 +2405,15 @@ function endGame(win, forfeit) {
   $('endTitle').textContent = t(win ? 'win' : 'lose');
   const acc = S.match.shots ? Math.round(S.match.hits / S.match.shots * 100) : 0;
   $('endText').textContent = t(forfeit ? 'winForfeit' : win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
-  const showXp = (r, failed) => {
-    if (r) {
-      const a = me(), l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
-      $('endXp').innerHTML = `<div class="xpgain">+${r.gain} XP</div>`
-        + (r.up ? `<div class="lvlup">⬆ ${esc(t('levelUp', { n: r.level, rank: rankOf(r.level) }))}</div>` : '')
-        + (r.limited ? `<div class="endnote">${esc(t('xpLimited'))}</div>` : '')
-        + (S.vsBot ? `<div class="endnote">${esc(t('botXp'))}</div>` : !isStdRules(CFG) ? `<div class="endnote">${esc(t('customXp'))}</div>` : '')
-        + `<div class="xpbar"><i style="width:${Math.round((a.xp - lo) / (hi - lo) * 100)}%"></i></div>`
-        + `<div class="xprow"><span>XP: <b>${a.xp - lo} / ${hi - lo}</b></span><span>${esc(t('levelN', { n: l }))}</span></div>`;
-    } else $('endXp').innerHTML = `<p class="endnote">${esc(t(failed ? 'saveFail' : 'xpGuest'))}</p>`;
-  };
-  const rec = recordGame(win);
-  if (rec && typeof rec.then === 'function') {
-    $('endXp').innerHTML = `<p class="endnote">${esc(t('saving'))}</p>`;
-    rec.then(showXp, () => showXp(null, true));
-  } else showXp(rec);
+  const r = recordGame(win);
+  if (r) {
+    const a = me(), l = levelOf(a.xp), lo = xpFor(l), hi = xpFor(l + 1);
+    $('endXp').innerHTML = `<div class="xpgain">+${r.gain} XP</div>`
+      + (r.up ? `<div class="lvlup">⬆ ${esc(t('levelUp', { n: r.level, rank: rankOf(r.level) }))}</div>` : '')
+      + (S.vsBot ? `<div class="endnote">${esc(t('botXp'))}</div>` : !isStdRules(CFG) ? `<div class="endnote">${esc(t('customXp'))}</div>` : '')
+      + `<div class="xpbar"><i style="width:${Math.round((a.xp - lo) / (hi - lo) * 100)}%"></i></div>`
+      + `<div class="xprow"><span>XP: <b>${a.xp - lo} / ${hi - lo}</b></span><span>${esc(t('levelN', { n: l }))}</span></div>`;
+  } else $('endXp').innerHTML = `<p class="endnote">${esc(t('xpGuest'))}</p>`;
   setTimeout(() => Snd.play(win ? 'win' : 'lose'), 600);
   setTimeout(() => $('end').classList.add('show'), 700);
   renderGame();
@@ -2849,22 +2496,17 @@ pg.addEventListener('pointerup', onPlaceUp);
 pg.addEventListener('pointercancel', () => { S.drag = null; });
 
 // Connexion
-$('segLogin').onclick = () => { msg('authMsg', ''); openAuth('login'); };
-$('segSignup').onclick = () => { msg('authMsg', ''); openAuth('signup'); };
-$('btnLogin').onclick = doLogin;
-$('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-$('btnSignup').onclick = doSignup;
-$('suPass2').addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
-$('btnGuest').onclick = () => { if (CLOUD) { try { sessionStorage.setItem(GUEST_KEY, '1'); } catch (e) {} loggedIn = true; cloudProfile = null; } else setSession(null); openDash('play'); };
+$('btnPlay').onclick = doPlay;
+$('suName').addEventListener('keydown', e => { if (e.key === 'Enter') doPlay(); });
+
+// Installation
+$('btnInstTip').onclick = async () => { if (!(await doInstall())) { pane = 'settings'; renderDash(); } };
+$('btnInstTipX').onclick = () => { try { localStorage.setItem(TIP_KEY, '1'); } catch (e) {} renderInstall(); };
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
 
 // Tableau de bord
 document.querySelectorAll('.tabsnav [data-pane]').forEach(b => { b.onclick = () => { pane = b.dataset.pane; msg('setMsg', ''); Snd.play('click'); renderDash(); }; });
-$('btnLogout').onclick = () => { if (CLOUD) return cloudSignOut(); clearSession(); msg('authMsg', ''); openAuth('login'); };
-$('btnGoogle').onclick = () => cloudSignIn('google');
-$('btnDiscord').onclick = () => cloudSignIn('discord');
-$('btnCreateProfile').onclick = createCloudProfile;
-$('obName').addEventListener('keydown', e => { if (e.key === 'Enter') createCloudProfile(); });
-$('btnObCancel').onclick = () => cloudSignOut();
+$('btnLogout').onclick = () => { clearSession(); msg('authMsg', ''); openAuth(); };
 $('avUp').addEventListener('click', e => { e.preventDefault(); pickPhoto(); });
 ['turnUrl', 'turnUser', 'turnCred'].forEach(id => $(id).addEventListener('change', () => {
   settings.turnUrl = $('turnUrl').value.trim(); settings.turnUser = $('turnUser').value.trim(); settings.turnCred = $('turnCred').value;
@@ -2876,7 +2518,7 @@ $('themeBox').addEventListener('click', e => { const b = e.target.closest('[data
 $('btnPhoto').onclick = pickPhoto;
 $('btnPhotoDel').onclick = () => { loadAccounts(); const a = me(); if (a) { a.emoji = null; saveAccount(a); renderDash(); } };
 $('sndToggle').onclick = () => { settings.sound = !settings.sound; saveSettings(); renderSettings(); Snd.play('click'); };
-const setLang = v => { settings.lang = I18N[v] ? v : 'fr'; saveSettings(); applyLang(); if ($('dash').classList.contains('active')) renderDash(); else if ($('auth').classList.contains('active')) openAuth(authTab); };
+const setLang = v => { settings.lang = I18N[v] ? v : 'fr'; saveSettings(); applyLang(); if ($('dash').classList.contains('active')) renderDash(); else if ($('auth').classList.contains('active')) openAuth(); };
 $('langSel').onchange = e => setLang(e.target.value);
 $('langMini').onchange = e => setLang(e.target.value);
 $('btnSaveProfile').onclick = saveProfile;
@@ -2890,7 +2532,6 @@ $('mHost').onclick = () => { Snd.play('click'); hostGame(); };
 $('btnJoin').onclick = joinGame;
 $('btnJoinCancel').onclick = () => {
   if (S.peer && !S.connected) { try { S.peer.destroy(); } catch (e) {} S.peer = null; S.conn = null; clearTimeout(S.joinTimer); }
-  if (CLOUD && S.conn && !S.connected) { try { S.conn.close(); } catch (e) {} S.conn = null; clearTimeout(S.joinTimer); }
   $('joinModal').classList.remove('show');
 };
 $('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
@@ -2927,7 +2568,7 @@ document.addEventListener('keydown', e => {
 window.addEventListener('storage', e => {
   if (e.key !== null && !e.key.startsWith(STORE_KEY)) return;
   if ($('dash').classList.contains('active')) renderDash();
-  else if ($('auth').classList.contains('active')) openAuth(authTab);
+  else if ($('auth').classList.contains('active')) openAuth();
 });
 
 // Bloque le zoom par pincement (Safari iOS ignore user-scalable=no).
@@ -2944,17 +2585,14 @@ window.addEventListener('pagehide', e => {
 
 // Lien d'invitation (?code=…) : la fenêtre « Rejoindre » s'ouvre dès qu'on arrive au tableau de bord.
 pendingCode = (new URLSearchParams(location.search).get('code') || '').toUpperCase().slice(0, 6) || null;
-try { if (!pendingCode && sessionStorage.getItem(JOIN_KEY)) { pendingCode = sessionStorage.getItem(JOIN_KEY); sessionStorage.removeItem(JOIN_KEY); } } catch (e) {}
 try { if (pendingCode !== null || location.search) history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
 applyTheme();
 applyLang();
+loadAccounts();
+restoreSession();
 // #stats ou #settings dans l'adresse ouvre directement cet onglet.
-if (CLOUD) cloudBoot();
-else {
-  loadAccounts();
-  restoreSession();
-  if (loggedIn) openDash(startPaneFromHash()); else openAuth();
-}
+const startPane = ['play', 'stats', 'rules', 'settings'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'play';
+if (loggedIn) openDash(startPane); else openAuth();
 </script>
 </body>
 </html>

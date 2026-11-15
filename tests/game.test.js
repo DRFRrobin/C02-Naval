@@ -13,10 +13,12 @@ let server, base, browser;
 
 before(async () => {
   server = http.createServer((req, res) => {
-    const file = req.url.split('?')[0] === '/' ? 'index.html' : null;
-    if (!file) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(fs.readFileSync(path.join(ROOT, file)));
+    const rel = req.url.split('?')[0] === '/' ? 'index.html' : decodeURIComponent(req.url.split('?')[0].slice(1));
+    const full = path.resolve(ROOT, rel);
+    if (!full.startsWith(ROOT + path.sep) || rel.startsWith('node_modules') || !fs.existsSync(full) || !fs.statSync(full).isFile()) { res.writeHead(404); return res.end(); }
+    const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+    res.writeHead(200, { 'content-type': types[path.extname(full)] || 'application/octet-stream' });
+    res.end(fs.readFileSync(full));
   });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}/`;
@@ -24,7 +26,8 @@ before(async () => {
 });
 after(async () => { await browser.close(); server.close(); });
 
-async function newPage(ctx, viewport) {
+let pseudoN = 0;
+async function newPage(ctx, viewport, pseudo) {
   const pg = await ctx.newPage();
   if (viewport) await pg.setViewportSize(viewport);
   const errors = [];
@@ -32,13 +35,14 @@ async function newPage(ctx, viewport) {
   pg.on('pageerror', e => errors.push(e.message));
   pg.on('dialog', d => d.accept());
   await pg.goto(base);
-  await pg.click('#btnGuest');
+  if (!(await pg.$('#auth.active'))) await pg.click('#btnLogout');   // le profil du premier onglet est repris : on change de pseudo
+  await pg.fill('#suName', pseudo || 'Joueur' + (++pseudoN));
+  await pg.click('#btnPlay');
   return pg;
 }
 async function newContext() {
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({ serviceWorkers: 'block' });   // le service worker a ses propres tests
   await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());   // aucun accès réseau : PeerJS est simulé
-  await ctx.addInitScript(() => { window.C02_CONFIG = { url: '', key: '' }; });   // ces tests couvrent le mode sans Supabase
   await ctx.addInitScript({ path: path.join(__dirname, 'fake-peer.js') });
   return ctx;
 }
@@ -240,6 +244,125 @@ test('un adversaire ne peut pas tricher avec une amélioration non gagnée', asy
   await B.waitForFunction(() => S.myTurn, null, { timeout: 5000 });
   const hits = await B.evaluate(() => S.incoming.filter(Boolean).length);
   assert.equal(hits, 1, 'seule 1 case doit être touchée');
+  await ctx.close();
+});
+
+/* ---------------- Profil dans le navigateur (pseudo seul) ---------------- */
+test('connexion : un pseudo suffit, sans mot de passe', async () => {
+  const ctx = await newContext(); const pg = await ctx.newPage();
+  const errs = []; pg.on('pageerror', e => errs.push(e.message));
+  await pg.goto(base);
+  assert.equal(await pg.locator('#auth input[type=password]').count(), 0, 'aucun champ mot de passe sur l\'écran de connexion');
+  await pg.fill('#suName', 'A');
+  await pg.click('#btnPlay');
+  assert.ok(await pg.$('#auth.active'), 'pseudo trop court refusé');
+  assert.match(await pg.textContent('#authMsg'), /\S/);
+  await pg.fill('#suName', 'Capitaine');
+  await pg.press('#suName', 'Enter');
+  await pg.waitForSelector('#dash.active');
+  assert.equal(await pg.textContent('#tbName'), 'Capitaine');
+  // le profil survit au rechargement (stocké dans le navigateur)
+  await pg.reload();
+  await pg.waitForSelector('#dash.active');
+  assert.equal(await pg.textContent('#tbName'), 'Capitaine');
+  assert.deepEqual(errs, []);
+  await ctx.close();
+});
+
+test('connexion : retrouver un pseudo existant reprend son XP et ses statistiques', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, undefined, 'Amiral');
+  await pg.evaluate(() => { const a = me(); a.xp = 250; a.stats = { ...emptyStats(), games: 3, wins: 2 }; saveAccount(a); });
+  await pg.click('#btnLogout');
+  assert.ok(await pg.$('#auth.active'));
+  assert.equal(await pg.locator('#accPick .acc').count(), 1, 'le pseudo de cet appareil est proposé');
+  await pg.fill('#suName', 'amiral');                                  // casse différente : même profil
+  await pg.click('#btnPlay');
+  await pg.waitForSelector('#dash.active');
+  const r = await pg.evaluate(() => ({ xp: me().xp, games: me().stats.games, n: Object.keys(accounts).length }));
+  assert.deepEqual(r, { xp: 250, games: 3, n: 1 });
+  await ctx.close();
+});
+
+test('une partie contre le bot enregistre l\'XP dans le navigateur', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, undefined, 'Moussaillon');
+  const before = await pg.evaluate(() => me().xp);
+  const gain = await pg.evaluate(() => { S.match = { shots: 10, hits: 6, sunk: 2, upgrades: 0, start: Date.now() - 60000 }; S.vsBot = true; return recordGame(true).gain; });
+  assert.ok(gain > 0);
+  await pg.reload(); await pg.waitForSelector('#dash.active');
+  assert.equal(await pg.evaluate(() => me().xp), before + gain);
+  await ctx.close();
+});
+
+/* ---------------- Application installable (écran d'accueil) ---------------- */
+test('PWA : manifeste, icônes et balises iPhone présents', async () => {
+  const ctx = await newContext(); const pg = await ctx.newPage();
+  await pg.goto(base);
+  const head = await pg.evaluate(() => ({
+    manifest: document.querySelector('link[rel=manifest]')?.getAttribute('href'),
+    touch: document.querySelector('link[rel=apple-touch-icon]')?.getAttribute('href'),
+    capable: document.querySelector('meta[name=apple-mobile-web-app-capable]')?.content,
+    title: document.querySelector('meta[name=apple-mobile-web-app-title]')?.content,
+    bar: document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]')?.content,
+    viewport: document.querySelector('meta[name=viewport]')?.content,
+  }));
+  assert.equal(head.manifest, 'manifest.webmanifest'); assert.equal(head.capable, 'yes');
+  assert.equal(head.title, 'C02 Naval'); assert.equal(head.bar, 'black-translucent');
+  assert.match(head.viewport, /viewport-fit=cover/);
+  const man = await (await ctx.request.get(base + head.manifest)).json();
+  assert.equal(man.display, 'standalone'); assert.ok(man.name && man.start_url && man.background_color);
+  assert.ok(man.icons.some(i => i.sizes === '192x192') && man.icons.some(i => i.sizes === '512x512'));
+  assert.ok(man.icons.some(i => i.purpose === 'maskable'), 'icône adaptative Android');
+  for (const src of [...man.icons.map(i => i.src), head.touch]) {
+    const r = await ctx.request.get(base + src);
+    assert.equal(r.status(), 200, src); assert.equal(r.headers()['content-type'], 'image/png', src);
+  }
+  const png = await (await ctx.request.get(base + head.touch)).body();
+  assert.equal(png.readUInt32BE(16), 180); assert.equal(png.readUInt32BE(20), 180);   // l'icône iPhone fait 180×180
+  await ctx.close();
+});
+
+test('iPhone : le bandeau et le mode d\'emploi « Sur l\'écran d\'accueil » s\'affichent', async () => {
+  const ctx = await browser.newContext({ locale: 'fr-FR', serviceWorkers: 'block', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1', viewport: { width: 390, height: 844 }, hasTouch: true });
+  await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
+  const pg = await newPage(ctx);
+  assert.ok(await pg.isVisible('#installTip'), 'bandeau visible sur iPhone');
+  await pg.click('#btnInstTip');                                       // « Comment ? » ouvre les réglages
+  assert.equal(await pg.locator('#instBody li').count(), 4);
+  assert.match(await pg.textContent('#instBody'), /écran d'accueil/);
+  await pg.click('.tabsnav [data-pane=play]');
+  await pg.click('#btnInstTipX');                                      // fermé : ne revient pas
+  await pg.reload(); await pg.waitForSelector('#dash.active');
+  assert.ok(!(await pg.isVisible('#installTip')));
+  assert.equal(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, true);
+  await ctx.close();
+});
+
+test('application déjà installée : pas de bandeau, message de confirmation', async () => {
+  const ctx = await newContext();
+  await ctx.addInitScript(() => { try { localStorage.setItem('c02naval.v1.settings', JSON.stringify({ lang: 'fr' })); } catch (e) {} });
+  await ctx.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { value: true }); });
+  const pg = await newPage(ctx);
+  assert.ok(!(await pg.isVisible('#installTip')));
+  await pg.click('.tabsnav [data-pane=settings]');
+  assert.match(await pg.textContent('#instBody'), /installée/);
+  await ctx.close();
+});
+
+test('service worker : le jeu s\'ouvre hors ligne après une première visite', async () => {
+  const ctx = await browser.newContext();                              // service worker autorisé
+  await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
+  const pg = await ctx.newPage();
+  await pg.goto(base);
+  await pg.evaluate(() => navigator.serviceWorker.ready);
+  await pg.waitForFunction(() => navigator.serviceWorker.controller || true);
+  await pg.reload();                                                   // la page est maintenant contrôlée
+  await pg.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 5000 });
+  await ctx.setOffline(true);
+  await pg.reload();
+  assert.equal(await pg.title(), 'C02 Naval');
+  await pg.fill('#suName', 'HorsLigne'); await pg.click('#btnPlay');
+  await pg.waitForSelector('#dash.active');
+  await ctx.setOffline(false);
   await ctx.close();
 });
 
