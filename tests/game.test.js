@@ -43,6 +43,7 @@ async function newPage(ctx, viewport, pseudo) {
 async function newContext() {
   const ctx = await browser.newContext({ serviceWorkers: 'block' });   // le service worker a ses propres tests
   await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());   // aucun accès réseau : PeerJS est simulé
+  await ctx.addInitScript(() => { window.C02_API = ''; });   // pas de serveur de comptes par défaut : connexion par pseudo local
   await ctx.addInitScript({ path: path.join(__dirname, 'fake-peer.js') });
   return ctx;
 }
@@ -252,7 +253,7 @@ test('connexion : un pseudo suffit, sans mot de passe', async () => {
   const ctx = await newContext(); const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', e => errs.push(e.message));
   await pg.goto(base);
-  assert.equal(await pg.locator('#auth input[type=password]').count(), 0, 'aucun champ mot de passe sur l\'écran de connexion');
+  assert.equal(await pg.locator('#auth input[type=password]:visible').count(), 0, 'aucun champ mot de passe visible sans serveur de comptes'.slice(0,0) + 'aucun champ mot de passe sur l\'écran de connexion');
   await pg.fill('#suName', 'A');
   await pg.click('#btnPlay');
   assert.ok(await pg.$('#auth.active'), 'pseudo trop court refusé');
@@ -323,6 +324,7 @@ test('PWA : manifeste, icônes et balises iPhone présents', async () => {
 
 test('iPhone : le bandeau et le mode d\'emploi « Sur l\'écran d\'accueil » s\'affichent', async () => {
   const ctx = await browser.newContext({ locale: 'fr-FR', serviceWorkers: 'block', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1', viewport: { width: 390, height: 844 }, hasTouch: true });
+  await ctx.addInitScript(() => { window.C02_API = ''; });
   await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
   const pg = await newPage(ctx);
   assert.ok(await pg.isVisible('#installTip'), 'bandeau visible sur iPhone');
@@ -350,6 +352,7 @@ test('application déjà installée : pas de bandeau, message de confirmation', 
 
 test('service worker : le jeu s\'ouvre hors ligne après une première visite', async () => {
   const ctx = await browser.newContext();                              // service worker autorisé
+  await ctx.addInitScript(() => { window.C02_API = ''; });
   await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
   const pg = await ctx.newPage();
   await pg.goto(base);
@@ -370,6 +373,7 @@ test('iPhone en mode application : l\'interface ne passe pas sous la Dynamic Isl
   const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
   const top = async (viewport, standalone, ua) => {
     const ctx = await browser.newContext({ serviceWorkers: 'block', userAgent: ua, viewport, hasTouch: true });
+    await ctx.addInitScript(() => { window.C02_API = ''; });
     await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
     if (standalone) await ctx.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { value: true }); });
     const pg = await newPage(ctx);
@@ -449,4 +453,72 @@ test('sauvegarde chiffrée : export puis import sur un autre appareil', async ()
   await p2.click('#btnBkImport');
   await p2.waitForFunction(() => /incorrecte|valide|Wrong|valid/.test($('bkMsg').textContent), null, { timeout: 15000 });
   await c1.close(); await c2.close();
+});
+
+/* ---------------- Comptes en ligne (API simulée par le vrai serveur, base en mémoire) ---------------- */
+test('compte en ligne : inscription, XP calculée par le serveur, connexion sur un autre appareil', async () => {
+  const { createApp } = require('../server/app');
+  const api = createApp({ DB_PATH: ':memory:', ALLOWED_ORIGINS: new URL(base).origin });
+  await new Promise(r => api.server.listen(0, '127.0.0.1', r));
+  const url = 'http://127.0.0.1:' + api.server.address().port;
+  const mk = async () => {
+    const ctx = await newContext();
+    await ctx.addInitScript(u => { window.C02_API = u; }, url);
+    const pg = await ctx.newPage(); pg.on('dialog', d => d.accept());
+    const errors = []; pg.on('pageerror', e => errors.push(e.message));
+    await pg.goto(base); return { ctx, pg, errors };
+  };
+  const A = await mk();
+  assert.ok(await A.pg.isVisible('#cloudPane'), 'écran de compte affiché');
+  // mauvais mot de passe, puis création
+  await A.pg.click('#tabReg');
+  await A.pg.fill('#cName', 'Amiral'); await A.pg.fill('#cPass', 'court');
+  await A.pg.click('#btnCloud');
+  assert.match(await A.pg.textContent('#authMsg'), /8 (à|to) 128/);
+  await A.pg.fill('#cPass', 'un-mot-de-passe-solide');
+  await A.pg.click('#btnCloud');
+  await A.pg.waitForSelector('#dash.active', { timeout: 15000 }).catch(async e => { throw new Error('inscription bloquée : ' + await A.pg.textContent('#authMsg') + ' / ' + A.errors.join('|')); });
+  assert.equal(await A.pg.evaluate(() => me().cloud), true);
+  // une partie : le serveur recalcule le gain
+  const gain = await A.pg.evaluate(() => { S.match = { shots: 10, hits: 6, sunk: 2, upgrades: 0, start: Date.now() - 60000 }; S.vsBot = false; return recordGame(true).gain; });
+  await A.pg.waitForFunction(() => !me().pending.length, null, { timeout: 15000 });
+  const xpA = await A.pg.evaluate(() => me().xp);
+  assert.equal(xpA, gain);
+  // pseudo déjà pris (sans tenir compte de la casse) sur un second appareil
+  const B = await mk();
+  await B.pg.click('#tabReg');
+  await B.pg.fill('#cName', 'AMIRAL'); await B.pg.fill('#cPass', 'un-mot-de-passe-solide');
+  await B.pg.click('#btnCloud');
+  await B.pg.waitForFunction(() => /pris|taken/.test($('authMsg').textContent), null, { timeout: 15000 });
+  // mauvais mot de passe puis bon mot de passe : même profil
+  await B.pg.click('#tabLogin');
+  await B.pg.fill('#cName', 'amiral'); await B.pg.fill('#cPass', 'mauvais-mot-de-passe');
+  await B.pg.click('#btnCloud');
+  await B.pg.waitForFunction(() => /incorrect|Wrong/.test($('authMsg').textContent), null, { timeout: 15000 });
+  await B.pg.fill('#cPass', 'un-mot-de-passe-solide');
+  await B.pg.click('#btnCloud');
+  await B.pg.waitForSelector('#dash.active');
+  assert.equal(await B.pg.evaluate(() => me().xp), xpA);
+  assert.equal(await B.pg.evaluate(() => me().stats.wins), 1);
+  // déconnexion : le jeton est révoqué
+  const tok = await A.pg.evaluate(() => me().tok);
+  await A.pg.click('#btnLogout');
+  await A.pg.waitForSelector('#auth.active');
+  assert.equal((await fetch(url + '/api/me', { headers: { authorization: 'Bearer ' + tok } })).status, 401);
+  assert.deepEqual(A.errors.concat(B.errors), []);
+  await A.ctx.close(); await B.ctx.close();
+  await new Promise(r => api.server.close(r));
+});
+
+test('compte en ligne : serveur injoignable => repli automatique sur le pseudo local', async () => {
+  const ctx = await newContext();
+  await ctx.addInitScript(() => { window.C02_API = 'http://127.0.0.1:1'; });
+  const pg = await ctx.newPage(); pg.on('dialog', d => d.accept());
+  await pg.goto(base);
+  await pg.waitForSelector('#loginPane', { state: 'visible', timeout: 10000 });
+  assert.ok(!(await pg.isVisible('#cloudPane')));
+  assert.match(await pg.textContent('#authMsg'), /indisponibles|unavailable/);
+  await pg.fill('#suName', 'Hors-ligne'); await pg.click('#btnPlay');
+  await pg.waitForSelector('#dash.active');
+  await ctx.close();
 });

@@ -32,6 +32,10 @@ Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qu
 - Le profil (pseudo, avatar, XP, statistiques) est enregistré **dans le navigateur de l'appareil** : il ne se synchronise pas entre PC et téléphone, et effacer les données du site l'efface. Taper un pseudo déjà utilisé sur l'appareil rouvre ce profil ; aucun mot de passe ne le protège.
 - Contre le bot, l'XP gagnée est divisée par deux.
 
+## Comptes en ligne (optionnel)
+
+Le jeu propose un compte **pseudo unique + mot de passe** dont le profil (XP, niveau, stats) se synchronise entre appareils. Il repose sur une petite API (`server/`, Node.js sans dépendance + SQLite) hébergée sur un NAS derrière un tunnel Cloudflare : voir [docs/SERVEUR.md](docs/SERVEUR.md). Sans serveur joignable, on peut toujours « Jouer sans compte » avec un pseudo local.
+
 ## Transférer sa progression sur un autre appareil
 
 Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase secrète (8 caractères minimum), puis télécharge le fichier `.c02save` ou copie le code `C02S1.…`. Sur l'autre appareil, colle le code (ou choisis le fichier), saisis la même phrase et clique sur *Importer*.

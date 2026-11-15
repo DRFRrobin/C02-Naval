@@ -64,6 +64,8 @@ h1,h2,h3{margin:0}
 input,select,textarea{font-family:inherit;resize:vertical;width:100%;background:var(--input);border:1px solid var(--border2);border-radius:10px;color:var(--text);
   padding:12px 14px;font:16px var(--font);margin-top:8px}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
+.seg{display:flex;gap:8px}.seg .btn{flex:1}.seg .btn.on{background:var(--primary);color:#fff;box-shadow:0 0 0 2px var(--ring)}
+.linkbtn{background:none;border:0;color:var(--sky);text-decoration:underline;cursor:pointer;font:inherit;font-size:13px;padding:10px 0 0;width:100%;text-align:center}
 .field-label{display:block;font-size:13px;color:var(--muted);margin-top:14px}
 
 /* Boutons */
@@ -406,6 +408,19 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
         <h1>C02 Naval</h1>
         <p data-i18n="tagline"></p>
       </div>
+      <div id="cloudPane" style="margin-top:22px;display:none">
+        <div class="seg" role="tablist">
+          <button id="tabLogin" class="btn on" type="button" data-i18n="tabLogin"></button>
+          <button id="tabReg" class="btn" type="button" data-i18n="tabReg"></button>
+        </div>
+        <label class="field-label" for="cName" data-i18n="pseudo"></label>
+        <input id="cName" maxlength="16" autocomplete="username" autocapitalize="off" spellcheck="false">
+        <label class="field-label" for="cPass" data-i18n="password"></label>
+        <input id="cPass" type="password" maxlength="128" autocomplete="current-password">
+        <button id="btnCloud" class="btn primary wide" style="margin-top:16px" type="button"><i class="fa-solid fa-right-to-bracket"></i><span id="btnCloudT"></span></button>
+        <p class="msg" style="font-size:12px;margin:10px 0 0" data-i18n="cloudNote"></p>
+        <button id="btnLocalMode" class="linkbtn" type="button" data-i18n="goLocal"></button>
+      </div>
       <div id="loginPane" style="margin-top:22px">
         <label class="field-label" for="suName" data-i18n="pseudo"></label>
         <input id="suName" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false">
@@ -416,7 +431,8 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
         </div>
       </div>
       <p id="authMsg" class="msg"></p>
-      <p class="msg" style="font-size:12px;margin:4px 0 0" data-i18n="localNote"></p>
+      <p id="localNote" class="msg" style="font-size:12px;margin:4px 0 0" data-i18n="localNote"></p>
+      <button id="btnCloudMode" class="linkbtn" type="button" style="display:none" data-i18n="goCloud"></button>
       <div class="lang-mini"><select id="langMini" aria-label="Langue / Language"><option value="fr">Français</option><option value="en">English</option></select></div>
     </div>
   </section>
@@ -513,7 +529,14 @@ html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.
               <button id="btnPhotoDel" class="btn"><i class="fa-solid fa-xmark"></i><span data-i18n="photoRemove"></span></button>
             </div>
           </div>
-          <div class="set-block">
+          <div class="set-block" id="cloudSettings" style="display:none">
+            <b><i class="fa-solid fa-key"></i><span data-i18n="pwT"></span></b><small data-i18n="pwD"></small>
+            <input id="pwOld" type="password" autocomplete="current-password" data-ph="pwOldPh" maxlength="128">
+            <input id="pwNew" type="password" autocomplete="new-password" data-ph="pwNewPh" maxlength="128">
+            <button id="btnPw" class="btn grad wide" style="margin-top:14px" type="button" data-i18n="pwBtn"></button>
+            <p id="pwMsg" class="msg"></p>
+          </div>
+          <div class="set-block" id="localProfile">
             <b><i class="fa-solid fa-user-shield"></i><span data-i18n="editT"></span></b>
             <label class="field-label" for="editName" data-i18n="newPseudo"></label>
             <input id="editName" maxlength="16" autocomplete="username">
@@ -679,6 +702,7 @@ const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 const I18N = {
   fr: {
     tagline: 'Bataille navale à deux, sur PC ou téléphone.',
+    apiDown: 'Les comptes en ligne sont momentanément indisponibles : tu peux jouer avec un pseudo local.',
     tabLogin: 'Connexion', tabSignup: 'Créer un compte', account: 'Compte', password: 'Mot de passe',
     passwordConfirm: 'Confirmer le mot de passe', pseudo: 'Pseudo (2 à 16 caractères)', btnLogin: 'Se connecter',
     btnSignup: 'Créer le compte', guest: 'Jouer en invité (sans XP)',
@@ -715,6 +739,14 @@ const I18N = {
     bkBad: 'Phrase secrète incorrecte ou sauvegarde corrompue.', bkFmt: 'Ce n\'est pas une sauvegarde C02 Naval valide.',
     bkNewer: 'Un profil « {name} » existe déjà ici avec plus de progression. L\'écraser par la sauvegarde ?',
     bkOk: 'Profil « {name} » importé.', bkKept: 'Ton profil local est plus avancé : rien n\'a été modifié.',
+    tabLogin: 'Connexion', tabReg: 'Créer un compte', password: 'Mot de passe', btnLogin: 'Se connecter', btnRegister: 'Créer mon compte',
+    cloudNote: 'Ton pseudo est unique et ton profil te suit sur tous tes appareils. Aucun e-mail demandé.', goLocal: 'Jouer sans compte (pseudo local)', goCloud: 'Se connecter avec un compte',
+    e_bad_credentials: 'Pseudo ou mot de passe incorrect.', e_locked: 'Trop d\'essais : compte verrouillé {min} min.', e_pseudo_taken: 'Ce pseudo est déjà pris.',
+    e_pseudo_invalid: 'Pseudo invalide : 2 à 16 caractères (lettres, chiffres, espace, _ . -).', e_pseudo_reserved: 'Ce pseudo est réservé.',
+    e_password_invalid: 'Mot de passe : 8 à 128 caractères.', e_rate_limited: 'Trop de tentatives, réessaie dans quelques minutes.',
+    e_network: 'Serveur injoignable. Vérifie ta connexion ou joue sans compte.', e_server_error: 'Erreur du serveur, réessaie plus tard.', e_session: 'Session expirée : reconnecte-toi.',
+    pwT: 'Mot de passe', pwD: 'Change ton mot de passe. Tes autres appareils seront déconnectés.', pwOldPh: 'Mot de passe actuel', pwNewPh: 'Nouveau mot de passe (8 caractères min.)', pwBtn: 'Changer le mot de passe', pwDone: 'Mot de passe modifié.',
+    delPrompt: 'Saisis ton mot de passe pour supprimer définitivement ce compte :', cloudAcct: 'Compte en ligne',
     deleteConfirm: 'Supprimer définitivement le compte « {name} », son XP et ses statistiques ?',
     errPseudoLen: 'Le pseudo doit faire entre 2 et 16 caractères.', errPseudoTaken: 'Ce pseudo existe déjà sur cet appareil.',
     errPassLen: 'Le mot de passe doit faire au moins 4 caractères.', errPassMatch: 'Les mots de passe ne correspondent pas.',
@@ -839,6 +871,15 @@ const I18N = {
     bkBad: 'Wrong passphrase or corrupted backup.', bkFmt: 'This is not a valid C02 Naval backup.',
     bkNewer: 'A profile "{name}" already exists here with more progress. Overwrite it with the backup?',
     bkOk: 'Profile "{name}" imported.', bkKept: 'Your local profile is more advanced: nothing was changed.',
+    apiDown: 'Online accounts are temporarily unavailable: you can play with a local username.',
+    tabLogin: 'Sign in', tabReg: 'Create account', password: 'Password', btnLogin: 'Sign in', btnRegister: 'Create my account',
+    cloudNote: 'Your username is unique and your profile follows you on all your devices. No e-mail required.', goLocal: 'Play without an account (local username)', goCloud: 'Sign in with an account',
+    e_bad_credentials: 'Wrong username or password.', e_locked: 'Too many attempts: account locked for {min} min.', e_pseudo_taken: 'This username is already taken.',
+    e_pseudo_invalid: 'Invalid username: 2 to 16 characters (letters, digits, space, _ . -).', e_pseudo_reserved: 'This username is reserved.',
+    e_password_invalid: 'Password: 8 to 128 characters.', e_rate_limited: 'Too many attempts, try again in a few minutes.',
+    e_network: 'Server unreachable. Check your connection or play without an account.', e_server_error: 'Server error, try again later.', e_session: 'Session expired: please sign in again.',
+    pwT: 'Password', pwD: 'Change your password. Your other devices will be signed out.', pwOldPh: 'Current password', pwNewPh: 'New password (8 characters min.)', pwBtn: 'Change password', pwDone: 'Password changed.',
+    delPrompt: 'Enter your password to permanently delete this account:', cloudAcct: 'Online account',
     deleteConfirm: 'Permanently delete the account "{name}", its XP and statistics?',
     errPseudoLen: 'Username must be 2 to 16 characters long.', errPseudoTaken: 'This username already exists on this device.',
     errPassLen: 'Password must be at least 4 characters long.', errPassMatch: 'Passwords do not match.',
@@ -1227,15 +1268,114 @@ function restoreSession() {
   let id = null;
   try { id = sessionStorage.getItem(TAB_KEY) || localStorage.getItem(CUR_KEY); } catch (e) {}
   if (id === 'guest') { curId = null; loggedIn = true; return; }
-  if (id && accounts[id]) { curId = id; loggedIn = true; }
+  if (id && accounts[id] && (!accounts[id].cloud || accounts[id].tok)) { curId = id; loggedIn = true; }
 }
 
 const nameTaken = (name, exceptId) => Object.values(accounts).some(a => a.id !== exceptId && a.name.toLowerCase() === name.toLowerCase());
 
-/* ---------- Écran de connexion : un simple pseudo, sans mot de passe ---------- */
+/* ---------- Comptes en ligne (API sur le NAS) ---------- */
+const API_URL = (typeof window.C02_API === 'string' ? window.C02_API : 'https://api.c02.app').replace(/\/+$/, '');
+let authMode = 'login', cloudPaneOn = true, syncing = false, syncTimer = null, apiUp = null;
+async function api(method, path, body, tok) {
+  let r;
+  try {
+    r = await fetch(API_URL + path, { method, headers: { 'content-type': 'application/json', ...(tok ? { authorization: 'Bearer ' + tok } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined });
+  } catch (e) { throw { code: 'network' }; }
+  let j = null; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) throw { code: (j && j.error) || 'server_error', status: r.status, retryAfter: j && j.retryAfter };
+  return j;
+}
+// API injoignable (pas encore installée, NAS éteint…) : on bascule sur le pseudo local au lieu d'afficher une erreur.
+async function probeApi() {
+  if (!API_URL) return;
+  try { const r = await fetch(API_URL + '/api/health', { signal: AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined }); apiUp = r.ok; }
+  catch (e) { apiUp = false; }
+  if (!apiUp && $('auth').classList.contains('active') && cloudPaneOn) { setAuthPane(false); msg('authMsg', t('apiDown')); }
+}
+function apiErr(e) {
+  const k = 'e_' + (e && e.code);
+  if (e && e.code === 'locked') return t('e_locked', { min: Math.max(1, Math.ceil((e.retryAfter || 900) / 60)) });
+  return I18N[settings.lang][k] ? t(k) : t('e_server_error');
+}
+// Le profil du serveur fait foi : on le recopie dans le compte local (cache hors ligne).
+function applyCloud(p, tok) {
+  loadAccounts();
+  const id = 'c:' + p.name.normalize('NFKC').toLowerCase(), prev = accounts[id] || {};
+  const a = { id, cloud: true, tok: tok || prev.tok || null, name: p.name, emoji: validEmoji(p.emoji) ? p.emoji : null, xp: p.xp,
+    created: new Date(p.created).toISOString(), lastLogin: new Date().toISOString(), stats: { ...emptyStats(), ...p.stats }, pending: prev.pending || [] };
+  saveAccount(a); return a;
+}
+function setAuthPane(cloud) {
+  cloudPaneOn = !!API_URL && cloud;
+  $('cloudPane').style.display = cloudPaneOn ? '' : 'none';
+  $('loginPane').style.display = cloudPaneOn ? 'none' : '';
+  $('localNote').style.display = cloudPaneOn ? 'none' : '';
+  $('btnCloudMode').style.display = API_URL && !cloudPaneOn ? '' : 'none';
+  setAuthMode(authMode);
+}
+function setAuthMode(m) {
+  authMode = m;
+  $('tabLogin').classList.toggle('on', m === 'login'); $('tabReg').classList.toggle('on', m === 'reg');
+  $('cPass').autocomplete = m === 'reg' ? 'new-password' : 'current-password';
+  $('btnCloudT').textContent = t(m === 'reg' ? 'btnRegister' : 'btnLogin');
+  msg('authMsg', '');
+}
+async function cloudSubmit() {
+  const name = $('cName').value.trim().replace(/\s+/g, ' '), pw = $('cPass').value;
+  if (name.length < 2 || name.length > 16) { Snd.play('blocked'); return msg('authMsg', t('errPseudoLen'), true); }
+  if (pw.length < 8) { Snd.play('blocked'); return msg('authMsg', t('e_password_invalid'), true); }
+  const btn = $('btnCloud'); btn.disabled = true; msg('authMsg', '…');
+  try {
+    let r;
+    if (authMode === 'reg') {
+      loadAccounts();   // un profil local du même pseudo est repris (borné par le serveur)
+      const loc = Object.values(accounts).find(x => !x.cloud && x.name.toLowerCase() === name.toLowerCase());
+      r = await api('POST', '/api/register', { name, password: pw, profile: loc ? { xp: loc.xp, emoji: loc.emoji, stats: loc.stats } : undefined });
+    } else r = await api('POST', '/api/login', { name, password: pw });
+    const a = applyCloud(r.profile, r.token);
+    $('cName').value = ''; $('cPass').value = ''; msg('authMsg', '');
+    setSession(a.id); openDash('play');
+    msg('dashMsg', t('welcome', { name: a.name }), 'ok');
+  } catch (e) { Snd.play('blocked'); msg('authMsg', apiErr(e), true); }
+  finally { btn.disabled = false; }
+}
+function queueResult(a, type, body) { a.pending = a.pending || []; a.pending.push({ type, body }); saveAccount(a); syncCloud(); }
+// Envoie les parties en attente (dans l'ordre) puis recharge le profil depuis le serveur.
+async function syncCloud() {
+  const a0 = me(); if (!a0 || !a0.cloud || !a0.tok || syncing) return;
+  syncing = true; clearTimeout(syncTimer);
+  try {
+    for (;;) {
+      loadAccounts(); const a = me(); if (!a) return;
+      const it = (a.pending || [])[0]; if (!it) break;
+      try { await api('POST', it.type === 'i' ? '/api/interrupted' : '/api/result', it.body, a.tok); }
+      catch (e) { if (e.status !== 400) throw e; }          // 400 : résultat refusé par le serveur, on l'abandonne
+      loadAccounts(); const b = me(); if (b) { b.pending.shift(); saveAccount(b); }
+    }
+    const a = me(); if (!a) return;
+    const r = await api('GET', '/api/me', undefined, a.tok);
+    applyCloud(r.profile);
+    if ($('dash').classList.contains('active')) renderDash();
+  } catch (e) {
+    if (e.status === 401) { const a = me(); if (a) { a.tok = null; saveAccount(a); } clearSession(); openAuth(); msg('authMsg', t('e_session'), true); }
+    else if (e.status === 429 || e.code === 'network') syncTimer = setTimeout(syncCloud, 20000);   // trop rapide / hors ligne : on réessaie
+  } finally { syncing = false; }
+}
+async function cloudChangePassword() {
+  const a = me(); if (!a || !a.cloud) return;
+  const o = $('pwOld').value, n = $('pwNew').value;
+  if (n.length < 8) return msg('pwMsg', t('e_password_invalid'), true);
+  try { await api('POST', '/api/password', { password: o, newPassword: n }, a.tok); $('pwOld').value = ''; $('pwNew').value = ''; msg('pwMsg', t('pwDone'), 'ok'); }
+  catch (e) { msg('pwMsg', apiErr(e), true); }
+}
+
+/* ---------- Écran de connexion ---------- */
 function openAuth() {
   loadAccounts();
-  const accs = Object.values(accounts).sort((a, b) => (b.lastLogin || '').localeCompare(a.lastLogin || ''));
+  setAuthPane(cloudPaneOn && apiUp !== false);
+  if (apiUp === null) probeApi();
+  const accs = Object.values(accounts).filter(a => !a.cloud).sort((a, b) => (b.lastLogin || '').localeCompare(a.lastLogin || ''));
   $('accBox').style.display = accs.length ? '' : 'none';
   const list = $('accPick'); list.innerHTML = '';
   accs.forEach(a => {
@@ -1253,7 +1393,7 @@ function doPlay() {
   const name = $('suName').value.trim().replace(/\s+/g, ' ');
   if (name.length < 2 || name.length > 16) { Snd.play('blocked'); return msg('authMsg', t('errPseudoLen'), true); }
   const now = new Date().toISOString();
-  let a = Object.values(accounts).find(x => x.name.toLowerCase() === name.toLowerCase());
+  let a = Object.values(accounts).find(x => !x.cloud && x.name.toLowerCase() === name.toLowerCase());
   const isNew = !a;
   if (a) a.lastLogin = now;
   else a = { id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)], xp: 0, created: now, lastLogin: now, stats: emptyStats() };
@@ -1273,6 +1413,7 @@ function openDash(p) {
   pane = p || pane;
   if (renderDash() === false) return;
   showView('dash');
+  syncCloud();
   if (pendingCode) { const c = pendingCode; pendingCode = null; openJoin(c); }
 }
 function renderDash() {
@@ -1426,6 +1567,9 @@ function renderSettings() {
   $('sndToggle').className = 'toggle ' + (settings.sound ? 'on' : 'off');
   $('sndToggle').textContent = settings.sound ? 'ON' : 'OFF';
   $('acctSettings').style.display = a ? '' : 'none';
+  $('cloudSettings').style.display = a && a.cloud ? '' : 'none';
+  $('localProfile').style.display = a && !a.cloud ? '' : 'none';
+  $('backupBlock').style.display = a && !a.cloud ? '' : 'none';
   if (a) {
     if (document.activeElement !== $('editName')) $('editName').value = a.name;
     $('btnPhotoDel').disabled = !validEmoji(a.emoji);
@@ -1530,9 +1674,14 @@ async function bkImport() {
   $('bkCode').value = ''; $('bkPass').value = '';
   renderDash(); msg('bkMsg', t('bkOk', { name: d.name }), 'ok');
 }
-function deleteAccount() {
+async function deleteAccount() {
   const a = me(); if (!a) return;
   if (!confirm(t('deleteConfirm', { name: a.name }))) return;
+  if (a.cloud) {
+    const pw = prompt(t('delPrompt'));
+    if (pw === null) return;
+    try { await api('POST', '/api/delete', { password: pw }, a.tok); } catch (e) { return msg('pwMsg', apiErr(e), true); }
+  }
   try { localStorage.removeItem(ACC_PREFIX + a.id); } catch (e) {}
   delete accounts[a.id];
   clearSession();
@@ -1545,7 +1694,7 @@ function pickPhoto() {
   EMOJIS.forEach(e => {
     const b = document.createElement('button');
     b.type = 'button'; b.textContent = e; b.className = e === a.emoji ? 'on' : '';
-    b.onclick = () => { loadAccounts(); const acc = me(); if (acc) { acc.emoji = e; saveAccount(acc); renderDash(); } Snd.play('click'); $('emojiModal').classList.remove('show'); };
+    b.onclick = () => { loadAccounts(); const acc = me(); if (acc) { acc.emoji = e; saveAccount(acc); renderDash(); if (acc.cloud) api('PATCH', '/api/me', { emoji: e }, acc.tok).catch(() => {}); } Snd.play('click'); $('emojiModal').classList.remove('show'); };
     g.appendChild(b);
   });
   $('emojiModal').classList.add('show');
@@ -1572,6 +1721,11 @@ function recordGame(win) {
     if (m.shots > 0 && (!s.fastestWin || m.shots < s.fastestWin)) s.fastestWin = m.shots;
   } else { s.losses++; s.streak = 0; }
   saveAccount(a);
+  if (a.cloud) {   // le serveur recalcule l'XP lui-même : on lui envoie seulement ce qui s'est passé
+    const shots = Math.min(m.shots, 500), hits = Math.min(m.hits, shots), sunk = Math.min(m.sunk, hits, 12);
+    queueResult(a, 'r', { win: !!win, shots, hits, sunk, upgrades: Math.min(m.upgrades, 30),
+      duration: Math.min(7200, Math.max(5, m.start ? Math.round((Date.now() - m.start) / 1000) : 5)), bot: !!S.vsBot, std: isStdRules(CFG) });
+  }
   return { gain, level: levelOf(a.xp), up: levelOf(a.xp) > before };
 }
 function recordInterrupted() {
@@ -1582,6 +1736,7 @@ function recordInterrupted() {
   a.stats.interrupted++;
   a.stats.timePlayed += S.match.start ? Math.round((Date.now() - S.match.start) / 1000) : 0;
   saveAccount(a);
+  if (a.cloud) queueResult(a, 'i', { duration: Math.min(7200, S.match.start ? Math.round((Date.now() - S.match.start) / 1000) : 0) });
 }
 function myIdentity() {
   const a = me();
@@ -2642,6 +2797,13 @@ pg.addEventListener('pointercancel', () => { S.drag = null; });
 
 // Connexion
 $('btnPlay').onclick = doPlay;
+$('btnCloud').onclick = cloudSubmit;
+$('cPass').onkeydown = $('cName').onkeydown = e => { if (e.key === 'Enter') cloudSubmit(); };
+$('tabLogin').onclick = () => setAuthMode('login');
+$('tabReg').onclick = () => setAuthMode('reg');
+$('btnLocalMode').onclick = () => setAuthPane(false);
+$('btnCloudMode').onclick = () => { setAuthPane(true); apiUp = null; msg('authMsg', ''); probeApi(); };
+$('btnPw').onclick = cloudChangePassword;
 $('suName').addEventListener('keydown', e => { if (e.key === 'Enter') doPlay(); });
 
 // Installation
@@ -2651,7 +2813,11 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.
 
 // Tableau de bord
 document.querySelectorAll('.tabsnav [data-pane]').forEach(b => { b.onclick = () => { pane = b.dataset.pane; msg('setMsg', ''); Snd.play('click'); renderDash(); }; });
-$('btnLogout').onclick = () => { clearSession(); msg('authMsg', ''); openAuth(); };
+$('btnLogout').onclick = () => {
+  const a = me();
+  if (a && a.cloud) { if (a.tok) api('POST', '/api/logout', {}, a.tok).catch(() => {}); a.tok = null; saveAccount(a); }   // le jeton est révoqué : le mot de passe sera redemandé
+  clearSession(); msg('authMsg', ''); openAuth();
+};
 $('avUp').addEventListener('click', e => { e.preventDefault(); pickPhoto(); });
 ['turnUrl', 'turnUser', 'turnCred'].forEach(id => $(id).addEventListener('change', () => {
   settings.turnUrl = $('turnUrl').value.trim(); settings.turnUser = $('turnUser').value.trim(); settings.turnCred = $('turnCred').value;
@@ -2661,7 +2827,7 @@ $('btnEmojiCancel').onclick = () => $('emojiModal').classList.remove('show');
 $('emojiModal').addEventListener('click', e => { if (e.target === $('emojiModal')) $('emojiModal').classList.remove('show'); });
 $('themeBox').addEventListener('click', e => { const b = e.target.closest('[data-th]'); if (!b) return; settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderThemes(); Snd.play('click'); });
 $('btnPhoto').onclick = pickPhoto;
-$('btnPhotoDel').onclick = () => { loadAccounts(); const a = me(); if (a) { a.emoji = null; saveAccount(a); renderDash(); } };
+$('btnPhotoDel').onclick = () => { loadAccounts(); const a = me(); if (a) { a.emoji = null; saveAccount(a); renderDash(); if (a.cloud) api('PATCH', '/api/me', { emoji: null }, a.tok).catch(() => {}); } };
 $('sndToggle').onclick = () => { settings.sound = !settings.sound; saveSettings(); renderSettings(); Snd.play('click'); };
 const setLang = v => { settings.lang = I18N[v] ? v : 'fr'; saveSettings(); applyLang(); if ($('dash').classList.contains('active')) renderDash(); else if ($('auth').classList.contains('active')) openAuth(); };
 $('langSel').onchange = e => setLang(e.target.value);

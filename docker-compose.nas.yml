@@ -1,0 +1,24 @@
+# À coller dans TrueNAS SCALE : Applications > Discover Apps > Install via YAML (voir docs/SERVEUR.md)
+services:
+  c02-api:
+    image: ghcr.io/drfrrobin/c02-naval-api:latest
+    container_name: c02-naval-api
+    restart: unless-stopped
+    environment:
+      # Origines autorisées à appeler l'API (séparées par des virgules) : l'adresse de ton jeu.
+      ALLOWED_ORIGINS: "https://drfrrobin.github.io"
+      # 1 uniquement si l'API n'est joignable que par le tunnel Cloudflare (voir le guide).
+      TRUST_PROXY: "1"
+    ports:
+      - "8787:8787"
+    volumes:
+      - c02-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  c02-data:
