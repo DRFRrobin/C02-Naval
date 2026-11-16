@@ -59,6 +59,7 @@ const S = {
   oppUsed: 0, opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
   aim: null,                           // tir spécial visé, en attente de confirmation : [r, c]
   myCommit: null, oppCommit: null, oppReveal: null, verify: 'none', verifyTimer: null, recordPending: false,   // anti-triche
+  blockedSeen: 0, oppShields: 0,       // « bouclier » annoncés par l'adversaire / boucliers qu'il a réellement posés
 };
 
 /* ---------- Outils ---------- */
@@ -69,11 +70,24 @@ const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;
 const EMOJIS = ['⚓', '🚢', '⛵', '🛥️', '🐙', '🦈', '🐬', '🐳', '🐋', '🐟', '🐠', '🐡', '🦀', '🦞', '🐢', '🐧', '🦅', '🦉', '🦜', '🐺', '🦊', '🐻', '🐼', '🦁', '🐯', '🐸', '🐵', '🦄', '🐲',
   '🌊', '🏝️', '🌴', '☀️', '🌙', '⭐', '🚀', '🛸', '🔥', '⚡', '🌈', '🍀', '🎯', '🏆', '👑', '🎮', '🎲', '🧭', '🔭', '🤖', '👾', '😀', '😎', '🤠', '🥳', '😺'];
 const validEmoji = e => typeof e === 'string' && EMOJIS.includes(e);
-const THEMES = { ocean: ['#0a84d0', '#0f2b49'], night: ['#7c3aed', '#1d1740'], forest: ['#059669', '#0f3a2c'], sunset: ['#ea580c', '#3a2a4a'], light: ['#0a6fbf', '#dce9f7'] };
-const THEME_BAR = { ocean: '#050d1b', night: '#0d0a1c', forest: '#06150f', sunset: '#1a0d10', light: '#dce9f7' };
+const THEMES = { ocean: ['#0a84d0', '#0f2b49'], night: ['#7c3aed', '#1d1740'], forest: ['#059669', '#0f3a2c'], sunset: ['#ea580c', '#3a2a4a'], light: ['#0a6fbf', '#dce9f7'],
+  arcade: ['#ff3d9a', '#0a0a1c'], xmas: ['#ff3d5a', '#0a2016'] };
+const THEME_BAR = { ocean: '#050d1b', night: '#0d0a1c', forest: '#06150f', sunset: '#1a0d10', light: '#dce9f7', arcade: '#0a0a1c', xmas: '#07150e' };
+const RETRO_THEMES = ['arcade', 'xmas'];   // thèmes rétro : polices pixel, bordures carrées, ombres franches (voir « Thèmes rétro » dans le CSS)
+// Thème par défaut (aucun choix du joueur) : « Rétro Noël » du 1er au 26 décembre inclus (date de l'appareil), « Océan » le reste de l'année.
+function defaultTheme(d = new Date()) { return d.getMonth() === 11 && d.getDate() <= 26 ? 'xmas' : 'ocean'; }
+const currentTheme = () => (THEMES[settings.theme] ? settings.theme : defaultTheme());
 function applyTheme() {
-  const th = THEMES[settings.theme] ? settings.theme : 'ocean';
+  const th = currentTheme();
+  const retro = RETRO_THEMES.includes(th);
   document.documentElement.dataset.theme = th;
+  document.documentElement.classList.toggle('retro', retro);
+  if (retro && !document.getElementById('retroFonts')) {   // polices pixel chargées seulement si un thème rétro est choisi
+    const l = document.createElement('link');
+    l.id = 'retroFonts'; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap';
+    document.head.appendChild(l);
+  }
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEME_BAR[th];
 }
 function showView(id) { document.querySelectorAll('.view').forEach(e => e.classList.toggle('active', e.id === id)); window.scrollTo(0, 0); }
@@ -145,7 +159,9 @@ function sanitizeRules(c) {
 }
 const cloneRules = r => ({ ...r, fleet: r.fleet.slice() });
 const sameRules = (a, b) => a.size === b.size && a.fleet.join() === b.fleet.join() && a.radar === b.radar && a.cross === b.cross && a.shield === b.shield && a.timer === b.timer;
-const isStdRules = r => sameRules(r, DEFAULT_RULES);
+// Adversaire aléatoire : règles standard avec un compte à rebours de 20 s par coup (hors des choix du chronomètre de l'écran Règles).
+const MATCH_RULES = { ...DEFAULT_RULES, timer: 20 };
+const isStdRules = r => sameRules(r, DEFAULT_RULES) || sameRules(r, MATCH_RULES);   // règles standard : XP complète
 let RULES = sanitizeRules(settings.rules) || cloneRules(DEFAULT_RULES);   // règles choisies par le joueur (hôte / bot)
 let CFG = cloneRules(RULES);                                              // règles de la partie en cours
 if (typeof settings.bot !== 'boolean') settings.bot = true;

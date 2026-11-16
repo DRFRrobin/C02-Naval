@@ -8,7 +8,7 @@ Bataille navale dans le navigateur, sur PC ou téléphone. Sans installation, sa
 
 ## Modes de jeu
 
-- **Adversaire aléatoire** : affronte un joueur en ligne au hasard. Si personne n'est trouvé en 45 s, un bot prend sa place.
+- **Adversaire aléatoire** : affronte un joueur en ligne au hasard, avec **20 s par coup** (barre de compte à rebours, rouge et tic sonore sur les 5 dernières secondes ; temps écoulé = tir automatique au hasard, placement limité à 90 s). Si personne n'est trouvé en 45 s, un bot prend sa place, avec les mêmes règles.
 - **Partie contre un bot** : entraînement immédiat contre une IA tactique (elle calcule les positions de bateaux les plus probables).
 - **Hôte** : crée un salon privé et partage le code de 6 caractères (ou le lien d'invitation).
 - **Rejoindre une partie** : saisis le code d'un ami.
@@ -25,7 +25,7 @@ Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2
 - **Partager le résultat** : le bouton crée une **image** (1080 × 1350, aux couleurs du thème) avec le gagnant, **les deux grilles** côte à côte (sa flotte avec les tirs reçus, la flotte adverse avec ses tirs et les bateaux non trouvés quand on les connaît), puis tirs, précision, bateaux coulés, durée et le lien du jeu. Sur téléphone, elle part dans le partage habituel (Messages, WhatsApp, Instagram…) ; sur ordinateur, elle est téléchargée.
 - **Voir les grilles** : la grille adverse montre, encadrés en jaune, les bateaux qu'on n'a pas trouvés (contre le bot, ou contre un joueur dont la grille a été dévoilée et vérifiée). Les boutons « Résultat » et « Partager » restent en bas pour revenir à l'écran de fin.
 
-**Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
+**Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Certaines réponses impossibles sont repérées **pendant** la partie (un « bouclier » sans bouclier posé, ou des « raté » à tout au point qu'il ne reste plus de place pour ses bateaux) : la partie s'arrête et c'est une victoire. Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
 
 ## Règles personnalisables
 
@@ -37,7 +37,7 @@ Onglet **Règles** du tableau de bord :
 - **Chronomètre de tour** (désactivé, 15, 30, 60 ou 90 s) : à la fin du temps, un tir au hasard est joué. Il limite aussi le placement des bateaux à 90 s.
 - **Intelligence artificielle** : autoriser ou non le bot (partie contre le bot et bot de secours du mode aléatoire), avec trois niveaux : facile, normal, difficile.
 
-Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qui rejoint un salon reçoit automatiquement les règles de l'hôte. L'adversaire aléatoire utilise toujours les règles standard. Avec des règles personnalisées, l'XP gagnée est divisée par deux.
+Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qui rejoint un salon reçoit automatiquement les règles de l'hôte. L'adversaire aléatoire utilise toujours les règles standard, avec 20 s par coup (l'XP n'est pas réduite). Avec des règles personnalisées, l'XP gagnée est divisée par deux.
 
 ## Profil
 
@@ -68,7 +68,7 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 ## Version et mises à jour
 
-Le numéro de version (`1.2.2`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+Le numéro de version (`1.2.3`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
 
 **Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `js/main.js` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
 
@@ -86,7 +86,11 @@ Fichiers : `manifest.webmanifest`, `sw.js` (service worker), `icons/` (icône iP
 
 ## Paramètres
 
-Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème de couleurs** (Océan, Nuit, Forêt, Crépuscule, Clair), pseudo, avatar.
+Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème** (Auto, Océan, Nuit, Forêt, Crépuscule, Clair, **Rétro arcade**, **Rétro Noël**), pseudo, avatar.
+
+Par défaut (choix **Auto**), le thème est **Rétro Noël du 1er au 26 décembre** (date de l'appareil) et Océan le reste de l'année. Un thème choisi à la main est toujours gardé.
+
+Les deux thèmes rétro changent tout le style, pas seulement les couleurs : polices pixel (Press Start 2P pour les titres et boutons, VT323 pour le texte, chargées seulement si un thème rétro est choisi), coins carrés, bordures épaisses aux couleurs néon, ombres franches qui s'enfoncent au clic et quadrillage en fond. **Rétro arcade** est néon rose, cyan et jaune sur indigo. **Rétro Noël** est rouge, vert et or sur vert sapin, avec de la neige en pixels qui tombe, une guirlande lumineuse sur les panneaux et une barre d'XP en sucre d'orge. Les animations s'arrêtent si l'appareil demande moins de mouvements.
 
 **Avatar** : uniquement un emoji choisi dans une liste fermée d'une cinquantaine d'emojis adaptés à partir de 12 ans (animaux, mer, espace, sport, smileys…). L'emoji reçu d'un adversaire est vérifié contre cette même liste.
 

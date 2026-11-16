@@ -29,7 +29,7 @@ $('suName').addEventListener('keydown', e => { if (e.key === 'Enter') doPlay(); 
 $('btnInstTip').onclick = async () => { if (!(await doInstall())) { pane = 'settings'; renderDash(); } };
 $('btnInstTipX').onclick = () => { try { localStorage.setItem(TIP_KEY, '1'); } catch (e) {} renderInstall(); };
 /* ---------- Version et mises à jour ---------- */
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 const verCmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
 let newVersion = null;
 // Lit version.json sur le serveur (jamais depuis un cache) : 'new' | 'ok' | 'err'
@@ -91,7 +91,13 @@ $('avUp').addEventListener('click', e => { e.preventDefault(); pickPhoto(); });
 }));
 $('btnEmojiCancel').onclick = () => $('emojiModal').classList.remove('show');
 $('emojiModal').addEventListener('click', e => { if (e.target === $('emojiModal')) $('emojiModal').classList.remove('show'); });
-$('themeBox').addEventListener('click', e => { const b = e.target.closest('[data-th]'); if (!b) return; settings.theme = b.dataset.th; saveSettings(); applyTheme(); renderThemes(); Snd.play('click'); });
+$('themeBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-th]'); if (!b) return;
+  if (b.dataset.th === 'auto') { delete settings.theme; settings.themeChosen = false; } else { settings.theme = b.dataset.th; settings.themeChosen = true; }
+  saveSettings(); applyTheme(); renderThemes(); Snd.play('click');
+});
+// Thème automatique : la date a pu changer pendant que le jeu était en arrière-plan (passage au 1er ou au 27 décembre)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !THEMES[settings.theme]) applyTheme(); });
 $('btnPhoto').onclick = pickPhoto;
 $('btnPhotoDel').onclick = () => { loadAccounts(); const a = me(); if (a) { a.emoji = null; saveAccount(a); renderDash(); if (a.cloud) api('PATCH', '/api/me', { emoji: null }, a.tok).catch(() => {}); } };
 $('volRange').oninput = e => { settings.volume = +e.target.value / 100; saveSettings(); };

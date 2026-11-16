@@ -32,7 +32,7 @@ const I18N = {
     photoChange: 'Choisir un emoji', photoRemove: 'Retirer',
     emojiPick: 'Choisis ton avatar', emojiNote: 'Emojis adaptés aux 12 ans et plus (PEGI 12).',
     themeT: 'Thème', themeD: "Couleurs de l'interface",
-    themeNames: { ocean: 'Océan', night: 'Nuit', forest: 'Forêt', sunset: 'Crépuscule', light: 'Clair' },
+    themeNames: { auto: 'Auto (Noël en décembre)', ocean: 'Océan', night: 'Nuit', forest: 'Forêt', sunset: 'Crépuscule', light: 'Clair', arcade: 'Rétro arcade', xmas: 'Rétro Noël' },
     editT: 'Changer de pseudo', newPseudo: 'Nouveau pseudo',
     newPass: 'Nouveau mot de passe (laisser vide pour conserver)', save: 'Enregistrer les modifications',
     saved: 'Modifications enregistrées.', nothingChanged: 'Aucune modification.',
@@ -101,7 +101,7 @@ const I18N = {
     customXp: 'XP réduite de moitié : règles personnalisées.',
     stReconnecting: 'Reconnexion…', reconnecting: "Connexion perdue : tentative de reconnexion (45 s max)…",
     rTimerT: 'Chronomètre de tour', rTimerD: "Temps limite par tour ; passé ce délai, un tir au hasard est joué. Limite aussi le placement à 90 s.",
-    timerOff: 'Désactivé', timerN: '{n} s', autoShot: 'Temps écoulé : tir automatique.', placeLimit: 'Placement limité à {s} s.',
+    timerOff: 'Désactivé', timerN: '{n} s', autoShot: 'Temps écoulé : tir automatique.', placeLimit: 'Placement limité à {s} s.', turnLimit: '{s} s par coup.',
     instT: "Installer l'application", instD: "Ajoute C02 Naval à l'écran d'accueil : il s'ouvre en plein écran, comme une vraie application.",
     instTipT: "Installe le jeu sur ton téléphone", instTipHow: "Ajoute-le à l'écran d'accueil pour jouer en plein écran.",
     instBtnHow: 'Comment ?', instBtnInstall: 'Installer', instDone: "✓ L'application est installée : tu l'utilises en plein écran.",
@@ -134,7 +134,7 @@ const I18N = {
     upCrossN: 'Frappe en croix', upCrossD: 'Tire sur la case visée et ses 4 voisines. Coûte le tour.',
     upShieldN: 'Bouclier', upShieldD: 'Le premier coup sur un de tes bateaux est annulé. Coûte le tour, sans tir.',
     choiceTitle: 'Bateau ennemi coulé !', choiceSub: 'Choisis une amélioration :', choiceSubN: 'Choisis une amélioration ({n} à choisir) :',
-    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', winForfeit: "L'adversaire a abandonné la partie.", loseText: 'Toute ta flotte a été coulée.',
+    win: 'Victoire !', lose: 'Défaite…', winText: 'Tu as coulé toute la flotte adverse.', winForfeit: "L'adversaire a abandonné la partie.", winCheat: "L'adversaire a triché : ses réponses sont impossibles.", loseText: 'Toute ta flotte a été coulée.',
     endStats: p => `${pl(p.shots, 'tir', 'tirs')}, ${p.acc} % de précision.`,
     lostTitle: 'Connexion perdue', lostText: "La liaison avec l'adversaire est coupée. La partie est arrêtée.",
     rematch: 'Revanche', rematchWait: 'En attente de {name}…', rematchOpp: '{name} propose une revanche !', rematchGone: "L'adversaire a quitté la partie.",
@@ -181,7 +181,7 @@ const I18N = {
     photoChange: 'Pick an emoji', photoRemove: 'Remove',
     emojiPick: 'Choose your avatar', emojiNote: 'Emojis suitable for ages 12+ (PEGI 12).',
     themeT: 'Theme', themeD: 'Interface colors',
-    themeNames: { ocean: 'Ocean', night: 'Night', forest: 'Forest', sunset: 'Sunset', light: 'Light' },
+    themeNames: { auto: 'Auto (Christmas in December)', ocean: 'Ocean', night: 'Night', forest: 'Forest', sunset: 'Sunset', light: 'Light', arcade: 'Retro arcade', xmas: 'Retro Christmas' },
     editT: 'Change username', newPseudo: 'New username',
     newPass: 'New password (leave empty to keep)', save: 'Save changes',
     saved: 'Changes saved.', nothingChanged: 'Nothing to change.',
@@ -251,7 +251,7 @@ const I18N = {
     customXp: 'XP halved: custom rules.',
     stReconnecting: 'Reconnecting…', reconnecting: 'Connection lost: trying to reconnect (45 s max)…',
     rTimerT: 'Turn timer', rTimerD: 'Time limit per turn; when it runs out, a random shot is fired. Also limits placement to 90 s.',
-    timerOff: 'Off', timerN: '{n} s', autoShot: 'Time is up: automatic shot.', placeLimit: 'Placement limited to {s} s.',
+    timerOff: 'Off', timerN: '{n} s', autoShot: 'Time is up: automatic shot.', placeLimit: 'Placement limited to {s} s.', turnLimit: '{s} s per move.',
     instT: 'Install the app', instD: 'Add C02 Naval to your home screen: it opens full screen, like a real app.',
     instTipT: 'Install the game on your phone', instTipHow: 'Add it to your home screen to play full screen.',
     instBtnHow: 'How?', instBtnInstall: 'Install', instDone: '✓ The app is installed: you are using it full screen.',
@@ -284,7 +284,7 @@ const I18N = {
     upCrossN: 'Cross strike', upCrossD: 'Fires at the targeted square and its 4 neighbours. Costs your turn.',
     upShieldN: 'Shield', upShieldD: 'The first hit on one of your ships is cancelled. Costs your turn, no shot.',
     choiceTitle: 'Enemy ship sunk!', choiceSub: 'Pick an upgrade:', choiceSubN: 'Pick an upgrade ({n} to pick):',
-    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', winForfeit: 'The opponent left the game.', loseText: 'Your whole fleet was sunk.',
+    win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', winForfeit: 'The opponent left the game.', winCheat: "The opponent cheated: their answers are impossible.", loseText: 'Your whole fleet was sunk.',
     endStats: p => `${pl(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
     lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
     rematch: 'Rematch', rematchWait: 'Waiting for {name}…', rematchOpp: '{name} wants a rematch!', rematchGone: 'Your opponent left the game.',
@@ -309,7 +309,10 @@ const SETTINGS_KEY = 'c02naval.v1.settings';
 const settings = { sound: true, lang: (navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) {}
 if (!I18N[settings.lang]) settings.lang = 'fr';
-if (typeof settings.theme !== 'string') settings.theme = 'ocean';
+// Thème : celui choisi par le joueur ; sinon (absent) le thème de la saison, voir defaultTheme() dans core.js.
+// Jusqu'à la 1.2.2, « ocean » était enregistré même sans choix : on ne le considère comme choisi qu'avec themeChosen.
+if (typeof settings.theme !== 'string' || (settings.theme === 'ocean' && !settings.themeChosen)) delete settings.theme;
+else settings.themeChosen = true;
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
 function t(key, p = {}) {
   let v = I18N[settings.lang][key];

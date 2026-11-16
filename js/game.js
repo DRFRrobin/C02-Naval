@@ -52,12 +52,19 @@ function startTurnTimer() {
   }, 500);
 }
 function renderTimer() {
-  if (S.phase !== 'game' || !CFG.timer || !S.myTurn || S.waiting || S.reconnecting) return;
-  const left = Math.max(0, Math.ceil(CFG.timer - (Date.now() - S.turnStart) / 1000));
+  const bar = $('turnBar');
+  if (S.phase !== 'game' || !CFG.timer || !S.myTurn || S.waiting || S.reconnecting) { bar.classList.remove('show', 'low'); return; }
+  const ms = Math.max(0, CFG.timer * 1000 - (Date.now() - S.turnStart)), left = Math.ceil(ms / 1000);
   $('status').textContent = t('stMyTurn') + ' · ' + left + ' s';
+  bar.classList.add('show');
+  bar.classList.toggle('low', left <= 5);
+  bar.firstElementChild.style.width = (ms / (CFG.timer * 10)).toFixed(1) + '%';
+  if (left <= 5 && left > 0 && S.lastBeep !== left) { S.lastBeep = left; Snd.play('click'); }   // tic des 5 dernières secondes
 }
 function autoShot() {   // temps écoulé : tir au hasard sur une case encore inconnue
-  const free = []; for (let k = 0; k < N * N; k++) if (S.enemy[k] === null) free.push(k);
+  // cases jamais tirées en priorité, sinon une case scannée par le radar (sans quoi le tour resterait bloqué)
+  let free = []; for (let k = 0; k < N * N; k++) if (S.enemy[k] === null) free.push(k);
+  if (!free.length) for (let k = 0; k < N * N; k++) if (targetable(k)) free.push(k);
   if (!free.length) return;
   const k = free[Math.floor(Math.random() * free.length)];
   S.mode = 'shot'; S.aim = null;
@@ -185,9 +192,11 @@ function onRes(m) {
     S.match.sunk += sunk;
     playResultSound(results);
   }
+  S.blockedSeen += results.filter(x => x.v === 'blocked').length;
   setLog(summarize(act.kind, act.at, results));
   S.waiting = false; S.pendingAct = null;
   if (m.over) return endGame(true);
+  if (!S.vsBot && oppAnswersImpossible()) return endGame(true, 'cheat');   // l'adversaire ment : la partie ne finirait jamais
   S.myTurn = false;
   if (anyUpgrade()) S.choices += sunk;
   renderGame();
@@ -196,12 +205,21 @@ function onRes(m) {
 function onPass() {
   if (S.phase !== 'game' || S.myTurn || S.waiting) return;
   if (!CFG.shield || S.oppUsed >= S.ships.filter(isSunk).length) return;   // bouclier non gagné ou désactivé : ignoré
-  S.oppUsed++;
+  S.oppUsed++; S.oppShields++;
   S.myTurn = true; S.turnStart = Date.now();
   S.lastIn = [];
   setLog(t('oppShield', { name: S.opp ? S.opp.name : '?' }), true);
   Snd.play('turn');
   renderGame();
+}
+
+// Réponses adverses impossibles, détectables sans attendre la fin : plus de « bouclier » que de boucliers posés,
+// ou plus assez de cases inconnues pour loger les morceaux de bateaux pas encore touchés (il répond « raté » à tout).
+function oppAnswersImpossible() {
+  if (S.blockedSeen > S.oppShields) return true;
+  let touched = 0, open = 0;
+  for (const v of S.enemy) { if (v === 'hit' || v === 'sunk') touched++; else if (v === null || v === 'scanOcc' || v === 'blocked') open++; }
+  return open < sumOf(LENS) - touched;
 }
 
 /* ---------- Améliorations ---------- */
@@ -225,6 +243,7 @@ function endGame(win, forfeit) {
   S.phase = 'over'; S.reconnecting = false;
   clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
   S.myTurn = false; S.waiting = false; S.aim = null;
+  const cheat = forfeit === 'cheat';   // victoire : l'adversaire a donné des réponses impossibles
   S.win = !!win; S.forfeit = !!forfeit; S.match.end = Date.now();
   msg('shareMsg', '');
   if (S.bot) S.bot.stop();
@@ -232,10 +251,10 @@ function endGame(win, forfeit) {
   $('endIcon').textContent = win ? '🏆' : '🌊';
   $('endTitle').textContent = t(win ? 'win' : 'lose');
   const acc = S.match.shots ? Math.round(S.match.hits / S.match.shots * 100) : 0;
-  $('endText').textContent = t(forfeit ? 'winForfeit' : win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
+  $('endText').textContent = t(cheat ? 'winCheat' : forfeit ? 'winForfeit' : win ? 'winText' : 'loseText') + ' ' + t('endStats', { shots: S.match.shots, acc });
   // Anti-triche : on dévoile sa grille, et on vérifie celle de l'adversaire s'il s'y était engagé.
   if (!S.vsBot && !forfeit) sendReveal();
-  S.verify = !S.vsBot && !forfeit && S.oppCommit ? 'pending' : 'none';
+  S.verify = cheat ? 'cheat' : !S.vsBot && !forfeit && S.oppCommit ? 'pending' : 'none';
   renderVerify();
   if (S.verify === 'pending') {
     clearTimeout(S.verifyTimer);
@@ -312,6 +331,7 @@ async function checkReveal(m) {
       ships.push(cells);
     }
     if (await boardHash(m.salt, ships) !== S.oppCommit) return 'cheat';
+    if (S.blockedSeen > S.oppShields) return 'cheat';   // « bouclier » annoncé sans bouclier posé
     for (let k = 0; k < N * N; k++) {
       const v = S.enemy[k], has = occ.has(k);
       if ((v === 'miss' || v === 'scanEmpty') && has) return 'cheat';
@@ -400,7 +420,7 @@ function resetRound() {
   Object.assign(S, { sel: 0, horiz: true, preview: null, lifted: null, drag: null, meReady: false, oppReady: false, myTurn: false, waiting: false, mode: 'shot',
     enemy: Array(N * N).fill(null), incoming: Array(N * N).fill(null), enemySunk: [], inv: { radar: 0, cross: 0, shield: 0 }, choices: 0, lastIn: [],
     pendingAct: null, oppUsed: 0, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 }, rematchMe: false, rematchOpp: false,
-    aim: null, myCommit: null, oppCommit: null, oppReveal: null, revealed: false, verify: 'none', win: false });
+    aim: null, myCommit: null, oppCommit: null, oppReveal: null, revealed: false, verify: 'none', win: false, blockedSeen: 0, oppShields: 0 });
   clearTimeout(S.verifyTimer);
   $('verifyNote').textContent = '';
   msg('placeMsg', '');
@@ -489,6 +509,7 @@ function renderGame() {
     d.textContent = v ? SYM[v] : '';
   });
 
+  renderTimer();
   $('enemyFleet').innerHTML = LENS.map((_, i) => `<span class="${S.enemySunk.includes(i) ? 'down' : ''}">${esc(shipName(i))}</span>`).join('');
 
   document.querySelectorAll('#modes button').forEach(b => {
