@@ -104,7 +104,7 @@ function joinGame() {
 function findRandom() {
   if (!checkPeerLib('dashMsg')) return;
   S.kind = 'random'; S.phase = 'lobby'; S.mmStopped = false;
-  applyConfig(DEFAULT_RULES);
+  applyConfig(MATCH_RULES);
   setupLobby('random');
   const deadline = Date.now() + MM_WAIT_MS;
   const tick = () => {

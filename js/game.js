@@ -52,9 +52,14 @@ function startTurnTimer() {
   }, 500);
 }
 function renderTimer() {
-  if (S.phase !== 'game' || !CFG.timer || !S.myTurn || S.waiting || S.reconnecting) return;
-  const left = Math.max(0, Math.ceil(CFG.timer - (Date.now() - S.turnStart) / 1000));
+  const bar = $('turnBar');
+  if (S.phase !== 'game' || !CFG.timer || !S.myTurn || S.waiting || S.reconnecting) { bar.classList.remove('show', 'low'); return; }
+  const ms = Math.max(0, CFG.timer * 1000 - (Date.now() - S.turnStart)), left = Math.ceil(ms / 1000);
   $('status').textContent = t('stMyTurn') + ' · ' + left + ' s';
+  bar.classList.add('show');
+  bar.classList.toggle('low', left <= 5);
+  bar.firstElementChild.style.width = (ms / (CFG.timer * 10)).toFixed(1) + '%';
+  if (left <= 5 && left > 0 && S.lastBeep !== left) { S.lastBeep = left; Snd.play('click'); }   // tic des 5 dernières secondes
 }
 function autoShot() {   // temps écoulé : tir au hasard sur une case encore inconnue
   // cases jamais tirées en priorité, sinon une case scannée par le radar (sans quoi le tour resterait bloqué)
@@ -504,6 +509,7 @@ function renderGame() {
     d.textContent = v ? SYM[v] : '';
   });
 
+  renderTimer();
   $('enemyFleet').innerHTML = LENS.map((_, i) => `<span class="${S.enemySunk.includes(i) ? 'down' : ''}">${esc(shipName(i))}</span>`).join('');
 
   document.querySelectorAll('#modes button').forEach(b => {

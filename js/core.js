@@ -159,7 +159,9 @@ function sanitizeRules(c) {
 }
 const cloneRules = r => ({ ...r, fleet: r.fleet.slice() });
 const sameRules = (a, b) => a.size === b.size && a.fleet.join() === b.fleet.join() && a.radar === b.radar && a.cross === b.cross && a.shield === b.shield && a.timer === b.timer;
-const isStdRules = r => sameRules(r, DEFAULT_RULES);
+// Adversaire aléatoire : règles standard avec un compte à rebours de 20 s par coup (hors des choix du chronomètre de l'écran Règles).
+const MATCH_RULES = { ...DEFAULT_RULES, timer: 20 };
+const isStdRules = r => sameRules(r, DEFAULT_RULES) || sameRules(r, MATCH_RULES);   // règles standard : XP complète
 let RULES = sanitizeRules(settings.rules) || cloneRules(DEFAULT_RULES);   // règles choisies par le joueur (hôte / bot)
 let CFG = cloneRules(RULES);                                              // règles de la partie en cours
 if (typeof settings.bot !== 'boolean') settings.bot = true;

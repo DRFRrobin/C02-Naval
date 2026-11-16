@@ -8,7 +8,7 @@ Bataille navale dans le navigateur, sur PC ou téléphone. Sans installation, sa
 
 ## Modes de jeu
 
-- **Adversaire aléatoire** : affronte un joueur en ligne au hasard. Si personne n'est trouvé en 45 s, un bot prend sa place.
+- **Adversaire aléatoire** : affronte un joueur en ligne au hasard, avec **20 s par coup** (barre de compte à rebours, rouge et tic sonore sur les 5 dernières secondes ; temps écoulé = tir automatique au hasard, placement limité à 90 s). Si personne n'est trouvé en 45 s, un bot prend sa place, avec les mêmes règles.
 - **Partie contre un bot** : entraînement immédiat contre une IA tactique (elle calcule les positions de bateaux les plus probables).
 - **Hôte** : crée un salon privé et partage le code de 6 caractères (ou le lien d'invitation).
 - **Rejoindre une partie** : saisis le code d'un ami.
@@ -37,7 +37,7 @@ Onglet **Règles** du tableau de bord :
 - **Chronomètre de tour** (désactivé, 15, 30, 60 ou 90 s) : à la fin du temps, un tir au hasard est joué. Il limite aussi le placement des bateaux à 90 s.
 - **Intelligence artificielle** : autoriser ou non le bot (partie contre le bot et bot de secours du mode aléatoire), avec trois niveaux : facile, normal, difficile.
 
-Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qui rejoint un salon reçoit automatiquement les règles de l'hôte. L'adversaire aléatoire utilise toujours les règles standard. Avec des règles personnalisées, l'XP gagnée est divisée par deux.
+Ces règles s'appliquent aux parties « Hôte » et contre le bot ; l'invité qui rejoint un salon reçoit automatiquement les règles de l'hôte. L'adversaire aléatoire utilise toujours les règles standard, avec 20 s par coup (l'XP n'est pas réduite). Avec des règles personnalisées, l'XP gagnée est divisée par deux.
 
 ## Profil
 

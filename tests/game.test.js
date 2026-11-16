@@ -202,6 +202,10 @@ test('adversaire aléatoire : appariement puis reprise après coupure', async ()
   await B.click('#mRandom');
   await phase(A, 'place'); await phase(B, 'place');
   await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  // 20 s par coup, sans que les règles comptent comme personnalisées (XP complète)
+  for (const p of [A, B]) assert.deepEqual(await p.evaluate(() => [CFG.timer, isStdRules(CFG)]), [20, true]);
+  const first = (await A.evaluate(() => S.myTurn)) ? A : B;
+  await first.waitForFunction(() => $('turnBar').classList.contains('show') && / · \d+ s$/.test($('status').textContent));
   await startAuto(A); await startAuto(B);
   await B.waitForFunction(() => S.match.shots >= 3);
   await watchRecon(A); await watchRecon(B);
@@ -308,6 +312,24 @@ test('anti-triche : une grille dévoilée différente de celle annoncée est ref
   await loser.waitForFunction(() => S.verify === 'cheat', null, { timeout: 8000 });
   const st = await loser.evaluate(() => me().stats);
   assert.equal(st.losses, 0); assert.equal(st.interrupted, 1);
+  await ctx.close();
+});
+
+test('adversaire aléatoire : le bot de secours joue aussi avec 20 s par coup, compte à rebours visible', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; startBot(true); });
+  await phase(pg, 'place', 8000);
+  assert.match(await pg.textContent('#rulesInfo'), /20 s par coup|20 s per move/);
+  await ready(pg); await phase(pg, 'game', 8000);
+  await pg.waitForFunction(() => S.myTurn && !S.waiting);
+  assert.equal(await pg.evaluate(() => CFG.timer), 20);
+  // il reste 4 s : barre rouge ; temps écoulé : tir automatique
+  await pg.evaluate(() => { S.turnStart = Date.now() - 16000; });
+  await pg.waitForFunction(() => $('turnBar').classList.contains('low'), null, { timeout: 2000 });
+  const before = await pg.evaluate(() => S.match.shots);
+  await pg.evaluate(() => { S.turnStart = Date.now() - 21000; });
+  await pg.waitForFunction(b => S.match.shots > b || S.waiting, before, { timeout: 3000 });
+  assert.deepEqual(pg.errors, []);
   await ctx.close();
 });
 

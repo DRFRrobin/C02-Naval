@@ -4,7 +4,7 @@
    ========================================================= */
 function enterPlacement() {
   S.phase = 'place';
-  $('rulesInfo').textContent = t('rulesInfo', { size: N, n: LENS.length, up: anyUpgrade() }) + (CFG.timer ? ' ' + t('placeLimit', { s: PLACE_LIMIT_MS / 1000 }) : '');
+  $('rulesInfo').textContent = t('rulesInfo', { size: N, n: LENS.length, up: anyUpgrade() }) + (CFG.timer ? ' ' + t('placeLimit', { s: PLACE_LIMIT_MS / 1000 }) + ' ' + t('turnLimit', { s: CFG.timer }) : '');
   S.placeDeadline = CFG.timer ? Date.now() + PLACE_LIMIT_MS : 0;
   if (S.placeDeadline) {
     clearInterval(S.turnTimer);

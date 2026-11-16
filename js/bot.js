@@ -94,7 +94,7 @@ class Bot {
 }
 function startBot(fromRandom) {
   if (!settings.bot) return;
-  applyConfig(fromRandom ? DEFAULT_RULES : RULES);
+  applyConfig(fromRandom ? MATCH_RULES : RULES);   // bot de secours du mode aléatoire : mêmes règles, 20 s par coup
   S.kind = 'bot'; S.vsBot = true; S.isHost = true;
   S.bot = new Bot();
   S.connected = true;
