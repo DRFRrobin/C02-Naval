@@ -59,6 +59,7 @@ const S = {
   oppUsed: 0, opp: null, match: { shots: 0, hits: 0, sunk: 0, upgrades: 0, start: 0 },
   aim: null,                           // tir spécial visé, en attente de confirmation : [r, c]
   myCommit: null, oppCommit: null, oppReveal: null, verify: 'none', verifyTimer: null, recordPending: false,   // anti-triche
+  blockedSeen: 0, oppShields: 0,       // « bouclier » annoncés par l'adversaire / boucliers qu'il a réellement posés
 };
 
 /* ---------- Outils ---------- */
@@ -73,8 +74,11 @@ const THEMES = { ocean: ['#0a84d0', '#0f2b49'], night: ['#7c3aed', '#1d1740'], f
   arcade: ['#ff3d9a', '#0a0a1c'], xmas: ['#ff3d5a', '#0a2016'] };
 const THEME_BAR = { ocean: '#050d1b', night: '#0d0a1c', forest: '#06150f', sunset: '#1a0d10', light: '#dce9f7', arcade: '#0a0a1c', xmas: '#07150e' };
 const RETRO_THEMES = ['arcade', 'xmas'];   // thèmes rétro : polices pixel, bordures carrées, ombres franches (voir « Thèmes rétro » dans le CSS)
+// Thème par défaut (aucun choix du joueur) : « Rétro Noël » du 1er au 26 décembre inclus (date de l'appareil), « Océan » le reste de l'année.
+function defaultTheme(d = new Date()) { return d.getMonth() === 11 && d.getDate() <= 26 ? 'xmas' : 'ocean'; }
+const currentTheme = () => (THEMES[settings.theme] ? settings.theme : defaultTheme());
 function applyTheme() {
-  const th = THEMES[settings.theme] ? settings.theme : 'ocean';
+  const th = currentTheme();
   const retro = RETRO_THEMES.includes(th);
   document.documentElement.dataset.theme = th;
   document.documentElement.classList.toggle('retro', retro);

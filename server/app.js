@@ -203,7 +203,8 @@ function createApp(opts = {}) {
       if (typeof body.win !== 'boolean') throw new HttpError(400, 'invalid_result');
       const shots = int(body.shots, 500), hits = int(body.hits, 500), sunk = int(body.sunk, 12);
       const upgrades = int(body.upgrades, 30), duration = int(body.duration, 7200);
-      if (hits > shots || sunk > hits || duration < 5 || (body.win && hits < 1)) throw new HttpError(400, 'invalid_result');
+      // Une victoire sans aucun touché n'est possible que par abandon de l'adversaire (forfeit).
+      if (hits > shots || sunk > hits || duration < 5 || (body.win && hits < 1 && body.forfeit !== true)) throw new HttpError(400, 'invalid_result');
       const half = body.bot === true || body.std !== true;
       if (duration < shots * 1.5) throw new HttpError(400, 'invalid_result');   // impossible de tirer aussi vite : durée falsifiée
       const { gain } = xpParts({ win: body.win, shots, hits, sunk, duration, half });

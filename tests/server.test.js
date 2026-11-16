@@ -107,6 +107,14 @@ test('anti-triche : résultats invraisemblables refusés', async () => {
   assert.equal((await call('POST', '/api/result', good)).status, 401);
 });
 
+test('victoire par abandon de l\'adversaire sans aucun touché : acceptée', async () => {
+  app.limiter.reset();
+  const { body: { token } } = await reg('Forfait');
+  const r = await call('POST', '/api/result', { ...good, win: true, shots: 0, hits: 0, sunk: 0, duration: 20, forfeit: true }, token);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.profile.stats.wins, 1);
+});
+
 test('victoire contre un bot : gain divisé par deux', async () => {
   app.limiter.reset();
   const { body: { token } } = await reg('Bot1');

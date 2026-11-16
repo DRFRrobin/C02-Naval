@@ -25,7 +25,7 @@ Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2
 - **Partager le résultat** : le bouton crée une **image** (1080 × 1350, aux couleurs du thème) avec le gagnant, **les deux grilles** côte à côte (sa flotte avec les tirs reçus, la flotte adverse avec ses tirs et les bateaux non trouvés quand on les connaît), puis tirs, précision, bateaux coulés, durée et le lien du jeu. Sur téléphone, elle part dans le partage habituel (Messages, WhatsApp, Instagram…) ; sur ordinateur, elle est téléchargée.
 - **Voir les grilles** : la grille adverse montre, encadrés en jaune, les bateaux qu'on n'a pas trouvés (contre le bot, ou contre un joueur dont la grille a été dévoilée et vérifiée). Les boutons « Résultat » et « Partager » restent en bas pour revenir à l'écran de fin.
 
-**Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
+**Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Certaines réponses impossibles sont repérées **pendant** la partie (un « bouclier » sans bouclier posé, ou des « raté » à tout au point qu'il ne reste plus de place pour ses bateaux) : la partie s'arrête et c'est une victoire. Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
 
 ## Règles personnalisables
 
@@ -86,7 +86,9 @@ Fichiers : `manifest.webmanifest`, `sw.js` (service worker), `icons/` (icône iP
 
 ## Paramètres
 
-Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème** (Océan, Nuit, Forêt, Crépuscule, Clair, **Rétro arcade**, **Rétro Noël**), pseudo, avatar.
+Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème** (Auto, Océan, Nuit, Forêt, Crépuscule, Clair, **Rétro arcade**, **Rétro Noël**), pseudo, avatar.
+
+Par défaut (choix **Auto**), le thème est **Rétro Noël du 1er au 26 décembre** (date de l'appareil) et Océan le reste de l'année. Un thème choisi à la main est toujours gardé.
 
 Les deux thèmes rétro changent tout le style, pas seulement les couleurs : polices pixel (Press Start 2P pour les titres et boutons, VT323 pour le texte, chargées seulement si un thème rétro est choisi), coins carrés, bordures épaisses aux couleurs néon, ombres franches qui s'enfoncent au clic et quadrillage en fond. **Rétro arcade** est néon rose, cyan et jaune sur indigo. **Rétro Noël** est rouge, vert et or sur vert sapin, avec de la neige en pixels qui tombe, une guirlande lumineuse sur les panneaux et une barre d'XP en sucre d'orge. Les animations s'arrêtent si l'appareil demande moins de mouvements.
 

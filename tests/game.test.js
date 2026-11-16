@@ -269,19 +269,56 @@ test('anti-triche : partie honnête, les deux grilles sont vérifiées', async (
   await ctx.close();
 });
 
-test('anti-triche : un adversaire qui ment sur ses résultats est démasqué, la défaite n\'est pas comptée', async () => {
+test('anti-triche : un adversaire qui répond « raté » à tout est démasqué pendant la partie', async () => {
   const ctx = await newContext();
   const [A, B] = await hostAndJoin(ctx);
-  // B est modifié : il annonce « raté » à chaque tir reçu
+  // B est modifié : il annonce « raté » à chaque tir reçu (la partie ne finirait jamais)
   await B.evaluate(() => { resolveOn = (ships, incoming, kind, cells) => ({ results: cells.map(([r, c]) => ({ r, c, v: kind === 'radar' ? 'empty' : 'miss' })), over: false }); });
   await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
   await startAuto(A); await startAuto(B);
-  await bothOver(A, B);
-  await A.waitForFunction(() => S.verify === 'cheat', null, { timeout: 8000 });
-  assert.match(await A.textContent('#endTitle'), /Défaite|Defeat/);
+  await phase(A, 'over', 120000);
+  assert.match(await A.textContent('#endTitle'), /Victoire|Victory/);
+  assert.match(await A.textContent('#endText'), /triché|cheated/);
   assert.match(await A.textContent('#verifyNote'), /Triche|Cheating/);
-  const st = await A.evaluate(() => me().stats);
+  assert.equal(await A.evaluate(() => me().stats.wins), 1);
+  await ctx.close();
+});
+
+test('anti-triche : un « bouclier » annoncé sans bouclier posé est démasqué tout de suite', async () => {
+  const ctx = await newContext();
+  const [A, B] = await hostAndJoin(ctx);
+  await B.evaluate(() => { resolveOn = (ships, incoming, kind, cells) => ({ results: cells.map(([r, c]) => ({ r, c, v: 'blocked' })), over: false }); });
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  await A.evaluate(() => onEnemyTap(0, 0));   // A (hôte) tire en premier
+  await phase(A, 'over', 5000);
+  assert.equal(await A.evaluate(() => [S.win, S.verify].join()), 'true,cheat');
+  await ctx.close();
+});
+
+test('anti-triche : une grille dévoilée différente de celle annoncée est refusée, la défaite n\'est pas comptée', async () => {
+  const ctx = await newContext();
+  const [A, B] = await hostAndJoin(ctx);
+  await ready(A); await ready(B); await phase(A, 'game'); await phase(B, 'game');
+  // les deux trichent au dévoilement (sel changé) : le perdant, quel qu'il soit, doit le voir
+  for (const p of [A, B]) await p.waitForFunction(() => S.myCommit);
+  for (const p of [A, B]) await p.evaluate(() => { S.myCommit.salt = '0'.repeat(32); });
+  await startAuto(A); await startAuto(B);
+  await bothOver(A, B);
+  const loser = (await A.evaluate(() => S.win)) ? B : A;
+  await loser.waitForFunction(() => S.verify === 'cheat', null, { timeout: 8000 });
+  const st = await loser.evaluate(() => me().stats);
   assert.equal(st.losses, 0); assert.equal(st.interrupted, 1);
+  await ctx.close();
+});
+
+test('chronomètre : s\'il ne reste que des cases scannées, le tir automatique en vise une', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await pg.waitForFunction(() => S.myTurn && !S.waiting);
+  await pg.evaluate(() => { S.enemy = S.enemy.map(() => 'miss'); S.enemy[5] = 'scanOcc'; autoShot(); });
+  assert.equal(await pg.evaluate(() => S.waiting || !S.myTurn), true);
+  assert.deepEqual(pg.errors, []);
   await ctx.close();
 });
 
@@ -584,6 +621,29 @@ test('thèmes rétro : polices pixel chargées, coins carrés, rien ne déborde 
   await ctx.close();
 });
 
+test('thème automatique : Rétro Noël du 1er au 26 décembre, sauf si le joueur a choisi un thème', async () => {
+  const ctx = await newContext();
+  const pg = await ctx.newPage();
+  await pg.clock.setFixedTime(new Date(2026, 11, 10, 12, 0));
+  await pg.goto(base);
+  const r = await pg.evaluate(() => ({ th: document.documentElement.dataset.theme,
+    d: [new Date(2026, 10, 30), new Date(2026, 11, 1, 0, 0), new Date(2026, 11, 26, 23, 59), new Date(2026, 11, 27), new Date(2027, 0, 1)].map(defaultTheme) }));
+  assert.equal(r.th, 'xmas', 'nouveau joueur en décembre : thème de Noël');
+  assert.deepEqual(r.d, ['ocean', 'xmas', 'xmas', 'ocean', 'ocean']);
+  // ancien réglage « ocean » enregistré sans choix explicite (≤ 1.2.2) : il suit la saison
+  await pg.evaluate(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: 'ocean', lang: 'fr' })); });
+  await pg.reload();
+  assert.equal(await pg.evaluate(() => document.documentElement.dataset.theme), 'xmas');
+  // thème choisi : il est gardé, même en décembre
+  await pg.evaluate(() => { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: 'night', lang: 'fr' })); });
+  await pg.reload();
+  assert.equal(await pg.evaluate(() => document.documentElement.dataset.theme), 'night');
+  // « Auto » dans les paramètres : retour au thème de la saison
+  await pg.evaluate(() => { renderThemes(); document.querySelector('[data-th="auto"]').click(); });
+  assert.deepEqual(await pg.evaluate(() => [document.documentElement.dataset.theme, settings.theme, JSON.parse(localStorage.getItem(SETTINGS_KEY)).themeChosen]), ['xmas', undefined, false]);
+  await ctx.close();
+});
+
 test('téléphone : onglets en bas de l\'écran, profil/XP en haut', async () => {
   const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
   const r = await pg.evaluate(() => {
@@ -626,6 +686,7 @@ test('sauvegarde chiffrée : export puis import sur un autre appareil', async ()
   await p2.fill('#bkPass', 'phrase secrète solide');
   await p2.click('#btnBkImport');
   await p2.waitForFunction(() => /import|Import/.test($('bkMsg').textContent) && me().name === 'Capitaine', null, { timeout: 15000 });
+  assert.ok(await p2.evaluate(() => /^\d{4}-\d\d-\d\dT/.test(me().created) && Date.parse(me().created) < Date.now() - 50), 'date de création conservée');
   const r = await p2.evaluate(() => ({ xp: me().xp, g: me().stats.games, w: me().stats.wins }));
   assert.deepEqual(r, { xp: 450, g: 12, w: 7 });
   // code altéré : refusé (intégrité)

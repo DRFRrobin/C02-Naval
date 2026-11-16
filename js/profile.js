@@ -408,7 +408,10 @@ function sanitizeBackup(o) {
     if (k === 'fastestWin') st[k] = Number.isFinite(src[k]) && src[k] >= 0 ? Math.min(Math.floor(src[k]), 1e7) : null;
     else st[k] = num(src[k], 1e9);
   }
-  return { name, emoji: validEmoji(o.emoji) ? o.emoji : null, xp: num(o.xp, 1e9), created: num(o.created, 4e12) || Date.now(), stats: st };
+  // date de création : texte ISO (format du profil) ou nombre (anciennes sauvegardes)
+  const ts = typeof o.created === 'string' ? Date.parse(o.created) : o.created;
+  const created = new Date(Number.isFinite(ts) && ts > 0 && ts < 4e12 ? ts : Date.now()).toISOString();
+  return { name, emoji: validEmoji(o.emoji) ? o.emoji : null, xp: num(o.xp, 1e9), created, stats: st };
 }
 function bkPass() {
   const p = $('bkPass').value;
@@ -448,11 +451,11 @@ async function bkImport() {
   if (cur) {
     const ahead = cur.xp > d.xp || (cur.xp === d.xp && (cur.stats?.games || 0) >= d.stats.games);
     if (ahead && !confirm(t('bkNewer', { name: cur.name }))) return msg('bkMsg', t('bkKept'));
-    Object.assign(cur, { emoji: d.emoji || cur.emoji, xp: d.xp, created: Math.min(cur.created || d.created, d.created), stats: d.stats });
+    Object.assign(cur, { emoji: d.emoji || cur.emoji, xp: d.xp, created: new Date(Math.min(Date.parse(cur.created) || Infinity, Date.parse(d.created))).toISOString(), stats: d.stats });
     saveAccount(cur); setSession(cur.id);
   } else {
     const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    saveAccount({ id, name: d.name, emoji: d.emoji, xp: d.xp, created: d.created, lastLogin: Date.now(), stats: d.stats });
+    saveAccount({ id, name: d.name, emoji: d.emoji, xp: d.xp, created: d.created, lastLogin: new Date().toISOString(), stats: d.stats });
     setSession(id);
   }
   $('bkCode').value = ''; $('bkPass').value = '';
@@ -484,7 +487,9 @@ function pickPhoto() {
   $('emojiModal').classList.add('show');
 }
 function renderThemes() {
-  $('themeBox').innerHTML = Object.keys(THEMES).map(k =>
+  // « Auto » : aucun choix enregistré, le thème suit la saison (Noël du 1er au 26 décembre).
+  const auto = `<button class="theme-btn${THEMES[settings.theme] ? '' : ' on'}" data-th="auto"><span class="sw" style="background:linear-gradient(135deg,${THEMES.ocean[0]} 50%,${THEMES.xmas[0]} 50%)"></span>${esc(t('themeNames').auto)}</button>`;
+  $('themeBox').innerHTML = auto + Object.keys(THEMES).map(k =>
     `<button class="theme-btn${settings.theme === k ? ' on' : ''}" data-th="${k}"><span class="sw" style="background:linear-gradient(135deg,${THEMES[k][1]} 50%,${THEMES[k][0]} 50%)"></span>${esc(t('themeNames')[k])}</button>`).join('');
 }
 
@@ -514,7 +519,7 @@ function recordGame(win) {
   } else { s.losses++; s.streak = 0; }
   saveAccount(a);
   if (a.cloud) {   // le serveur recalcule l'XP lui-même : on lui envoie seulement ce qui s'est passé
-    queueResult(a, 'r', { win: !!win, shots, hits, sunk, upgrades: Math.min(m.upgrades, 30), duration: dur, bot: !!S.vsBot, std: isStdRules(CFG) });
+    queueResult(a, 'r', { win: !!win, shots, hits, sunk, upgrades: Math.min(m.upgrades, 30), duration: dur, bot: !!S.vsBot, std: isStdRules(CFG), forfeit: !!(win && S.forfeit) });
   }
   return { gain, parts, xpBefore, levelBefore: before, level: levelOf(a.xp), up: levelOf(a.xp) > before };
 }
