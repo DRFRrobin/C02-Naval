@@ -380,26 +380,30 @@ test('fin de partie : la grille adverse montre les bateaux non trouvés', async 
   await ctx.close();
 });
 
-test('partager le résultat : partage du téléphone, sinon copie du texte', async () => {
+test('partager le résultat : image avec le gagnant et les deux grilles, partagée ou téléchargée', async () => {
   const ctx = await newContext(); const pg = await newPage(ctx);
   await pg.evaluate(() => { BOT_SPEED = 0.03; });
   await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
   await startAuto(pg); await phase(pg, 'over', 60000);
-  await pg.evaluate(() => { window.__shared = null; navigator.share = async d => { window.__shared = d.text; }; });
   await pg.waitForFunction(() => $('end').classList.contains('show'));
+  // l'image : PNG 1080 × 1350
+  const img = await pg.evaluate(async () => {
+    const b = await resultImage(); const bmp = await createImageBitmap(b);
+    return { type: b.type, size: b.size, w: bmp.width, h: bmp.height };
+  });
+  assert.deepEqual([img.type, img.w, img.h], ['image/png', 1080, 1350]);
+  assert.ok(img.size > 20000, 'image dessinée');
+  // téléphone : partage natif avec le fichier image
+  await pg.evaluate(() => { window.__shared = null; navigator.canShare = d => !!(d && d.files); navigator.share = async d => { window.__shared = { n: d.files.length, type: d.files[0].type, name: d.files[0].name, text: d.text }; }; });
   await pg.click('#btnShare');
-  const text = await pg.waitForFunction(() => window.__shared).then(h => h.jsonValue());
-  assert.match(text, /C02 Naval/);
-  assert.match(text, /(Victoire|Défaite|Victory|Defeat)/);
-  const rows = text.split('\n').filter(l => /^[🟥🟧🟦🟨⬛]+$/u.test(l));
-  assert.equal(rows.length, 10);
-  assert.ok(rows.every(l => [...l].length === 10));
-  assert.match(text, /http:\/\/127\.0\.0\.1/);
-  // sans partage natif : le texte est copié
-  await pg.evaluate(() => { delete navigator.share; Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
-    window.__copied = null; navigator.clipboard.writeText = async x => { window.__copied = x; }; });
-  await pg.click('#btnShare');
-  await pg.waitForFunction(() => window.__copied && /copié|copied/i.test($('shareMsg').textContent));
+  const sh = await pg.waitForFunction(() => window.__shared).then(h => h.jsonValue());
+  assert.deepEqual([sh.n, sh.type, sh.name], [1, 'image/png', 'c02-naval-resultat.png']);
+  assert.match(sh.text, /C02 Naval/);
+  // ordinateur (pas de partage de fichiers) : l'image est téléchargée
+  await pg.evaluate(() => { navigator.canShare = undefined; });
+  const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 5000 }), pg.click('#btnShare')]);
+  assert.equal(dl.suggestedFilename(), 'c02-naval-resultat.png');
+  await pg.waitForFunction(() => /enregistrée|saved/.test($('shareMsg').textContent));
   assert.deepEqual(pg.errors, []);
   await ctx.close();
 });

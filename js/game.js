@@ -225,7 +225,7 @@ function endGame(win, forfeit) {
   S.phase = 'over'; S.reconnecting = false;
   clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
   S.myTurn = false; S.waiting = false; S.aim = null;
-  S.win = !!win; S.match.end = Date.now();
+  S.win = !!win; S.forfeit = !!forfeit; S.match.end = Date.now();
   msg('shareMsg', '');
   if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
@@ -245,6 +245,7 @@ function endGame(win, forfeit) {
   }
   if (!S.recordPending) showXp(win);
   renderRematch();
+  prepareShare();
   setTimeout(() => Snd.play(win ? 'win' : 'lose'), 600);
   setTimeout(() => $('end').classList.add('show'), 700);
   renderGame();
@@ -336,6 +337,7 @@ function finishVerify(res) {
   }
   renderVerify();
   renderGame();   // la grille adverse dévoilée montre maintenant les bateaux non trouvés
+  prepareShare();
 }
 
 /* ---------- Partage du résultat ---------- */
@@ -346,32 +348,6 @@ function oppShipCells() {
   const ships = S.vsBot && S.bot ? S.bot.ships.map(x => x.cells) : S.verify === 'ok' && S.oppReveal ? S.oppReveal.ships : [];
   for (const cells of ships) for (const [r, c] of cells || []) set.add(r * N + c);
   return set;
-}
-// Texte à partager : résultat, chiffres du match et carte de ses tirs en emojis (🟥 coulé, 🟧 touché, 🟦 dans l'eau, ⬛ inconnu).
-function shareText() {
-  const m = S.match, acc = m.shots ? Math.round(m.hits / m.shots * 100) : 0;
-  const time = fmtTime(m.start ? ((m.end || Date.now()) - m.start) / 1000 : 0);
-  const EM = { sunk: '🟥', hit: '🟧', miss: '🟦', blocked: '🟨' };
-  const rows = [];
-  for (let r = 0; r < N; r++) rows.push(S.enemy.slice(r * N, r * N + N).map(v => EM[v] || '⬛').join(''));
-  const url = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : '';
-  return [
-    '⚓ C02 Naval — ' + t(S.win ? 'shareWin' : 'shareLose', { name: S.opp ? S.opp.name : '?' }),
-    t('shareLine', { shots: m.shots, acc, sunk: m.sunk, time }),
-    '', ...rows,
-    ...(url ? ['', t('shareInvite') + ' ' + url] : []),
-  ].join('\n');
-}
-async function shareResult() {
-  if (S.phase !== 'over' || S.lost) return;
-  const text = shareText();
-  Snd.play('click');
-  if (navigator.share) {
-    try { await navigator.share({ title: 'C02 Naval', text }); return; }
-    catch (e) { if (e && e.name === 'AbortError') return; }   // partage annulé par le joueur
-  }
-  try { await navigator.clipboard.writeText(text); msg('shareMsg', t('shareCopied'), 'ok'); }
-  catch (e) { msg('shareMsg', t('shareFail'), true); }
 }
 function renderVerify() {
   const el = $('verifyNote'), name = S.opp ? S.opp.name : '?';
