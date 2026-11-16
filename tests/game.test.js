@@ -261,6 +261,10 @@ test('anti-triche : partie honnête, les deux grilles sont vérifiées', async (
   const loser = (await A.evaluate(() => S.win)) ? B : A;
   assert.equal(await loser.evaluate(() => me().stats.losses), 1, 'la défaite est comptée');
   assert.match(await loser.textContent('#verifyNote'), /vérifiée|checked/);
+  // le perdant voit les bateaux du vainqueur qu'il n'a pas trouvés
+  const m = await loser.evaluate(() => ({ missed: $('enemyGrid').querySelectorAll('.cell.missed').length,
+    expected: S.oppReveal.ships.flat().filter(([a, b]) => S.enemy[a * N + b] !== 'hit' && S.enemy[a * N + b] !== 'sunk').length }));
+  assert.equal(m.missed, m.expected);
   assert.deepEqual([...A.errors, ...B.errors], []);
   await ctx.close();
 });
@@ -324,8 +328,61 @@ test('téléphone : les boutons d\'action restent fixés en bas pendant la parti
   assert.ok(clear, 'la flotte reste visible au-dessus de la barre');
   const over = await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   assert.ok(over <= 1, 'pas de débordement horizontal');
+  // les fenêtres (fin de partie, choix d'amélioration) passent au-dessus de la barre : leurs boutons restent cliquables
+  await pg.evaluate(() => endGame(false));
+  await pg.waitForFunction(() => $('end').classList.contains('show'));
+  await pg.click('#btnSeeGrids', { timeout: 3000 });
+  await pg.click('#btnBackEnd', { timeout: 3000 });
   await pg.setViewportSize({ width: 1200, height: 800 });
   assert.equal(await pg.evaluate(() => getComputedStyle($('actBar')).position), 'static');
+  await ctx.close();
+});
+
+test('fin de partie : la grille adverse montre les bateaux non trouvés', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await pg.waitForFunction(() => S.myTurn && !S.waiting);
+  await pg.evaluate(() => onEnemyTap(0, 0));
+  await pg.waitForFunction(() => S.myTurn && !S.waiting && S.phase === 'game');
+  await pg.evaluate(() => endGame(false));
+  await pg.click('#btnSeeGrids');
+  const r = await pg.evaluate(() => {
+    const ships = S.bot.ships.flatMap(x => x.cells.map(([a, b]) => a * N + b));
+    return { missed: $('enemyGrid').querySelectorAll('.cell.missed').length,
+      expected: ships.filter(k => S.enemy[k] !== 'hit' && S.enemy[k] !== 'sunk').length, hint: $('hint').textContent,
+      acts: $('overActs').classList.contains('show'), modes: getComputedStyle($('modes')).display };
+  });
+  assert.ok(r.missed > 0); assert.equal(r.missed, r.expected);
+  assert.match(r.hint, /pas trouvés|did not find/);
+  assert.equal(r.acts, true); assert.equal(r.modes, 'none');
+  await pg.click('#btnBackEnd');
+  assert.ok(await pg.evaluate(() => $('end').classList.contains('show')));
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
+test('partager le résultat : partage du téléphone, sinon copie du texte', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await startAuto(pg); await phase(pg, 'over', 60000);
+  await pg.evaluate(() => { window.__shared = null; navigator.share = async d => { window.__shared = d.text; }; });
+  await pg.waitForFunction(() => $('end').classList.contains('show'));
+  await pg.click('#btnShare');
+  const text = await pg.waitForFunction(() => window.__shared).then(h => h.jsonValue());
+  assert.match(text, /C02 Naval/);
+  assert.match(text, /(Victoire|Défaite|Victory|Defeat)/);
+  const rows = text.split('\n').filter(l => /^[🟥🟧🟦🟨⬛]+$/u.test(l));
+  assert.equal(rows.length, 10);
+  assert.ok(rows.every(l => [...l].length === 10));
+  assert.match(text, /http:\/\/127\.0\.0\.1/);
+  // sans partage natif : le texte est copié
+  await pg.evaluate(() => { delete navigator.share; Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    window.__copied = null; navigator.clipboard.writeText = async x => { window.__copied = x; }; });
+  await pg.click('#btnShare');
+  await pg.waitForFunction(() => window.__copied && /copié|copied/i.test($('shareMsg').textContent));
+  assert.deepEqual(pg.errors, []);
   await ctx.close();
 });
 

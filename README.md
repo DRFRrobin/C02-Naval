@@ -20,6 +20,10 @@ Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2
 - **Radar et Frappe en croix se confirment** : un premier appui montre la zone visée, un second sur la même case tire (un appui ailleurs déplace la visée). Aucune amélioration gâchée par erreur.
 - **Bouclier** : une liste des bateaux encore protégeables apparaît à côté des boutons ; toucher un nom suffit (toucher le bateau dans « Ta flotte » marche toujours).
 
+**Fin de partie :**
+- **Partager le résultat** : le bouton ouvre le partage du téléphone (messages, WhatsApp…) ou, à défaut, copie le texte. Il contient le résultat, l'adversaire, les tirs, la précision, les bateaux coulés, la durée, la carte de ses tirs en emojis (🟥 coulé, 🟧 touché, 🟦 dans l'eau, ⬛ inconnu) et le lien du jeu. Aucune position de bateau adverse n'y figure.
+- **Voir les grilles** : la grille adverse montre, encadrés en jaune, les bateaux qu'on n'a pas trouvés (contre le bot, ou contre un joueur dont la grille a été dévoilée et vérifiée). Les boutons « Résultat » et « Partager » restent en bas pour revenir à l'écran de fin.
+
 **Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
 
 ## Règles personnalisables
@@ -63,7 +67,7 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 ## Version et mises à jour
 
-Le numéro de version (`1.2.1`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+Le numéro de version (`1.2.2`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
 
 **Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `js/main.js` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
 

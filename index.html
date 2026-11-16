@@ -277,6 +277,10 @@ try { if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone === t
           <button data-mode="shield"><i class="ic fa-solid fa-shield-halved"></i><span data-i18n="modeShield"></span><b></b></button>
         </div>
         <div id="shieldPick" class="shield-pick"></div>
+        <div id="overActs" class="overacts">
+          <button id="btnBackEnd" class="btn" type="button"><i class="fa-solid fa-trophy"></i><span data-i18n="result"></span></button>
+          <button id="btnShare2" class="btn primary" type="button"><i class="fa-solid fa-share-nodes"></i><span data-i18n="shareShort"></span></button>
+        </div>
         <p id="hint" class="hint"></p>
         </div>
         <p id="log" class="log"></p>
@@ -335,6 +339,8 @@ try { if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone === t
     <div id="endXp"></div>
     <button id="btnRematch" class="btn primary wide" style="margin-top:12px" type="button"><i class="fa-solid fa-rotate-right"></i><span data-i18n="rematch"></span></button>
     <p id="rematchNote"></p>
+    <button id="btnShare" class="btn wide" style="margin-top:8px" type="button"><i class="fa-solid fa-share-nodes"></i><span data-i18n="share"></span></button>
+    <p id="shareMsg" class="msg"></p>
     <button id="btnNewGame" class="btn wide" style="margin-top:8px" type="button" data-i18n="newGame"></button>
     <button id="btnSeeGrids" class="btn ghost wide" data-i18n="seeGrids"></button>
   </div>

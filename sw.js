@@ -3,7 +3,7 @@
      et, hors ligne, depuis le cache : le jeu s'ouvre et on peut jouer contre le bot.
    - Les bibliothèques et polices (CDN) sont gardées en cache après la première visite.
    - Rien d'autre n'est intercepté : le serveur PeerJS, les WebSockets et le TURN passent directement. */
-const VERSION = 'c02-naval-v1.2.1';   // = APP_VERSION d'index.html (vérifié par les tests)
+const VERSION = 'c02-naval-v1.2.2';   // = APP_VERSION d'index.html (vérifié par les tests)
 const SHELL = ['./', 'index.html', 'css/style.css', ...['i18n', 'core', 'sound', 'profile', 'net', 'bot', 'place', 'game', 'main'].map(f => `js/${f}.js`),
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const CDN = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
