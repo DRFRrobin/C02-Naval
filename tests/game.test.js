@@ -551,7 +551,7 @@ test('iPhone en mode application : l\'interface ne passe pas sous la Dynamic Isl
 test('responsive : aucun débordement horizontal à 320 px (tous thèmes)', async () => {
   const ctx = await newContext(); const pg = await newPage(ctx, { width: 320, height: 640 });
   const issues = [];
-  for (const th of ['ocean', 'night', 'forest', 'sunset', 'light']) {
+  for (const th of await pg.evaluate(() => Object.keys(THEMES))) {
     await pg.evaluate(t => { settings.theme = t; applyTheme(); }, th);
     for (const pane of ['play', 'stats', 'rules', 'settings']) {
       await pg.evaluate(p => { pane = p; renderDash(); }, pane);
@@ -560,6 +560,27 @@ test('responsive : aucun débordement horizontal à 320 px (tous thèmes)', asyn
     }
   }
   assert.deepEqual(issues, []);
+  await ctx.close();
+});
+
+test('thèmes rétro : polices pixel chargées, coins carrés, rien ne déborde en partie sur téléphone', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
+  for (const th of ['arcade', 'xmas']) {
+    await pg.evaluate(t => { settings.theme = t; applyTheme(); }, th);
+    const r = await pg.evaluate(() => ({ retro: document.documentElement.classList.contains('retro'), fonts: !!document.getElementById('retroFonts'),
+      radius: getComputedStyle(document.querySelector('.mode-card')).borderTopLeftRadius, font: getComputedStyle(document.querySelector('.mode-card h3')).fontFamily }));
+    assert.deepEqual([r.retro, r.fonts, r.radius], [true, true, '0px'], th);
+    assert.match(r.font, /Press Start 2P/);
+  }
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await phase(pg, 'place', 8000);
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'placement sans débordement');
+  await ready(pg); await phase(pg, 'game', 8000);
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'partie sans débordement');
+  // retour à un thème classique : plus de style rétro
+  await pg.evaluate(() => { settings.theme = 'ocean'; applyTheme(); });
+  assert.equal(await pg.evaluate(() => document.documentElement.classList.contains('retro')), false);
+  assert.deepEqual(pg.errors, []);
   await ctx.close();
 });
 

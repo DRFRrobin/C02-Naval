@@ -68,7 +68,7 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 ## Version et mises à jour
 
-Le numéro de version (`1.2.2`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+Le numéro de version (`1.2.3`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
 
 **Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `js/main.js` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
 
@@ -86,7 +86,9 @@ Fichiers : `manifest.webmanifest`, `sw.js` (service worker), `icons/` (icône iP
 
 ## Paramètres
 
-Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème de couleurs** (Océan, Nuit, Forêt, Crépuscule, Clair), pseudo, avatar.
+Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème** (Océan, Nuit, Forêt, Crépuscule, Clair, **Rétro arcade**, **Rétro Noël**), pseudo, avatar.
+
+Les deux thèmes rétro changent tout le style, pas seulement les couleurs : polices pixel (Press Start 2P pour les titres et boutons, VT323 pour le texte, chargées seulement si un thème rétro est choisi), coins carrés, bordures épaisses aux couleurs néon, ombres franches qui s'enfoncent au clic et quadrillage en fond. **Rétro arcade** est néon rose, cyan et jaune sur indigo. **Rétro Noël** est rouge, vert et or sur vert sapin, avec de la neige en pixels qui tombe, une guirlande lumineuse sur les panneaux et une barre d'XP en sucre d'orge. Les animations s'arrêtent si l'appareil demande moins de mouvements.
 
 **Avatar** : uniquement un emoji choisi dans une liste fermée d'une cinquantaine d'emojis adaptés à partir de 12 ans (animaux, mer, espace, sport, smileys…). L'emoji reçu d'un adversaire est vérifié contre cette même liste.
 

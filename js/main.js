@@ -29,7 +29,7 @@ $('suName').addEventListener('keydown', e => { if (e.key === 'Enter') doPlay(); 
 $('btnInstTip').onclick = async () => { if (!(await doInstall())) { pane = 'settings'; renderDash(); } };
 $('btnInstTipX').onclick = () => { try { localStorage.setItem(TIP_KEY, '1'); } catch (e) {} renderInstall(); };
 /* ---------- Version et mises à jour ---------- */
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.3';
 const verCmp = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
 let newVersion = null;
 // Lit version.json sur le serveur (jamais depuis un cache) : 'new' | 'ok' | 'err'

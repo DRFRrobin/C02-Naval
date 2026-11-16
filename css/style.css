@@ -436,3 +436,101 @@ html[data-theme="light"] .ic-cyan{color:#0e7490}html[data-theme="light"] .ic-gre
 html[data-theme="light"] .ic-yellow{color:#a16207}html[data-theme="light"] .ic-purple{color:#6d28d9}
 html[data-theme="light"] .cell.blocked,html[data-theme="light"] .cell.scanOcc{color:#10233a}
 html[data-theme="light"] .btn.ghost:hover:not(:disabled){background:rgba(0,0,0,.05)}
+
+/* ===== Thèmes rétro (« Rétro arcade » et « Rétro Noël ») =====
+   Look borne d'arcade : polices pixel (Press Start 2P pour les titres et boutons, VT323 pour le texte),
+   coins carrés, bordures épaisses aux couleurs néon, ombres franches décalées, quadrillage en fond.
+   La classe « retro » est posée sur <html> par applyTheme() (js/core.js), qui charge aussi les polices. */
+html[data-theme="arcade"]{
+  --card:#14143a; --card2:#101030; --border:#2b2b6b; --border2:#3a3a8a;
+  --text:#e8e8ff; --muted:#8c8cc8; --dim:#5d5d99; --primary:#ff3d9a; --sky:#3df5ff; --cyan:#3df5ff; --green:#5dff7a; --yellow:#ffe14d; --purple:#b388ff; --red:#ff3d5a;
+  --btn:#1d1d52; --btn-hi:#2a2a6a; --water:#1b1b4a; --water-hi:#2a2a72; --water-hov:#3a3a9a; --ship:#3df5ff; --hit:#ff3d9a; --sunk:#6a1040; --miss:#e8e8ff; --ok:#5dff7a;
+  --input:#000; --modal:#14143a; --err:#ff6b9a; --scan:#3a3a8a; --scan-hi:#4a4aaa; --blk:#6a5a10;
+  --avbg:#101030; --stepbg:#101030; --bg1:#0a0a1c; --bg2:#0a0a1c; --bg3:#07071a; --glow:rgba(61,245,255,.08); --xpbg:#000;
+  --off:#2b2b6b; --offtx:#e8e8ff; --overlay:rgba(5,5,20,.82); --badge-tx:#3df5ff; --ring:#ffe14d;
+  --dng-bg:#3a0a24; --dng-bd:#ff3d5a; --dng-tx:#ff9ab8; --shadow:#000;
+  --grid-line:rgba(61,245,255,.05); --ac1:#3df5ff; --ac2:#ff3d9a; --title-shadow:#ff3d9a;
+}
+html[data-theme="xmas"]{
+  --card:#0f2a1c; --card2:#0b2016; --border:#1f5a3a; --border2:#2a7a4e;
+  --text:#fff6e8; --muted:#a8d4b4; --dim:#6a9a7a; --primary:#e0283c; --sky:#ffffff; --cyan:#7af0b0; --green:#5dff7a; --yellow:#ffd34d; --purple:#ff9ab8; --red:#ff3d5a;
+  --btn:#163a26; --btn-hi:#1f4f34; --water:#12324a; --water-hi:#1c4a6a; --water-hov:#28618a; --ship:#f2f2f2; --hit:#e0283c; --sunk:#6a0f1c; --miss:#bfe9ff; --ok:#5dff7a;
+  --input:#000; --modal:#0f2a1c; --err:#ff8a8a; --scan:#2a5a7a; --scan-hi:#3a7a9a; --blk:#7a5a10;
+  --avbg:#0b2016; --stepbg:#0b2016; --bg1:#071a10; --bg2:#07150e; --bg3:#040d08; --glow:rgba(255,211,77,.06); --xpbg:#000;
+  --off:#1f5a3a; --offtx:#fff6e8; --overlay:rgba(3,10,6,.82); --badge-tx:#ffd34d; --ring:#ffd34d;
+  --dng-bg:#3a0a12; --dng-bd:#ff3d5a; --dng-tx:#ffb0b0; --shadow:#000;
+  --grid-line:rgba(255,255,255,.04); --ac1:#ffd34d; --ac2:#e0283c; --title-shadow:#1f9a4e;
+}
+html.retro{
+  color-scheme:dark;
+  --font:'VT323',ui-monospace,Consolas,monospace; --num:'Press Start 2P',ui-monospace,monospace; --px:'Press Start 2P',ui-monospace,monospace;
+}
+/* VT323 est petite et Press Start 2P très large : on les ramène à une hauteur d'œil commune, les tailles du reste du CSS restent valables */
+html.retro body{font-size-adjust:.5;
+  background-color:var(--bg2);
+  background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:32px 32px}
+html.retro *,html.retro *::before,html.retro *::after{border-radius:0 !important}
+html.retro h1,html.retro h2,html.retro h3,html.retro .btn,html.retro .status,html.retro .modes button,html.retro .shield-pick button,
+html.retro .seg button,html.retro .toggle,html.retro .theme-btn,html.retro .shipbtn,html.retro .who-line,html.retro .vs,html.retro .glabel,html.retro .fleet span{
+  font-family:var(--px);font-weight:400;letter-spacing:0;font-size-adjust:.4}   /* police pixel très large : réduite pour garder les libellés sur une ligne */
+html.retro .brand h1,html.retro .panel h2,html.retro .lobby-card h2,html.retro .modal h2{color:var(--yellow);font-size-adjust:.45;text-shadow:3px 3px 0 var(--title-shadow),6px 6px 0 #000}
+html.retro .panel h2{border-bottom:2px dashed var(--border2)}
+html.retro .panel h2::before{content:">";color:var(--ac2);margin-right:2px}
+html.retro .panel h3.sub{font-family:var(--px);font-weight:400;font-size:13px;font-size-adjust:.4;color:var(--cyan)}
+html.retro .panel h3.sub::before{content:"> ";color:var(--ac2)}
+/* Panneaux : bordure épaisse et ombre franche */
+html.retro .topbar,html.retro .panel,html.retro .card,html.retro .auth,html.retro .lobby-card,html.retro .ghead,html.retro .modal,html.retro .tile,html.retro .install-tip{
+  border:3px solid var(--border2);box-shadow:5px 5px 0 #000;background:var(--card);-webkit-backdrop-filter:none;backdrop-filter:none}
+html.retro .mode-card{border:3px solid var(--ac1);box-shadow:5px 5px 0 #000;background:var(--card)}
+html.retro .mode-card:nth-child(even){border-color:var(--ac2)}
+html.retro .mode-card h3{font-family:var(--px);font-weight:400;font-size:16px;font-size-adjust:.4}
+html.retro .mode-card:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 #000}
+html.retro .mode-ic{border-width:3px}
+/* Boutons : ombre qui s'enfonce au clic */
+html.retro .btn{border:3px solid var(--border2);box-shadow:4px 4px 0 #000;transition:transform .08s,box-shadow .08s}
+html.retro .btn.primary,html.retro .btn.grad{background:var(--primary);border-color:var(--yellow);color:#fff;box-shadow:4px 4px 0 #000}
+html.retro .btn.ok{background:#118a3e;border-color:var(--green)}
+html.retro .btn.ghost{border-color:transparent;box-shadow:none}
+html.retro .btn:hover:not(:disabled){transform:translate(-2px,-2px);box-shadow:6px 6px 0 #000;color:var(--yellow)}
+html.retro .btn.ghost:hover:not(:disabled){box-shadow:none;transform:none}
+html.retro .btn:active:not(:disabled){transform:translate(3px,3px);box-shadow:1px 1px 0 #000}
+html.retro .tabsnav .btn.on,html.retro .seg .btn.on,html.retro .seg button.on{background:var(--primary);color:#fff;box-shadow:0 0 0 3px var(--yellow)}
+html.retro .modes button,html.retro .shipbtn,html.retro .theme-btn,html.retro .opt,html.retro .shield-pick button{border:3px solid var(--border2);box-shadow:3px 3px 0 #000}
+html.retro .modes button.on,html.retro .shipbtn.sel,html.retro .theme-btn.on{border-color:var(--yellow);box-shadow:3px 3px 0 #000,0 0 12px var(--yellow)}
+html.retro input,html.retro select,html.retro textarea,html.retro .code{border:3px solid var(--ac1);background:#000;box-shadow:4px 4px 0 #000}
+html.retro .code{color:var(--yellow)}
+html.retro .status{border:3px solid var(--border2);box-shadow:4px 4px 0 #000;font-size:14px}
+html.retro .status.me{background:#118a3e;border-color:var(--green)}
+html.retro .status.wait{background:#8a4a00;border-color:var(--yellow)}
+/* Grilles : cases carrées, effet pixel */
+html.retro .cell{box-shadow:inset -2px -2px 0 rgba(0,0,0,.35)}
+html.retro .cell.ship{box-shadow:inset -3px -3px 0 rgba(0,0,0,.3),inset 3px 3px 0 rgba(255,255,255,.25)}
+html.retro .xpbar{height:12px;border:2px solid var(--border2)}
+html.retro .xpbar i{background:repeating-linear-gradient(90deg,var(--ac1) 0 8px,var(--ac2) 8px 16px)}
+html.retro .xpgain,html.retro .count{color:var(--yellow);text-shadow:3px 3px 0 #000}
+html.retro .tabsnav{box-shadow:0 -4px 0 #000}
+@media (max-width:640px){
+  html.retro .tabsnav,html.retro #game .actbar,html.retro #place .placebar{background:var(--card);border-top:3px solid var(--border2);-webkit-backdrop-filter:none;backdrop-filter:none}
+}
+/* Noël : neige en pixels qui tombe doucement (désactivée si l'appareil demande moins d'animations) */
+html[data-theme="xmas"] body::before{content:"";position:fixed;inset:-200px 0 0 0;pointer-events:none;z-index:0;opacity:.55;
+  background-image:radial-gradient(#fff 1.5px,transparent 2px),radial-gradient(#fff 1px,transparent 1.5px),radial-gradient(#dff4ff 2px,transparent 2.5px);
+  background-size:120px 120px,70px 70px,190px 190px;background-position:0 0,35px 20px,80px 60px;
+  animation:snow 18s linear infinite}
+html[data-theme="xmas"] #app{position:relative;z-index:1}
+@keyframes snow{to{transform:translateY(200px)}}
+@media (prefers-reduced-motion:reduce){html[data-theme="xmas"] body::before{animation:none}}
+html[data-theme="xmas"] .brand h1::after{content:" 🎄"}
+html[data-theme="xmas"] .brand .logo{box-shadow:0 0 0 3px var(--yellow),5px 5px 0 #000}
+/* Noël : guirlande lumineuse (rouge, vert, or) sur le haut des panneaux principaux, qui clignote doucement */
+html[data-theme="xmas"] :is(.topbar,.auth,.ghead,.lobby-card){position:relative}
+html[data-theme="xmas"] :is(.topbar,.auth,.ghead,.lobby-card)::after{content:"";position:absolute;left:10px;right:10px;top:-8px;height:12px;pointer-events:none;
+  background:radial-gradient(circle at 8px 6px,#ff3d5a 0 4px,transparent 4.5px) 0 0/48px 12px repeat-x,
+    radial-gradient(circle at 24px 6px,#5dff7a 0 4px,transparent 4.5px) 0 0/48px 12px repeat-x,
+    radial-gradient(circle at 40px 6px,#ffd34d 0 4px,transparent 4.5px) 0 0/48px 12px repeat-x,
+    linear-gradient(#1f5a3a,#1f5a3a) 0 2px/100% 2px no-repeat;
+  animation:twinkle 1.6s steps(2,jump-none) infinite}
+@keyframes twinkle{50%{filter:brightness(.55) saturate(.7)}}
+@media (prefers-reduced-motion:reduce){html[data-theme="xmas"] :is(.topbar,.auth,.ghead,.lobby-card)::after{animation:none}}
+html[data-theme="xmas"] .xpbar i{background:repeating-linear-gradient(135deg,#e0283c 0 8px,#fff6e8 8px 16px)}   /* sucre d'orge */
