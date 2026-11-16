@@ -302,6 +302,7 @@ function lost() {
   $('endTitle').textContent = t('lostTitle');
   $('endText').textContent = t('lostText');
   $('endXp').innerHTML = '';
+  $('btnShare').style.display = 'none';   // partie interrompue : rien à partager
   renderRematch();
   $('end').classList.add('show');
   if ($('game').classList.contains('active')) renderGame();

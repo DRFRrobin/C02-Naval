@@ -225,6 +225,8 @@ function endGame(win, forfeit) {
   S.phase = 'over'; S.reconnecting = false;
   clearInterval(S.hb); clearInterval(S.reconTimer); clearInterval(S.turnTimer);
   S.myTurn = false; S.waiting = false; S.aim = null;
+  S.win = !!win; S.forfeit = !!forfeit; S.match.end = Date.now();
+  msg('shareMsg', '');
   if (S.bot) S.bot.stop();
   $('choice').classList.remove('show');
   $('endIcon').textContent = win ? '🏆' : '🌊';
@@ -236,7 +238,6 @@ function endGame(win, forfeit) {
   S.verify = !S.vsBot && !forfeit && S.oppCommit ? 'pending' : 'none';
   renderVerify();
   if (S.verify === 'pending') {
-    S.win = win;
     clearTimeout(S.verifyTimer);
     S.verifyTimer = setTimeout(() => finishVerify('missing'), VERIFY_MS);
     if (!win) { S.recordPending = true; $('endXp').innerHTML = ''; }   // défaite : comptée seulement si la grille adverse est honnête
@@ -244,6 +245,7 @@ function endGame(win, forfeit) {
   }
   if (!S.recordPending) showXp(win);
   renderRematch();
+  prepareShare();
   setTimeout(() => Snd.play(win ? 'win' : 'lose'), 600);
   setTimeout(() => $('end').classList.add('show'), 700);
   renderGame();
@@ -334,6 +336,18 @@ function finishVerify(res) {
     else { recordInterrupted(true); $('endXp').innerHTML = ''; }
   }
   renderVerify();
+  renderGame();   // la grille adverse dévoilée montre maintenant les bateaux non trouvés
+  prepareShare();
+}
+
+/* ---------- Partage du résultat ---------- */
+// Bateaux adverses connus en fin de partie : ceux du bot, ou la grille dévoilée et vérifiée d'un joueur.
+function oppShipCells() {
+  const set = new Set();
+  if (S.phase !== 'over') return set;
+  const ships = S.vsBot && S.bot ? S.bot.ships.map(x => x.cells) : S.verify === 'ok' && S.oppReveal ? S.oppReveal.ships : [];
+  for (const cells of ships) for (const [r, c] of cells || []) set.add(r * N + c);
+  return set;
 }
 function renderVerify() {
   const el = $('verifyNote'), name = S.opp ? S.opp.name : '?';
@@ -431,6 +445,7 @@ function renderHint() {
   if (S.phase === 'game' && S.oppAway) { $('hint').textContent = t('oppAway'); return; }
   const key = { shot: 'hintShot', radar: 'hintRadar', cross: 'hintCross', shield: 'hintShield' }[S.mode];
   const live = S.phase === 'game' && S.myTurn && !S.waiting;
+  if (S.phase === 'over') { $('hint').textContent = oppShipCells().size && S.enemy.some((v, k) => v !== 'sunk' && oppShipCells().has(k)) ? t('missedLegend') : ''; return; }
   $('hint').textContent = !live ? '' : S.aim ? t('hintConfirm', { cell: cellName(...S.aim) }) : t(key);
 }
 function setLog(text, fromOpp) {
@@ -451,9 +466,11 @@ function renderGame() {
   eg.classList.toggle('live', live && S.mode !== 'shield');
   if (!live || (S.mode !== 'radar' && S.mode !== 'cross')) S.aim = null;
   const aimed = new Set(S.aim ? aimCells(S.mode, ...S.aim).map(([r, c]) => r * N + c) : []);
+  const opp = oppShipCells();
   eg.cells.forEach((d, k) => {
     const v = S.enemy[k];
-    d.className = 'cell' + (v ? ' ' + v : '') + (targetable(k) ? ' target' : '') + (aimed.has(k) ? ' aim' : '');
+    const missed = opp.has(k) && v !== 'hit' && v !== 'sunk';   // fin de partie : bateau adverse jamais touché à cet endroit
+    d.className = 'cell' + (v ? ' ' + v : '') + (targetable(k) ? ' target' : '') + (aimed.has(k) ? ' aim' : '') + (missed ? ' missed' : '');
     d.textContent = v ? SYM[v] : '';
   });
 
@@ -485,6 +502,11 @@ function renderGame() {
   const sp = $('shieldPick'), pick = live && S.mode === 'shield';
   sp.classList.toggle('show', pick);
   sp.innerHTML = pick ? S.ships.map((x, i) => (canShield(x) ? `<button type="button" data-ship="${i}"><i class="fa-solid fa-shield-halved"></i>${esc(shipName(i))}</button>` : '')).join('') : '';
-  $('actBar').style.display = S.phase === 'over' ? 'none' : '';
+  // Fin de partie : la barre propose de revoir le résultat ou de le partager
+  const over = S.phase === 'over';
+  $('modes').style.display = over ? 'none' : '';
+  $('overActs').classList.toggle('show', over);
+  $('btnShare2').style.display = S.lost ? 'none' : '';
+  $('btnShare').style.display = S.lost ? 'none' : '';
   renderHint();
 }

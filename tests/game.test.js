@@ -261,6 +261,10 @@ test('anti-triche : partie honnête, les deux grilles sont vérifiées', async (
   const loser = (await A.evaluate(() => S.win)) ? B : A;
   assert.equal(await loser.evaluate(() => me().stats.losses), 1, 'la défaite est comptée');
   assert.match(await loser.textContent('#verifyNote'), /vérifiée|checked/);
+  // le perdant voit les bateaux du vainqueur qu'il n'a pas trouvés
+  const m = await loser.evaluate(() => ({ missed: $('enemyGrid').querySelectorAll('.cell.missed').length,
+    expected: S.oppReveal.ships.flat().filter(([a, b]) => S.enemy[a * N + b] !== 'hit' && S.enemy[a * N + b] !== 'sunk').length }));
+  assert.equal(m.missed, m.expected);
   assert.deepEqual([...A.errors, ...B.errors], []);
   await ctx.close();
 });
@@ -313,6 +317,24 @@ test('Bouclier : la liste des bateaux permet de le poser sans chercher sa flotte
   await ctx.close();
 });
 
+test('téléphone : les outils de placement restent fixés en bas', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
+  await pg.click('#mBot'); await phase(pg, 'place', 8000);
+  const r = await pg.evaluate(() => { const b = $('placeBar').getBoundingClientRect(), g = $('placeGrid').getBoundingClientRect();
+    return { pos: getComputedStyle($('placeBar')).position, bottom: b.bottom, top: b.top, gridBottom: g.bottom, h: innerHeight }; });
+  assert.equal(r.pos, 'fixed'); assert.ok(Math.abs(r.bottom - r.h) <= 1, 'collée en bas');
+  assert.ok(r.gridBottom <= r.top, 'la grille de placement est entièrement visible au-dessus de la barre');
+  await pg.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  assert.ok(await pg.evaluate(() => $('shipList').getBoundingClientRect().bottom <= $('placeBar').getBoundingClientRect().top), 'la liste des bateaux n\'est pas cachée');
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'pas de débordement horizontal');
+  await pg.click('#btnRandom', { timeout: 3000 }); await pg.click('#btnReady', { timeout: 3000 });
+  await phase(pg, 'game', 8000);
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  assert.equal(await pg.evaluate(() => getComputedStyle($('placeBar')).position), 'static');
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
 test('téléphone : les boutons d\'action restent fixés en bas pendant la partie', async () => {
   const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
   await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
@@ -324,8 +346,65 @@ test('téléphone : les boutons d\'action restent fixés en bas pendant la parti
   assert.ok(clear, 'la flotte reste visible au-dessus de la barre');
   const over = await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   assert.ok(over <= 1, 'pas de débordement horizontal');
+  // les fenêtres (fin de partie, choix d'amélioration) passent au-dessus de la barre : leurs boutons restent cliquables
+  await pg.evaluate(() => endGame(false));
+  await pg.waitForFunction(() => $('end').classList.contains('show'));
+  await pg.click('#btnSeeGrids', { timeout: 3000 });
+  await pg.click('#btnBackEnd', { timeout: 3000 });
   await pg.setViewportSize({ width: 1200, height: 800 });
   assert.equal(await pg.evaluate(() => getComputedStyle($('actBar')).position), 'static');
+  await ctx.close();
+});
+
+test('fin de partie : la grille adverse montre les bateaux non trouvés', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await pg.waitForFunction(() => S.myTurn && !S.waiting);
+  await pg.evaluate(() => onEnemyTap(0, 0));
+  await pg.waitForFunction(() => S.myTurn && !S.waiting && S.phase === 'game');
+  await pg.evaluate(() => endGame(false));
+  await pg.click('#btnSeeGrids');
+  const r = await pg.evaluate(() => {
+    const ships = S.bot.ships.flatMap(x => x.cells.map(([a, b]) => a * N + b));
+    return { missed: $('enemyGrid').querySelectorAll('.cell.missed').length,
+      expected: ships.filter(k => S.enemy[k] !== 'hit' && S.enemy[k] !== 'sunk').length, hint: $('hint').textContent,
+      acts: $('overActs').classList.contains('show'), modes: getComputedStyle($('modes')).display };
+  });
+  assert.ok(r.missed > 0); assert.equal(r.missed, r.expected);
+  assert.match(r.hint, /pas trouvés|did not find/);
+  assert.equal(r.acts, true); assert.equal(r.modes, 'none');
+  await pg.click('#btnBackEnd');
+  assert.ok(await pg.evaluate(() => $('end').classList.contains('show')));
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
+test('partager le résultat : image avec le gagnant et les deux grilles, partagée ou téléchargée', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx);
+  await pg.evaluate(() => { BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);
+  await startAuto(pg); await phase(pg, 'over', 60000);
+  await pg.waitForFunction(() => $('end').classList.contains('show'));
+  // l'image : PNG 1080 × 1350
+  const img = await pg.evaluate(async () => {
+    const b = await resultImage(); const bmp = await createImageBitmap(b);
+    return { type: b.type, size: b.size, w: bmp.width, h: bmp.height };
+  });
+  assert.deepEqual([img.type, img.w, img.h], ['image/png', 1080, 1350]);
+  assert.ok(img.size > 20000, 'image dessinée');
+  // téléphone : partage natif avec le fichier image
+  await pg.evaluate(() => { window.__shared = null; navigator.canShare = d => !!(d && d.files); navigator.share = async d => { window.__shared = { n: d.files.length, type: d.files[0].type, name: d.files[0].name, text: d.text }; }; });
+  await pg.click('#btnShare');
+  const sh = await pg.waitForFunction(() => window.__shared).then(h => h.jsonValue());
+  assert.deepEqual([sh.n, sh.type, sh.name], [1, 'image/png', 'c02-naval-resultat.png']);
+  assert.match(sh.text, /C02 Naval/);
+  // ordinateur (pas de partage de fichiers) : l'image est téléchargée
+  await pg.evaluate(() => { navigator.canShare = undefined; });
+  const [dl] = await Promise.all([pg.waitForEvent('download', { timeout: 5000 }), pg.click('#btnShare')]);
+  assert.equal(dl.suggestedFilename(), 'c02-naval-resultat.png');
+  await pg.waitForFunction(() => /enregistrée|saved/.test($('shareMsg').textContent));
+  assert.deepEqual(pg.errors, []);
   await ctx.close();
 });
 

@@ -222,6 +222,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box
 .hint{text-align:center;color:var(--muted);font-size:13px;min-height:1.2em;margin:10px 0 0}
 .shield-pick{display:none;flex-wrap:wrap;justify-content:center;gap:6px;width:min(460px,100%);margin:10px auto 0}
 .shield-pick.show{display:flex}
+.overacts{display:none;gap:8px;width:min(460px,100%);margin:0 auto}
+.overacts.show{display:grid;grid-template-columns:1fr 1fr}
+/* Fin de partie : bateaux adverses que l'on n'a pas trouvés */
+.cell.missed{background:var(--ship);opacity:.6;box-shadow:inset 0 0 0 2px var(--yellow)}
 .shield-pick button{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;min-height:40px;font:600 13px var(--font);color:var(--text);
   background:var(--btn);border:1px solid var(--yellow);border-radius:10px;cursor:pointer}
 .shield-pick button i{color:var(--yellow)}
@@ -358,7 +362,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box
 /* Téléphone : barre d'onglets fixée en bas, comme une application native */
 @media (max-width:640px){
   #dash{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
-  .tabsnav{position:fixed;left:0;right:0;bottom:0;z-index:40;width:auto;margin:0;gap:2px;flex-wrap:nowrap;
+  .tabsnav{position:fixed;left:0;right:0;bottom:0;z-index:15;width:auto;margin:0;gap:2px;flex-wrap:nowrap;
     padding:8px max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
     background:var(--card);border-top:1px solid var(--border2);box-shadow:0 -8px 24px rgba(0,0,0,.4);
     -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
@@ -374,11 +378,23 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sky);box
 /* Téléphone : pendant la partie, les boutons d'action restent fixés en bas, sous le pouce */
 @media (max-width:640px){
   #game{padding-bottom:calc(var(--actbar-h,150px) + 12px)}   /* hauteur réelle de la barre, mesurée dans js/main.js */
-  #game .actbar{position:fixed;left:0;right:0;bottom:0;z-index:40;
+  #game .actbar{position:fixed;left:0;right:0;bottom:0;z-index:15;   /* sous les fenêtres (.overlay, z-index 20) */
     padding:8px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
     background:var(--card);border-top:1px solid var(--border2);box-shadow:0 -8px 24px rgba(0,0,0,.4);
     -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   html.ios-standalone #game .actbar{padding-bottom:max(env(safe-area-inset-bottom),22px)}
+  /* Placement : outils, Poser / Retirer et Prêt fixés en bas, sur 3 lignes compactes (message, outils, actions) */
+  #place{padding-bottom:calc(var(--placebar-h,170px) + 12px)}
+  #place .placebar{position:fixed;left:0;right:0;bottom:0;z-index:15;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
+    padding:6px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+    background:var(--card);border-top:1px solid var(--border2);box-shadow:0 -8px 24px rgba(0,0,0,.4);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  html.ios-standalone #place .placebar{padding-bottom:max(env(safe-area-inset-bottom),22px)}
+  #place .placebar #placeMsg{grid-column:1/-1;grid-row:1;margin:0;min-height:1.2em;font-size:.85rem}
+  #place .placebar .tools{grid-column:1/-1;grid-row:2;margin:0}
+  #place .placebar .row{grid-column:1/3;grid-row:3;gap:8px;flex-wrap:nowrap}
+  #place .placebar .row .btn,#place .placebar #btnReady{min-width:0;padding:8px 4px;font-size:14px}
+  #place .placebar #btnReady{grid-column:3;grid-row:3;width:auto;margin:0}
   #game .actbar .modes{margin-top:0}
   #game .actbar .hint{margin-top:6px}
 }

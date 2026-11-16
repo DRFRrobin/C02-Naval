@@ -17,8 +17,13 @@ Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2
 
 **Pendant la partie :**
 - Sur téléphone, les boutons **Tir / Radar / Croix / Bouclier** restent fixés en bas de l'écran, sous le pouce ; sur ordinateur, ils sont sous la grille adverse.
+- De même pendant le **placement** : Pivoter / Aléatoire / Effacer, Poser / Retirer et **Prêt** restent fixés en bas de l'écran du téléphone.
 - **Radar et Frappe en croix se confirment** : un premier appui montre la zone visée, un second sur la même case tire (un appui ailleurs déplace la visée). Aucune amélioration gâchée par erreur.
 - **Bouclier** : une liste des bateaux encore protégeables apparaît à côté des boutons ; toucher un nom suffit (toucher le bateau dans « Ta flotte » marche toujours).
+
+**Fin de partie :**
+- **Partager le résultat** : le bouton crée une **image** (1080 × 1350, aux couleurs du thème) avec le gagnant, **les deux grilles** côte à côte (sa flotte avec les tirs reçus, la flotte adverse avec ses tirs et les bateaux non trouvés quand on les connaît), puis tirs, précision, bateaux coulés, durée et le lien du jeu. Sur téléphone, elle part dans le partage habituel (Messages, WhatsApp, Instagram…) ; sur ordinateur, elle est téléchargée.
+- **Voir les grilles** : la grille adverse montre, encadrés en jaune, les bateaux qu'on n'a pas trouvés (contre le bot, ou contre un joueur dont la grille a été dévoilée et vérifiée). Les boutons « Résultat » et « Partager » restent en bas pour revenir à l'écran de fin.
 
 **Anti-triche (parties en ligne) :** chaque joueur annonce lui-même si un tir l'a touché. Pour qu'un client modifié ne puisse pas mentir, chacun envoie au début l'empreinte SHA-256 de sa grille (avec un sel aléatoire) : impossible de déplacer ses bateaux ensuite, et l'adversaire n'apprend rien. En fin de partie, les deux grilles sont dévoilées et vérifiées (empreinte, flotte valide, chaque raté / touché / coulé / radar annoncé). Si la grille du vainqueur est truquée ou n'est pas dévoilée, la défaite n'est pas comptée (partie interrompue, sans perte de série). Un adversaire d'une version plus ancienne (ou la version Windows) n'est simplement pas vérifié.
 
@@ -63,7 +68,7 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 ## Version et mises à jour
 
-Le numéro de version (`1.2.1`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+Le numéro de version (`1.2.2`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
 
 **Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `js/main.js` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
 
@@ -95,7 +100,7 @@ Effets sonores (synthétisés, sans fichier audio), langue (français / anglais)
 ## Technique
 
 - Site statique, sans étape de compilation : `index.html` (structure), `css/style.css` (apparence et thèmes) et le code dans `js/`, chargé dans cet ordre :
-  `i18n.js` (textes FR/EN), `core.js` (constantes, état, règles), `sound.js` (sons), `profile.js` (profil, comptes, XP, sauvegarde), `net.js` (réseau PeerJS, reprise après coupure), `bot.js` (IA), `place.js` (placement), `game.js` (partie, anti-triche, fin de partie), `main.js` (démarrage, version, mises à jour).
+  `i18n.js` (textes FR/EN), `core.js` (constantes, état, règles), `sound.js` (sons), `profile.js` (profil, comptes, XP, sauvegarde), `net.js` (réseau PeerJS, reprise après coupure), `bot.js` (IA), `place.js` (placement), `game.js` (partie, anti-triche, fin de partie), `share.js` (image de résultat à partager), `main.js` (démarrage, version, mises à jour).
   Ce sont des scripts classiques : les fonctions et constantes déclarées dans un fichier sont visibles dans les suivants.
 - Connexion pair-à-pair (WebRTC) avec [PeerJS](https://peerjs.com) 1.5.4. Le service public de PeerJS sert uniquement à mettre les navigateurs en relation.
 - Sur les réseaux très fermés, la connexion directe peut échouer : un relais TURN personnel peut être ajouté dans la constante `MY_TURN` de `js/core.js`.
