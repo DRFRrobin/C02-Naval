@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 
 const ROOT = path.join(__dirname, '..');
 // Code du jeu (index.html + fichiers js/), lu tel quel par quelques tests
-const SOURCE = () => ['index.html', ...fs.readdirSync(path.join(ROOT, 'js')).map(f => 'js/' + f)].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
+const SOURCE = () => ['index.html', ...fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js')).map(f => 'js/' + f)].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
 let server, base, browser;
 
 before(async () => {
@@ -664,6 +664,45 @@ test('thème automatique : Rétro Noël du 1er au 26 décembre, sauf si le joueu
   await pg.evaluate(() => { renderThemes(); document.querySelector('[data-th="auto"]').click(); });
   assert.deepEqual(await pg.evaluate(() => [document.documentElement.dataset.theme, settings.theme, JSON.parse(localStorage.getItem(SETTINGS_KEY)).themeChosen]), ['xmas', undefined, false]);
   await ctx.close();
+});
+
+test('langues : 6 langues complètes, choix dans les paramètres, rien ne déborde à 320 px', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 320, height: 640 });
+  const langs = await pg.evaluate(() => [...$('langSel').options].map(o => o.value));
+  assert.deepEqual(langs, ['fr', 'en', 'pt', 'es', 'de', 'it']);
+  const issues = [];
+  for (const l of langs) {
+    await pg.evaluate(v => { $('langSel').value = v; $('langSel').dispatchEvent(new Event('change')); }, l);
+    const r = await pg.evaluate(() => ({ lang: document.documentElement.lang,
+      missing: Object.keys(I18N.en).filter(k => I18N[settings.lang][k] === undefined),
+      raw: [...document.querySelectorAll('[data-i18n]')].filter(e => e.textContent === e.dataset.i18n).map(e => e.dataset.i18n) }));
+    assert.equal(r.lang, l); assert.deepEqual(r.missing, [], l); assert.deepEqual(r.raw, [], l);
+    for (const pane of ['play', 'stats', 'rules', 'settings']) {
+      await pg.evaluate(p => { pane = p; renderDash(); }, pane);
+      const over = await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+      if (over > 1) issues.push(`${l}/${pane}: ${over}px`);
+    }
+  }
+  assert.deepEqual(issues, []);
+  // partie en allemand (mots les plus longs) : placement et jeu sans débordement
+  await pg.evaluate(() => { $('langSel').value = 'de'; $('langSel').dispatchEvent(new Event('change')); pane = 'play'; renderDash(); BOT_SPEED = 0.03; });
+  await pg.click('#mBot'); await phase(pg, 'place', 8000);
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'placement');
+  await ready(pg); await phase(pg, 'game', 8000);
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'partie');
+  assert.match(await pg.textContent('#modes'), /Schuss/);
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
+test('langue de l\'appareil : portugais, espagnol, allemand, italien reconnus, anglais sinon', async () => {
+  for (const [loc, want] of [['pt-BR', 'pt'], ['es-ES', 'es'], ['de-DE', 'de'], ['it-IT', 'it'], ['fr-FR', 'fr'], ['ja-JP', 'en']]) {
+    const ctx = await browser.newContext({ serviceWorkers: 'block', locale: loc });
+    await ctx.route(/unpkg|googleapis|gstatic|cdnjs/, r => r.abort());
+    const pg = await ctx.newPage(); await pg.goto(base);
+    assert.equal(await pg.evaluate(() => settings.lang), want, loc);
+    await ctx.close();
+  }
 });
 
 test('téléphone : onglets en bas de l\'écran, profil/XP en haut', async () => {

@@ -68,7 +68,7 @@ Paramètres → *Transférer / sauvegarder ma progression* : choisis une phrase 
 
 ## Version et mises à jour
 
-Le numéro de version (`1.2.3`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
+Le numéro de version (`1.2.4`) s'affiche dans **Paramètres**, avec un bouton « Rechercher une mise à jour ». À chaque ouverture, le jeu lit `version.json` sur le serveur (jamais depuis un cache) : si une version plus récente existe et que tu es dans les menus, la page se recharge toute seule (un seul rechargement par version, pas de boucle) ; sinon un bandeau propose de mettre à jour. La vérification est refaite au retour au premier plan et toutes les 30 minutes.
 
 **Publier une nouvelle version :** changer le numéro à quatre endroits : `package.json`, `version.json`, `APP_VERSION` dans `js/main.js` et `VERSION` dans `sw.js`. Un test de la CI échoue si l'un d'eux diffère.
 
@@ -86,7 +86,7 @@ Fichiers : `manifest.webmanifest`, `sw.js` (service worker), `icons/` (icône iP
 
 ## Paramètres
 
-Effets sonores (synthétisés, sans fichier audio), langue (français / anglais), **thème** (Auto, Océan, Nuit, Forêt, Crépuscule, Clair, **Rétro arcade**, **Rétro Noël**), pseudo, avatar.
+Effets sonores (synthétisés, sans fichier audio), **langue** (français, anglais, portugais, espagnol, allemand, italien — celle du téléphone par défaut si le jeu la connaît, sinon l'anglais), **thème** (Auto, Océan, Nuit, Forêt, Crépuscule, Clair, **Rétro arcade**, **Rétro Noël**), pseudo, avatar.
 
 Par défaut (choix **Auto**), le thème est **Rétro Noël du 1er au 26 décembre** (date de l'appareil) et Océan le reste de l'année. Un thème choisi à la main est toujours gardé.
 
@@ -104,7 +104,7 @@ Les deux thèmes rétro changent tout le style, pas seulement les couleurs : pol
 ## Technique
 
 - Site statique, sans étape de compilation : `index.html` (structure), `css/style.css` (apparence et thèmes) et le code dans `js/`, chargé dans cet ordre :
-  `i18n.js` (textes FR/EN), `core.js` (constantes, état, règles), `sound.js` (sons), `profile.js` (profil, comptes, XP, sauvegarde), `net.js` (réseau PeerJS, reprise après coupure), `bot.js` (IA), `place.js` (placement), `game.js` (partie, anti-triche, fin de partie), `share.js` (image de résultat à partager), `main.js` (démarrage, version, mises à jour).
+  `lang/pt.js`, `lang/es.js`, `lang/de.js`, `lang/it.js` (textes portugais, espagnol, allemand, italien), `i18n.js` (textes français et anglais, choix de la langue ; une clé absente est prise en anglais), `core.js` (constantes, état, règles), `sound.js` (sons), `profile.js` (profil, comptes, XP, sauvegarde), `net.js` (réseau PeerJS, reprise après coupure), `bot.js` (IA), `place.js` (placement), `game.js` (partie, anti-triche, fin de partie), `share.js` (image de résultat à partager), `main.js` (démarrage, version, mises à jour).
   Ce sont des scripts classiques : les fonctions et constantes déclarées dans un fichier sont visibles dans les suivants.
 - Connexion pair-à-pair (WebRTC) avec [PeerJS](https://peerjs.com) 1.5.4. Le service public de PeerJS sert uniquement à mettre les navigateurs en relation.
 - Sur les réseaux très fermés, la connexion directe peut échouer : un relais TURN personnel peut être ajouté dans la constante `MY_TURN` de `js/core.js`.

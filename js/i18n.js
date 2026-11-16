@@ -1,8 +1,10 @@
 'use strict';
 /* =========================================================
-   Textes (français / anglais)
+   Textes : français et anglais ici ; portugais, espagnol, allemand et italien dans js/lang/*.js
+   (chargés avant ce fichier). Une clé absente d'une langue est prise en anglais, puis en français.
    ========================================================= */
-const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+const pl = (n, one, many) => `${n} ${n > 1 ? many : one}`;      // français : 0 et 1 au singulier
+const plEn = (n, one, many) => `${n} ${n === 1 ? one : many}`;  // anglais : 0 au pluriel
 const I18N = {
   fr: {
     tagline: 'Bataille navale à deux, sur PC ou téléphone.',
@@ -240,13 +242,13 @@ const I18N = {
     rulesIntro: 'Customize the grid size, the fleet and the upgrades. They apply to your "Host" games and games against the bot. Random opponents always use the standard rules; when you join a friend, the host\'s rules apply.',
     rGridT: 'Grid size', rGridD: 'From 6 × 6 to 15 × 15 squares.',
     rFleetT: 'Fleet', rFleetD: 'Number of ships of each size (10 ships max, at most 40% of the grid).',
-    rFleetTot: p => `${pl(p.n, 'ship', 'ships')} · ${pl(p.cells, 'square', 'squares')} (${p.pct}% of the grid)`,
+    rFleetTot: p => `${plEn(p.n, 'ship', 'ships')} · ${plEn(p.cells, 'square', 'squares')} (${p.pct}% of the grid)`,
     rUpT: 'Upgrades', rUpD: 'Earned by sinking an enemy ship. Turn them off for a classic battle.',
     rBotT: 'Artificial intelligence', rBotD: 'Allows games against the bot, and the fallback bot of random matches.',
     rSkillT: 'Bot level', skill0: 'Easy', skill1: 'Normal', skill2: 'Hard',
     rReset: 'Default rules', rOn: 'ON', rOff: 'OFF', rShip: 'Ships',
-    rSumStd: 'Standard rules (10 × 10, 5 ships)', rSumCustom: p => `Rules: ${p.size} × ${p.size}, ${pl(p.n, 'ship', 'ships')}`, rEdit: 'Edit',
-    rulesInfo: p => `Rules: ${p.size} × ${p.size} grid, ${pl(p.n, 'ship', 'ships')}${p.up ? '' : ', no upgrades'}.`,
+    rSumStd: 'Standard rules (10 × 10, 5 ships)', rSumCustom: p => `Rules: ${p.size} × ${p.size}, ${plEn(p.n, 'ship', 'ships')}`, rEdit: 'Edit',
+    rulesInfo: p => `Rules: ${p.size} × ${p.size} grid, ${plEn(p.n, 'ship', 'ships')}${p.up ? '' : ', no upgrades'}.`,
     botOff: 'The bot is disabled in the rules.', noBotMsg: 'No one was found and the bot is disabled. Back to the menu…',
     customXp: 'XP halved: custom rules.',
     stReconnecting: 'Reconnecting…', reconnecting: 'Connection lost: trying to reconnect (45 s max)…',
@@ -278,14 +280,14 @@ const I18N = {
     oppPrefix: '{name} — ',
     sumRadar: p => `Radar at ${p.cell}: ${p.n} of ${p.total} square${p.total > 1 ? 's' : ''} occupied.`,
     sumShot: p => `Shot at ${p.cell}: ${{ miss: 'miss.', hit: 'hit!', blocked: 'blocked by a shield.', sunk: `sunk! (${p.ship})` }[p.v] || ''}`,
-    sumCross: p => `Cross strike at ${p.cell}: ${pl(p.hits, 'hit', 'hits')}, ${pl(p.miss, 'miss', 'misses')}${p.blk ? ', ' + p.blk + ' blocked' : ''}.${p.sunk ? ` ${p.sunk} sunk!` : ''}`,
+    sumCross: p => `Cross strike at ${p.cell}: ${plEn(p.hits, 'hit', 'hits')}, ${plEn(p.miss, 'miss', 'misses')}${p.blk ? ', ' + p.blk + ' blocked' : ''}.${p.sunk ? ` ${p.sunk} sunk!` : ''}`,
     and: ' and ',
     upRadarN: 'Radar', upRadarD: 'Scans a 2 × 2 area from the targeted square. Costs your turn.',
     upCrossN: 'Cross strike', upCrossD: 'Fires at the targeted square and its 4 neighbours. Costs your turn.',
     upShieldN: 'Shield', upShieldD: 'The first hit on one of your ships is cancelled. Costs your turn, no shot.',
     choiceTitle: 'Enemy ship sunk!', choiceSub: 'Pick an upgrade:', choiceSubN: 'Pick an upgrade ({n} to pick):',
     win: 'Victory!', lose: 'Defeat…', winText: 'You sank the whole enemy fleet.', winForfeit: 'The opponent left the game.', winCheat: "The opponent cheated: their answers are impossible.", loseText: 'Your whole fleet was sunk.',
-    endStats: p => `${pl(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
+    endStats: p => `${plEn(p.shots, 'shot', 'shots')}, ${p.acc}% accuracy.`,
     lostTitle: 'Connection lost', lostText: 'The link with your opponent is broken. The game is stopped.',
     rematch: 'Rematch', rematchWait: 'Waiting for {name}…', rematchOpp: '{name} wants a rematch!', rematchGone: 'Your opponent left the game.',
     xpBase1: 'Victory', xpBase0: 'Participation', xpHits: 'Hits', xpSunk: 'Ships sunk', xpAcc: 'Accuracy', xpTime: 'Speed',
@@ -305,8 +307,12 @@ const I18N = {
       'Lieutenant commander', 'Commander', 'Captain', 'Admiral'],
   },
 };
+Object.assign(I18N, window.C02_LANGS || {});
+const LANG_NAMES = { fr: 'Français', en: 'English', pt: 'Português', es: 'Español', de: 'Deutsch', it: 'Italiano' };
 const SETTINGS_KEY = 'c02naval.v1.settings';
-const settings = { sound: true, lang: (navigator.language || 'fr').toLowerCase().startsWith('fr') ? 'fr' : 'en' };
+// Langue par défaut : celle de l'appareil si le jeu la connaît, sinon l'anglais.
+const navLang = (navigator.language || 'fr').slice(0, 2).toLowerCase();
+const settings = { sound: true, lang: I18N[navLang] ? navLang : 'en' };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch (e) {}
 if (!I18N[settings.lang]) settings.lang = 'fr';
 // Thème : celui choisi par le joueur ; sinon (absent) le thème de la saison, voir defaultTheme() dans core.js.
@@ -316,6 +322,7 @@ else settings.themeChosen = true;
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
 function t(key, p = {}) {
   let v = I18N[settings.lang][key];
+  if (v === undefined) v = I18N.en[key];
   if (v === undefined) v = I18N.fr[key];
   if (v === undefined) return key;
   if (typeof v === 'function') return v(p);
@@ -324,6 +331,9 @@ function t(key, p = {}) {
 }
 function applyLang() {
   document.documentElement.lang = settings.lang;
+  for (const sel of [$('langSel'), $('langMini')]) {   // menus de langue : chaque langue dans sa propre langue
+    if (sel.options.length !== Object.keys(I18N).length) sel.innerHTML = Object.keys(I18N).map(k => `<option value="${k}">${LANG_NAMES[k] || k}</option>`).join('');
+  }
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $('langSel').value = $('langMini').value = settings.lang;
   document.querySelectorAll('[data-ph]').forEach(el => { el.placeholder = t(el.dataset.ph); });
