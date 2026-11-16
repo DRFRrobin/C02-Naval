@@ -1,6 +1,6 @@
 {
   "name": "c02-naval",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "description": "C02 Naval : bataille navale multijoueur dans le navigateur (PeerJS / WebRTC) + API de comptes",
   "scripts": {

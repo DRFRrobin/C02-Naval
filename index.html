@@ -62,7 +62,7 @@ try { if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone === t
       <p id="authMsg" class="msg"></p>
       <p id="localNote" class="msg" style="font-size:12px;margin:4px 0 0" data-i18n="localNote"></p>
       <button id="btnCloudMode" class="linkbtn" type="button" style="display:none" data-i18n="goCloud"></button>
-      <div class="lang-mini"><select id="langMini" aria-label="Langue / Language"><option value="fr">Français</option><option value="en">English</option></select></div>
+      <div class="lang-mini"><select id="langMini" aria-label="Langue / Language"></select></div>
     </div>
   </section>
 
@@ -142,7 +142,7 @@ try { if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone === t
         </div>
         <div class="set-block">
           <b data-i18n="langT"></b><small data-i18n="langD"></small>
-          <select id="langSel"><option value="fr">Français</option><option value="en">English</option></select>
+          <select id="langSel"></select>
         </div>
         <div class="set-block">
           <b><i class="fa-solid fa-palette"></i><span data-i18n="themeT"></span></b><small data-i18n="themeD"></small>
@@ -351,6 +351,10 @@ try { if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone === t
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- Code du jeu, chargé dans l'ordre (scripts classiques : les déclarations sont partagées entre fichiers) -->
+<script src="js/lang/pt.js"></script>
+<script src="js/lang/es.js"></script>
+<script src="js/lang/de.js"></script>
+<script src="js/lang/it.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/core.js"></script>
 <script src="js/sound.js"></script>
