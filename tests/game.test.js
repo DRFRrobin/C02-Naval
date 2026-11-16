@@ -317,6 +317,24 @@ test('Bouclier : la liste des bateaux permet de le poser sans chercher sa flotte
   await ctx.close();
 });
 
+test('téléphone : les outils de placement restent fixés en bas', async () => {
+  const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
+  await pg.click('#mBot'); await phase(pg, 'place', 8000);
+  const r = await pg.evaluate(() => { const b = $('placeBar').getBoundingClientRect(), g = $('placeGrid').getBoundingClientRect();
+    return { pos: getComputedStyle($('placeBar')).position, bottom: b.bottom, top: b.top, gridBottom: g.bottom, h: innerHeight }; });
+  assert.equal(r.pos, 'fixed'); assert.ok(Math.abs(r.bottom - r.h) <= 1, 'collée en bas');
+  assert.ok(r.gridBottom <= r.top, 'la grille de placement est entièrement visible au-dessus de la barre');
+  await pg.evaluate(() => scrollTo(0, document.body.scrollHeight));
+  assert.ok(await pg.evaluate(() => $('shipList').getBoundingClientRect().bottom <= $('placeBar').getBoundingClientRect().top), 'la liste des bateaux n\'est pas cachée');
+  assert.ok(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'pas de débordement horizontal');
+  await pg.click('#btnRandom', { timeout: 3000 }); await pg.click('#btnReady', { timeout: 3000 });
+  await phase(pg, 'game', 8000);
+  await pg.setViewportSize({ width: 1200, height: 800 });
+  assert.equal(await pg.evaluate(() => getComputedStyle($('placeBar')).position), 'static');
+  assert.deepEqual(pg.errors, []);
+  await ctx.close();
+});
+
 test('téléphone : les boutons d\'action restent fixés en bas pendant la partie', async () => {
   const ctx = await newContext(); const pg = await newPage(ctx, { width: 390, height: 844 });
   await pg.click('#mBot'); await ready(pg); await phase(pg, 'game', 8000);

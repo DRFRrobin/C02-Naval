@@ -139,7 +139,10 @@ $('btnReady').onclick = setReady;
 document.querySelectorAll('.btnQuit').forEach(b => { b.onclick = quitGame; });
 document.querySelectorAll('#modes button').forEach(b => { b.onclick = () => setMode(b.dataset.mode); });
 // La barre d'actions fixe change de hauteur (liste du Bouclier, texte d'aide) : la page garde la place qu'il faut dessous.
-if (window.ResizeObserver) new ResizeObserver(() => document.documentElement.style.setProperty('--actbar-h', $('actBar').offsetHeight + 'px')).observe($('actBar'));
+if (window.ResizeObserver) {
+  new ResizeObserver(() => document.documentElement.style.setProperty('--actbar-h', $('actBar').offsetHeight + 'px')).observe($('actBar'));
+  new ResizeObserver(() => document.documentElement.style.setProperty('--placebar-h', $('placeBar').offsetHeight + 'px')).observe($('placeBar'));
+}
 $('shieldPick').onclick = e => { const b = e.target.closest('button[data-ship]'); if (b) protectShip(+b.dataset.ship); };
 $('btnSeeGrids').onclick = () => $('end').classList.remove('show');
 $('btnBackEnd').onclick = () => $('end').classList.add('show');

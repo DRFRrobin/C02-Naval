@@ -17,6 +17,7 @@ Chaque bateau ennemi coulé donne une amélioration au choix : **Radar** (zone 2
 
 **Pendant la partie :**
 - Sur téléphone, les boutons **Tir / Radar / Croix / Bouclier** restent fixés en bas de l'écran, sous le pouce ; sur ordinateur, ils sont sous la grille adverse.
+- De même pendant le **placement** : Pivoter / Aléatoire / Effacer, Poser / Retirer et **Prêt** restent fixés en bas de l'écran du téléphone.
 - **Radar et Frappe en croix se confirment** : un premier appui montre la zone visée, un second sur la même case tire (un appui ailleurs déplace la visée). Aucune amélioration gâchée par erreur.
 - **Bouclier** : une liste des bateaux encore protégeables apparaît à côté des boutons ; toucher un nom suffit (toucher le bateau dans « Ta flotte » marche toujours).
 
