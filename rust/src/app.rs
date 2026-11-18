@@ -145,6 +145,7 @@ pub enum Confirm {
 
 #[derive(Debug)]
 enum Timer {
+    BackToMenu,
     BotEmit(Json),
     BotMove,
     TurnSound,
@@ -480,6 +481,7 @@ impl App {
     pub fn new(cc: &eframe::CreationContext) -> App {
         crate::theme::setup_fonts(&cc.egui_ctx);
         let settings = Settings::load();
+        crate::net::set_user_turn(&settings.turn_url, &settings.turn_user, &settings.turn_cred);
         crate::theme::apply_theme(&cc.egui_ctx, theme_index(&settings));
         let (tx, rx) = channel();
         let net = Net::new(tx, cc.egui_ctx.clone());
@@ -613,6 +615,20 @@ impl App {
     pub fn set_lang(&mut self, l: Lang) {
         self.settings.lang = l;
         self.settings.save();
+    }
+    pub fn set_bot_enabled(&mut self, on: bool) {
+        self.settings.bot = on;
+        self.settings.save();
+    }
+    pub fn set_skill(&mut self, s: u8) {
+        self.settings.skill = s.min(2);
+        self.settings.save();
+    }
+    pub fn save_turn(&mut self) {
+        self.settings.turn_url = self.settings.turn_url.trim().to_string();
+        self.settings.save();
+        crate::net::set_user_turn(&self.settings.turn_url, &self.settings.turn_user, &self.settings.turn_cred);
+        self.set_msg = (self.t("turnSaved"), MsgKind::Ok);
     }
     pub fn toggle_sound(&mut self) {
         self.settings.sound = !self.settings.sound;
@@ -1597,10 +1613,14 @@ impl App {
        ========================================================= */
 
     pub fn start_bot(&mut self) {
+        if !self.settings.bot {
+            self.dash_msg = (self.t("botOff"), MsgKind::Err);
+            return;
+        }
         self.s.kind = Some(Kind::Bot);
         self.s.vs_bot = true;
         self.s.is_host = true;
-        self.s.bot = Some(Bot::new());
+        self.s.bot = Some(Bot::new(self.settings.skill.min(2)));
         self.s.connected = true;
         self.s.opp = Some(Opp { name: self.t("botName"), photo: None, level: self.my_identity().level.max(1), bot: true });
         self.enter_placement();
@@ -2448,7 +2468,7 @@ impl App {
         self.timers.clear();
         self.s.reset_round();
         if self.s.vs_bot {
-            self.s.bot = Some(Bot::new());
+            self.s.bot = Some(Bot::new(self.settings.skill.min(2)));
         }
         self.enter_placement();
         if self.s.vs_bot {
@@ -2589,8 +2609,14 @@ impl App {
                 self.s.mm_deadline = None;
             } else if now >= d {
                 self.stop_search();
-                self.lobby_msg = (self.t("noOneFound"), MsgKind::Ok);
-                self.after_ms(1000, Timer::StartBot);
+                if self.settings.bot {
+                    self.lobby_msg = (self.t("noOneFound"), MsgKind::Ok);
+                    self.after_ms(1000, Timer::StartBot);
+                } else {
+                    // bot désactivé : personne n'est venu, retour au tableau de bord
+                    self.lobby_msg = (self.t("noBotMsg"), MsgKind::Err);
+                    self.after_ms(2500, Timer::BackToMenu);
+                }
             }
         }
         // Liaison : ping régulier et détection de coupure.
@@ -2656,6 +2682,11 @@ impl App {
             Timer::OpenChoice => self.s.show_choice = self.s.phase == Phase::Game && self.s.choices > 0,
             Timer::EndSound(win) => self.play(if win { "win" } else { "lose" }),
             Timer::EndShow => self.s.end_show = true,
+            Timer::BackToMenu => {
+                if !self.s.connected {
+                    self.reset_to_menu();
+                }
+            }
             Timer::StartBot => {
                 if !self.s.connected {
                     self.start_bot();

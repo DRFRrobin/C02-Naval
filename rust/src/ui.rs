@@ -818,6 +818,68 @@ impl App {
                 ui.add_space(8.0);
                 sub_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        label(ui, ic::ROBOT, reg(20.0), pal().green);
+                        ui.add_space(6.0);
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            label(ui, self.t("rBotT"), bold(16.0), pal().text);
+                            wrapped(ui, self.t("rBotD"), reg(13.0), pal().muted);
+                        });
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            let on = self.settings.bot;
+                            let (r, resp) = ui.allocate_exact_size(vec2(58.0, 36.0), Sense::click());
+                            ui.painter().rect_filled(r, rd(9.0), if on { pal().ok } else { rgb(0x33, 0x41, 0x55) });
+                            let g = ui.painter().layout_no_wrap(if on { "ON" } else { "OFF" }.into(), bold(13.0), if on { Color32::WHITE } else { rgb(0xcb, 0xd5, 0xe1) });
+                            ui.painter().galley(r.center() - g.size() / 2.0, g, pal().text);
+                            if resp.hovered() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+                            if resp.clicked() {
+                                self.set_bot_enabled(!on);
+                            }
+                        });
+                    });
+                    ui.add_space(6.0);
+                    label(ui, self.t("rSkillT"), semi(14.0), pal().text);
+                    let mut sk_sel = self.settings.skill.min(2);
+                    let names = [self.t("skill0"), self.t("skill1"), self.t("skill2")];
+                    ui.add_enabled_ui(self.settings.bot, |ui| {
+                        egui::ComboBox::from_id_salt("skillSel")
+                            .selected_text(egui::RichText::new(names[sk_sel as usize].clone()).font(reg(14.0)))
+                            .width(ui.available_width() - 8.0)
+                            .show_ui(ui, |ui| {
+                                for (i, n) in names.iter().enumerate() {
+                                    ui.selectable_value(&mut sk_sel, i as u8, n.as_str());
+                                }
+                            });
+                    });
+                    if sk_sel != self.settings.skill {
+                        self.set_skill(sk_sel);
+                    }
+                });
+                ui.add_space(8.0);
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    label(ui, self.t("advT"), bold(16.0), pal().text);
+                    wrapped(ui, self.t("advD"), reg(13.0), pal().muted);
+                    ui.add_space(6.0);
+                    let (h1, h2, h3) = (self.t("turnUrlPh"), self.t("turnUserPh"), self.t("turnCredPh"));
+                    let mut s = self.settings.clone();
+                    let mut changed = false;
+                    changed |= theme::text_input(ui, &mut s.turn_url, false, 200, &h1).lost_focus();
+                    changed |= theme::text_input(ui, &mut s.turn_user, false, 100, &h2).lost_focus();
+                    changed |= theme::text_input(ui, &mut s.turn_cred, true, 200, &h3).lost_focus();
+                    self.settings.turn_url = s.turn_url;
+                    self.settings.turn_user = s.turn_user;
+                    self.settings.turn_cred = s.turn_cred;
+                    if changed {
+                        self.save_turn();
+                    }
+                });
+                ui.add_space(8.0);
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
                     label(ui, self.t("themeT"), bold(16.0), pal().text);
                     wrapped(ui, self.t("themeD"), reg(13.0), pal().muted);
                     ui.add_space(6.0);

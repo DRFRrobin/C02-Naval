@@ -239,16 +239,18 @@ pub struct Bot {
     pub incoming: Vec<Option<Mark>>,
     know: Vec<Option<Mark>>,
     remaining: Vec<usize>,
+    /// Niveau : 0 facile, 1 moyen, 2 difficile.
+    skill: u8,
 }
 
 impl Bot {
-    pub fn new() -> Bot {
+    pub fn new(skill: u8) -> Bot {
         let ships = random_cells(&LENS)
             .into_iter()
             .zip(LENS)
             .map(|(cells, len)| Ship { len, cells: Some(cells), shield: Shield::None })
             .collect();
-        Bot { ships, incoming: vec![None; N * N], know: vec![None; N * N], remaining: LENS.to_vec() }
+        Bot { ships, incoming: vec![None; N * N], know: vec![None; N * N], remaining: LENS.to_vec(), skill }
     }
 
     /// Le bot apprend le résultat de son propre tir.
@@ -273,8 +275,37 @@ impl Bot {
         }
     }
 
+    fn random_unknown(&self) -> Cell {
+        let free: Vec<usize> = (0..N * N).filter(|&k| self.know[k].is_none()).collect();
+        let k = free[rand::thread_rng().gen_range(0..free.len().max(1)).min(free.len().saturating_sub(1))];
+        (k / N, k % N)
+    }
+
     pub fn choose(&self) -> Cell {
         let k_ = &self.know;
+        let mut rng = rand::thread_rng();
+        if self.skill == 0 {
+            // facile : tirs au hasard, avec un peu de bon sens autour d'un touché
+            let mut near = vec![];
+            for k in 0..N * N {
+                if k_[k] != Some(Mark::Hit) {
+                    continue;
+                }
+                let (r, c) = ((k / N) as i32, (k % N) as i32);
+                for (a, b) in [(r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)] {
+                    if inside(a, b) && k_[a as usize * N + b as usize].is_none() {
+                        near.push((a as usize, b as usize));
+                    }
+                }
+            }
+            if !near.is_empty() && rng.gen::<f64>() < 0.6 {
+                return near[rng.gen_range(0..near.len())];
+            }
+            return self.random_unknown();
+        }
+        if self.skill == 1 && rng.gen::<f64>() < 0.3 {
+            return self.random_unknown();
+        }
         if let Some(k) = k_.iter().position(|v| *v == Some(Mark::Blocked)) {
             return (k / N, k % N); // bouclier : on retire au même endroit
         }
@@ -316,7 +347,6 @@ impl Bot {
                 }
             }
         }
-        let mut rng = rand::thread_rng();
         let mut best = -1.0;
         let mut best_k: Option<usize> = None;
         for k in 0..N * N {
@@ -355,17 +385,21 @@ mod tests {
 
     #[test]
     fn bot_finishes_a_game() {
-        let mut target = Bot::new();
-        let shooter = &mut Bot::new();
-        for _ in 0..100 {
-            let at = shooter.choose();
-            let (res, over) = resolve_on(&mut target.ships, &mut target.incoming, ActKind::Shot, &[at]);
-            shooter.learn(&res);
-            if over {
-                return;
+        for skill in 0..=2 {
+            let mut target = Bot::new(2);
+            let shooter = &mut Bot::new(skill);
+            let mut done = false;
+            for _ in 0..100 {
+                let at = shooter.choose();
+                let (res, over) = resolve_on(&mut target.ships, &mut target.incoming, ActKind::Shot, &[at]);
+                shooter.learn(&res);
+                if over {
+                    done = true;
+                    break;
+                }
             }
+            assert!(done, "le bot de niveau {skill} n'a pas fini en 100 tirs");
         }
-        panic!("le bot n'a pas fini en 100 tirs");
     }
 }
 

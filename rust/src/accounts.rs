@@ -32,6 +32,23 @@ pub struct Settings {
     pub current: Option<String>, // dernier compte connecté ("guest" = invité)
     #[serde(default)]
     pub theme: Option<String>, // thème choisi (None = automatique : Rétro Noël en décembre, Océan sinon)
+    #[serde(default = "yes")]
+    pub bot: bool, // adversaire bot autorisé (partie contre le bot et bot de secours du mode aléatoire)
+    #[serde(default = "skill_default")]
+    pub skill: u8, // niveau du bot : 0 facile, 1 moyen, 2 difficile
+    #[serde(default)]
+    pub turn_url: String, // relais TURN personnel (facultatif)
+    #[serde(default)]
+    pub turn_user: String,
+    #[serde(default)]
+    pub turn_cred: String,
+}
+
+fn yes() -> bool {
+    true
+}
+fn skill_default() -> u8 {
+    2
 }
 
 impl Settings {
@@ -39,7 +56,7 @@ impl Settings {
         fs::read_to_string(data_dir().join("settings.json"))
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None, theme: None })
+            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None, theme: None, bot: true, skill: 2, turn_url: String::new(), turn_user: String::new(), turn_cred: String::new() })
     }
     pub fn save(&self) {
         let _ = fs::create_dir_all(data_dir());
