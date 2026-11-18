@@ -1158,7 +1158,9 @@ impl App {
             }
         });
         // Message d'aide
-        let (text, kind) = if self.s.me_ready {
+        let (text, kind) = if self.s.reconnecting {
+            (self.t("reconnecting"), MsgKind::Info)
+        } else if self.s.me_ready {
             (if self.s.opp_ready { String::new() } else { self.t("waitOppReady") }, MsgKind::Info)
         } else if self.s.opp_away {
             (self.t("oppAway"), MsgKind::Info)
@@ -1181,6 +1183,8 @@ impl App {
         // Bandeau d'état
         let (text, fill, col) = if self.s.lost {
             (self.t("stLost"), pal().btn, pal().muted)
+        } else if self.s.reconnecting {
+            (self.t("stReconnecting"), pal().btn, pal().yellow)
         } else if self.s.phase == Phase::Over {
             (self.t("stOver"), pal().btn, pal().muted)
         } else if self.s.waiting {

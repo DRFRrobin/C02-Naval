@@ -248,7 +248,8 @@ struct Conn {
 type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn open_ws(id: &str, token: &str) -> Option<Ws> {
-    let url = format!("{SIGNAL_URL}?key={PEERJS_KEY}&id={id}&token={token}&version={PEERJS_VERSION}");
+    let signal = std::env::var("C02NAVAL_SIGNAL").unwrap_or_else(|_| SIGNAL_URL.to_string()); // test : serveur PeerJS local
+    let url = format!("{signal}?key={PEERJS_KEY}&id={id}&token={token}&version={PEERJS_VERSION}");
     match tokio::time::timeout(Duration::from_secs(15), tokio_tungstenite::connect_async(url)).await {
         Ok(Ok((ws, _))) => Some(ws),
         _ => None,

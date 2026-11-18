@@ -27,6 +27,8 @@ pub const JOIN_TIMEOUT: Duration = Duration::from_secs(15);
 pub const MATCH_TIMER: u32 = 20;
 /// Durée maximale d'attente de la grille dévoilée par l'adversaire en fin de partie.
 pub const VERIFY_WAIT: Duration = Duration::from_secs(10);
+/// Durée pendant laquelle on tente de reprendre une partie dont la liaison est coupée.
+pub const RECONNECT: Duration = Duration::from_secs(45);
 pub const WEB_URL: &str = "https://drfrrobin.github.io/C02-Naval/";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -284,6 +286,22 @@ pub struct GameState {
     pub rematch_me: bool,
     pub rematch_opp: bool,
     pub opp_gone: bool,
+    // reprise après coupure
+    pub sid: Option<String>,     // identifiant de la partie (annoncé par l'hôte)
+    pub host_id: Option<String>, // point de rendez-vous de l'hôte
+    pub txn: u64,
+    pub rxn: u64,
+    pub outbox: Vec<Json>,
+    pub reconnecting: bool,
+    pub recon_deadline: Option<Instant>,
+    pub rpeer: Option<PeerId>,
+    pub gpeer: Option<PeerId>,
+    pub gconn: Option<ConnId>,
+    pub gconn_open: bool,
+    pub g_deadline: Option<Instant>,
+    pub next_ask: Instant,
+    pub next_attempt: Instant,
+    pub resume_conns: Vec<ConnId>,
 }
 
 impl GameState {
@@ -355,6 +373,21 @@ impl GameState {
             rematch_me: false,
             rematch_opp: false,
             opp_gone: false,
+            sid: None,
+            host_id: None,
+            txn: 0,
+            rxn: 0,
+            outbox: vec![],
+            reconnecting: false,
+            recon_deadline: None,
+            rpeer: None,
+            gpeer: None,
+            gconn: None,
+            gconn_open: false,
+            g_deadline: None,
+            next_ask: now,
+            next_attempt: now,
+            resume_conns: vec![],
         }
     }
 
@@ -373,6 +406,13 @@ impl GameState {
             vs_bot: keep_bot,
             opp: self.opp.take(),
             rules: self.rules,
+            sid: self.sid.take(),
+            host_id: self.host_id.take(),
+            txn: self.txn,
+            rxn: self.rxn,
+            outbox: std::mem::take(&mut self.outbox),
+            rpeer: self.rpeer,
+            resume_conns: std::mem::take(&mut self.resume_conns),
             rounds: self.rounds + 1,
             last_seen: Instant::now(),
             next_ping: Instant::now() + HEARTBEAT,
@@ -1033,6 +1073,14 @@ impl App {
     fn handle_net(&mut self, e: NetEvent) {
         match e {
             NetEvent::PeerOpen(pid) => {
+                if self.s.gpeer == Some(pid) {
+                    if let Some(h) = self.s.host_id.clone() {
+                        let c = self.net.connect(pid, &h);
+                        self.s.gconn = Some(c);
+                        self.s.gconn_open = false;
+                    }
+                    return;
+                }
                 if self.s.peer != Some(pid) {
                     return;
                 }
@@ -1065,6 +1113,10 @@ impl App {
                 }
             }
             NetEvent::PeerError(pid, err) => {
+                if self.s.gpeer == Some(pid) {
+                    self.end_attempt();
+                    return;
+                }
                 if self.s.peer != Some(pid) {
                     return;
                 }
@@ -1106,12 +1158,34 @@ impl App {
                 }
             }
             NetEvent::PeerDisconnected(pid) => {
+                if self.s.connected && (self.s.rpeer == Some(pid) || self.s.peer == Some(pid)) && self.s.is_host {
+                    // l'hôte reste joignable : on se réenregistre pour la reprise
+                    if self.s.kind != Some(Kind::Random) || self.s.rpeer == Some(pid) {
+                        self.after_ms(1000, Timer::Reconnect(pid));
+                    }
+                    return;
+                }
                 if self.s.peer == Some(pid) && matches!(self.s.role, Some(PeerRole::Host | PeerRole::SlotOwner(_))) {
                     self.keep_peer_alive(pid);
                 }
             }
             NetEvent::Incoming(pid, conn) => {
                 self.net.adopt(pid, conn);
+                let resumable = self.s.connected
+                    && self.s.is_host
+                    && self.s.sid.is_some()
+                    && !self.s.lost
+                    && !self.s.vs_bot
+                    && self.s.phase != Phase::Over
+                    && (self.s.rpeer == Some(pid) || self.s.peer == Some(pid));
+                if resumable {
+                    self.s.resume_conns.push(conn); // première réponse attendue : « resume »
+                    return;
+                }
+                if self.s.rpeer == Some(pid) {
+                    self.net.close_conn(conn);
+                    return;
+                }
                 if self.s.peer != Some(pid) || self.s.mm_stopped && self.s.kind == Some(Kind::Random) {
                     self.net.close_conn(conn);
                     return;
@@ -1119,6 +1193,11 @@ impl App {
                 self.accept_conn(conn);
             }
             NetEvent::ConnOpen(conn) => {
+                if self.s.gconn == Some(conn) {
+                    self.s.gconn_open = true;
+                    self.s.next_ask = Instant::now();
+                    return;
+                }
                 if self.s.reject_conns.contains(&conn) {
                     self.net.send(conn, json!({"t":"busy"}));
                     self.after_ms(300, Timer::BusyClose(conn));
@@ -1130,25 +1209,46 @@ impl App {
                     if self.s.kind == Some(Kind::Host) {
                         hello["rules"] = self.s.rules.to_json(); // l'hôte annonce les règles de la partie
                     }
+                    if self.s.is_host && self.s.kind != Some(Kind::Join) {
+                        // identifiant de partie et point de reprise après coupure
+                        let sid = self.s.sid.get_or_insert_with(|| gen_code() + &gen_code()).clone();
+                        let rid = self.s.host_id.get_or_insert_with(|| {
+                            if self.s.kind == Some(Kind::Host) { format!("{PREFIX}{}", self.s.code) } else { format!("{PREFIX}{}", gen_code()) }
+                        });
+                        hello["sid"] = json!(sid);
+                        hello["rid"] = json!(rid);
+                    }
                     self.send(hello);
                 }
             }
             NetEvent::ConnData(conn, m) => {
-                if self.s.conn == Some(conn) {
+                if self.s.resume_conns.contains(&conn) {
+                    self.s.resume_conns.retain(|c| *c != conn);
+                    self.on_resume_request(conn, &m);
+                } else if self.s.gconn == Some(conn) {
+                    if m["t"] == "resume" && m["sid"].as_str() == self.s.sid.as_deref() && self.s.reconnecting {
+                        let rx = m["rx"].as_u64().unwrap_or(0);
+                        self.s.gconn = None;
+                        self.s.gconn_open = false;
+                        self.s.g_deadline = None;
+                        self.adopt_conn(conn, rx);
+                    }
+                } else if self.s.conn == Some(conn) {
                     self.on_data(m);
                 }
             }
             NetEvent::ConnClosed(conn) => {
                 self.s.reject_conns.retain(|c| *c != conn);
+                self.s.resume_conns.retain(|c| *c != conn);
+                if self.s.gconn == Some(conn) {
+                    self.end_attempt();
+                    return;
+                }
                 if self.s.conn != Some(conn) {
                     return;
                 }
                 if self.s.connected {
-                    if self.s.phase == Phase::Over && !self.s.lost && !self.s.vs_bot {
-                        self.s.opp_gone = true; // il a quitté l'écran de fin
-                    } else {
-                        self.lost();
-                    }
+                    self.conn_down();
                 } else {
                     self.on_reject(false);
                 }
@@ -1168,17 +1268,131 @@ impl App {
             if let Some(p) = self.s.peer {
                 self.net.disconnect(p);
             }
+            if self.s.is_host && self.s.rpeer.is_none() {
+                if let Some(rid) = self.s.host_id.clone() {
+                    self.s.rpeer = Some(self.net.create_peer(Some(rid)));
+                }
+            }
         }
         self.enter_placement();
     }
 
-    pub fn send(&mut self, m: Json) {
+    pub fn send(&mut self, mut m: Json) {
         if self.s.vs_bot {
             self.bot_receive(&m);
             return;
         }
-        if let Some(c) = self.s.conn {
+        // messages numérotés, renvoyés après une coupure
+        if ["ready", "act", "res", "pass", "quit", "reveal"].contains(&m["t"].as_str().unwrap_or("")) {
+            self.s.txn += 1;
+            m["n"] = json!(self.s.txn);
+            self.s.outbox.push(m.clone());
+        }
+        if let (Some(c), false) = (self.s.conn, self.s.reconnecting) {
             self.net.send(c, m);
+        }
+    }
+
+    /* ---------- Reprise après coupure (45 s) ---------- */
+
+    fn conn_down(&mut self) {
+        if self.s.phase == Phase::Over && self.s.connected && !self.s.lost && !self.s.vs_bot {
+            self.s.opp_gone = true; // il a quitté l'écran de fin
+            return;
+        }
+        if !self.s.connected || self.s.lost || self.s.phase == Phase::Over || self.s.vs_bot || self.s.reconnecting {
+            return;
+        }
+        if self.s.sid.is_none() || (!self.s.is_host && self.s.host_id.is_none()) {
+            self.lost(); // adversaire sans reprise possible (ancienne version)
+            return;
+        }
+        self.s.reconnecting = true;
+        self.s.recon_deadline = Some(Instant::now() + RECONNECT);
+        self.s.next_attempt = Instant::now();
+        if let Some(c) = self.s.conn {
+            self.net.close_conn(c);
+        }
+    }
+
+    /// Adopte une nouvelle liaison avec l'adversaire et renvoie ce qu'il n'a pas reçu.
+    fn adopt_conn(&mut self, conn: ConnId, their_rx: u64) {
+        if let Some(old) = self.s.conn.replace(conn) {
+            if old != conn {
+                self.net.close_conn(old);
+            }
+        }
+        self.s.reconnecting = false;
+        self.s.recon_deadline = None;
+        self.s.last_seen = Instant::now();
+        self.s.opp_away = false;
+        self.s.outbox.retain(|x| x["n"].as_u64().unwrap_or(0) > their_rx);
+        for m in self.s.outbox.clone() {
+            self.net.send(conn, m);
+        }
+    }
+
+    /// Hôte : un invité demande à reprendre la partie.
+    fn on_resume_request(&mut self, conn: ConnId, m: &Json) {
+        let ok = m["t"] == "resume"
+            && self.s.sid.is_some()
+            && m["sid"].as_str() == self.s.sid.as_deref()
+            && self.s.connected
+            && !self.s.lost
+            && self.s.phase != Phase::Over;
+        if !ok {
+            self.net.send(conn, json!({"t":"busy"}));
+            self.after_ms(300, Timer::BusyClose(conn));
+            return;
+        }
+        self.net.send(conn, json!({"t":"resume","sid":self.s.sid,"rx":self.s.rxn}));
+        self.adopt_conn(conn, m["rx"].as_u64().unwrap_or(0));
+    }
+
+    /// Invité : tentative périodique de reprise (nouveau pair, connexion au point de rendez-vous de l'hôte).
+    fn guest_attempt(&mut self) {
+        if self.s.gpeer.is_some() {
+            return;
+        }
+        let pid = self.net.create_peer(None);
+        self.s.gpeer = Some(pid);
+        self.s.g_deadline = Some(Instant::now() + Duration::from_secs(8));
+    }
+
+    fn end_attempt(&mut self) {
+        if let Some(p) = self.s.gpeer.take() {
+            self.net.destroy(p);
+        }
+        self.s.gconn = None;
+        self.s.gconn_open = false;
+        self.s.g_deadline = None;
+    }
+
+    fn recon_tick(&mut self, now: Instant) {
+        if !self.s.reconnecting {
+            return;
+        }
+        if self.s.recon_deadline.is_some_and(|d| now > d) {
+            self.s.reconnecting = false;
+            self.end_attempt();
+            self.lost();
+            return;
+        }
+        if self.s.is_host {
+            return;
+        }
+        if self.s.g_deadline.is_some_and(|d| now > d) {
+            self.end_attempt();
+        }
+        if self.s.gpeer.is_none() && now >= self.s.next_attempt {
+            self.s.next_attempt = now + Duration::from_secs(3);
+            self.guest_attempt();
+        }
+        if let (Some(c), true) = (self.s.gconn, self.s.gconn_open) {
+            if now >= self.s.next_ask {
+                self.s.next_ask = now + Duration::from_millis(1500);
+                self.net.send(c, json!({"t":"resume","sid":self.s.sid,"rx":self.s.rxn}));
+            }
         }
     }
 
@@ -1188,6 +1402,7 @@ impl App {
         }
         self.record_interrupted();
         self.s.lost = true;
+        self.s.reconnecting = false;
         self.s.phase = Phase::Over;
         self.s.show_choice = false;
         self.s.end = Some(EndInfo {
@@ -1285,7 +1500,19 @@ impl App {
         if !m.is_object() || self.s.lost {
             return;
         }
+        if let Some(n) = m["n"].as_u64() {
+            // message numéroté : on ignore les doublons (renvoi après coupure)
+            if n <= self.s.rxn {
+                return;
+            }
+            self.s.rxn = n;
+        }
         match m["t"].as_str().unwrap_or("") {
+            "ping" => {
+                if let Some(a) = m["a"].as_u64() {
+                    self.s.outbox.retain(|x| x["n"].as_u64().unwrap_or(0) > a);
+                }
+            }
             "hello" => {
                 let name: String = m["name"].as_str().unwrap_or("?").chars().take(16).collect();
                 let photo = m["photo"].as_str().filter(|p| valid_photo(p)).map(|s| s.to_string());
@@ -1302,6 +1529,14 @@ impl App {
                             }
                             self.join_fail(t);
                             return;
+                        }
+                    }
+                }
+                if !self.s.connected && !self.s.is_host && !self.s.vs_bot {
+                    if let (Some(sid), Some(rid)) = (m["sid"].as_str(), m["rid"].as_str()) {
+                        if sid.len() <= 40 && rid.len() <= 60 {
+                            self.s.sid = Some(sid.to_string());
+                            self.s.host_id = Some(rid.to_string());
                         }
                     }
                 }
@@ -2247,7 +2482,7 @@ impl App {
             return;
         }
         // pas notre tour, tir en cours ou choix d'amélioration ouvert : le chronomètre repart de zéro
-        if !self.s.my_turn || self.s.waiting || self.s.show_choice || self.s.choices > 0 {
+        if !self.s.my_turn || self.s.waiting || self.s.show_choice || self.s.choices > 0 || self.s.reconnecting {
             self.s.turn_start = if self.s.my_turn { Some(Instant::now()) } else { None };
             return;
         }
@@ -2361,11 +2596,16 @@ impl App {
         if self.s.connected && !self.s.vs_bot && !self.s.lost && self.s.phase != Phase::Over {
             if now >= self.s.next_ping {
                 self.s.next_ping = now + HEARTBEAT;
-                self.send(json!({"t":"ping"}));
+                let a = self.s.rxn;
+                self.send(json!({"t":"ping","a":a}));
             }
-            let limit = if self.s.opp_away { AWAY_TIMEOUT } else { TIMEOUT };
-            if now.duration_since(self.s.last_seen) > limit {
-                self.lost();
+            if self.s.reconnecting {
+                self.recon_tick(now);
+            } else {
+                let limit = if self.s.opp_away { AWAY_TIMEOUT } else { TIMEOUT };
+                if now.duration_since(self.s.last_seen) > limit {
+                    self.conn_down();
+                }
             }
         }
         self.turn_tick();
@@ -2389,7 +2629,7 @@ impl App {
         if let Some(t) = self.timers.iter().map(|(t, _)| *t).min() {
             next = next.min(t.saturating_duration_since(now));
         }
-        if self.s.mm_deadline.is_some() || (self.s.rules.timer > 0 && self.s.phase == Phase::Game) {
+        if self.s.reconnecting || self.s.mm_deadline.is_some() || (self.s.rules.timer > 0 && self.s.phase == Phase::Game) {
             next = next.min(Duration::from_millis(250));
         }
         ctx.request_repaint_after(next);
@@ -2433,7 +2673,7 @@ impl App {
             }
             Timer::TrySlot(k) => self.try_slot(k),
             Timer::Reconnect(pid) => {
-                if !self.s.connected && self.s.peer == Some(pid) {
+                if (!self.s.connected && self.s.peer == Some(pid)) || (self.s.connected && (self.s.rpeer == Some(pid) || self.s.peer == Some(pid))) {
                     self.net.reconnect(pid);
                 }
             }
