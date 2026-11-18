@@ -1231,6 +1231,7 @@ impl App {
                         self.s.gconn = None;
                         self.s.gconn_open = false;
                         self.s.g_deadline = None;
+                        self.s.gpeer = None; // le pair reste en vie (il porte la nouvelle liaison) ; une prochaine coupure en créera un autre
                         self.adopt_conn(conn, rx);
                     }
                 } else if self.s.conn == Some(conn) {
