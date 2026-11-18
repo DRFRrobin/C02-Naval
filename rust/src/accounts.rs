@@ -30,6 +30,8 @@ pub struct Settings {
     pub lang: Lang,
     #[serde(default)]
     pub current: Option<String>, // dernier compte connecté ("guest" = invité)
+    #[serde(default)]
+    pub theme: Option<String>, // thème choisi (None = automatique : Rétro Noël en décembre, Océan sinon)
 }
 
 impl Settings {
@@ -37,7 +39,7 @@ impl Settings {
         fs::read_to_string(data_dir().join("settings.json"))
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None })
+            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None, theme: None })
     }
     pub fn save(&self) {
         let _ = fs::create_dir_all(data_dir());

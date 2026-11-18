@@ -9,6 +9,7 @@ mod app;
 mod binarypack;
 mod game;
 mod i18n;
+mod i18n_data;
 mod icon;
 mod net;
 mod sound;

@@ -368,3 +368,190 @@ mod tests {
         panic!("le bot n'a pas fini en 100 tirs");
     }
 }
+
+/* =========================================================
+   Anti-triche (même protocole que la version web)
+   Chaque joueur décide seul si un tir l'a touché : un client modifié pourrait mentir. En se déclarant
+   prêt, il envoie donc l'empreinte SHA-256 de sa grille (avec un sel aléatoire). En fin de partie,
+   chacun dévoile sa grille et son sel ; l'autre contrôle l'empreinte, la validité de la flotte et que
+   chaque résultat annoncé correspond bien à cette grille.
+   ========================================================= */
+
+pub fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+pub fn board_hash(salt: &str, ships: &[Vec<Cell>]) -> String {
+    use sha2::{Digest, Sha256};
+    let board = ships
+        .iter()
+        .map(|cells| cells.iter().map(|&(r, c)| (r * N + c).to_string()).collect::<Vec<_>>().join(","))
+        .collect::<Vec<_>>()
+        .join(";");
+    let lens = LENS.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(",");
+    hex(&Sha256::digest(format!("c02-naval-v1|{N}|{lens}|{salt}|{board}").as_bytes()))
+}
+
+pub fn new_salt() -> String {
+    let mut b = [0u8; 16];
+    rand::Rng::fill(&mut rand::thread_rng(), &mut b);
+    hex(&b)
+}
+
+pub fn is_hash(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// Contrôle la grille dévoilée par l'adversaire. `true` = honnête.
+pub fn check_reveal(m: &Json, commit: &str, enemy: &[Option<Mark>], blocked_seen: u32, opp_shields: u32) -> bool {
+    let Some(salt) = m["salt"].as_str().filter(|s| s.len() == 32 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))) else {
+        return false;
+    };
+    let Some(raw) = m["ships"].as_array().filter(|a| a.len() == LENS.len()) else { return false };
+    let mut occ = [false; N * N];
+    let mut ships: Vec<Vec<Cell>> = vec![];
+    for (i, rs) in raw.iter().enumerate() {
+        let Some(rs) = rs.as_array().filter(|a| a.len() == LENS[i]) else { return false };
+        let mut cells: Vec<Cell> = vec![];
+        for p in rs {
+            let (Some(r), Some(c)) = (p[0].as_i64(), p[1].as_i64()) else { return false };
+            if !inside(r as i32, c as i32) {
+                return false;
+            }
+            cells.push((r as usize, c as usize));
+        }
+        let horiz = cells.iter().all(|p| p.0 == cells[0].0);
+        let vert = cells.iter().all(|p| p.1 == cells[0].1);
+        if !horiz && !vert {
+            return false;
+        }
+        let mut pos: Vec<usize> = cells.iter().map(|p| if horiz { p.1 } else { p.0 }).collect();
+        pos.sort_unstable();
+        if pos.windows(2).any(|w| w[1] != w[0] + 1) {
+            return false;
+        }
+        for &(r, c) in &cells {
+            if occ[r * N + c] {
+                return false;
+            }
+            occ[r * N + c] = true;
+        }
+        ships.push(cells);
+    }
+    if board_hash(salt, &ships) != commit || blocked_seen > opp_shields {
+        return false;
+    }
+    for k in 0..N * N {
+        let has = occ[k];
+        match enemy[k] {
+            Some(Mark::Miss) | Some(Mark::ScanEmpty) if has => return false,
+            Some(Mark::Hit) | Some(Mark::Sunk) | Some(Mark::Blocked) | Some(Mark::ScanOcc) if !has => return false,
+            _ => {}
+        }
+    }
+    // un bateau annoncé coulé l'est en entier
+    !ships.iter().any(|cells| {
+        cells.iter().any(|&(r, c)| enemy[r * N + c] == Some(Mark::Sunk)) && !cells.iter().all(|&(r, c)| enemy[r * N + c] == Some(Mark::Sunk))
+    })
+}
+
+/* ---------- XP (même formule que js/profile.js et server/app.js) ---------- */
+
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct XpParts {
+    pub base: u64,
+    pub hits: u64,
+    pub sunk: u64,
+    pub acc: u64,
+    pub time: u64,
+}
+
+impl XpParts {
+    pub fn sum(&self) -> u64 {
+        self.base + self.hits + self.sunk + self.acc + self.time
+    }
+}
+
+/// Détail de l'XP et gain : participation/victoire, touchés, bateaux coulés, précision, rapidité (victoire).
+pub fn xp_parts(win: bool, shots: u32, hits: u32, sunk: u32, duration: u64, half: bool) -> (XpParts, u64) {
+    let acc = if shots > 0 { hits as f64 / shots as f64 } else { 0.0 };
+    let p = XpParts {
+        base: if win { 100 } else { 30 },
+        hits: hits as u64 * 5,
+        sunk: sunk as u64 * 20,
+        acc: (acc * if win { 100.0 } else { 30.0 }).round() as u64,
+        time: if win { (60.0 * ((900.0 - duration as f64) / 720.0).clamp(0.0, 1.0)).round() as u64 } else { 0 },
+    };
+    let sum = p.sum();
+    (p, if half { (sum as f64 / 2.0).round() as u64 } else { sum })
+}
+
+#[cfg(test)]
+mod anticheat_tests {
+    use super::*;
+
+    fn fleet() -> Vec<Vec<Cell>> {
+        random_cells(&LENS)
+    }
+
+    #[test]
+    fn random_fleets_are_contiguous_and_ascending() {
+        for _ in 0..200 {
+            let f = fleet();
+            for (i, cells) in f.iter().enumerate() {
+                assert_eq!(cells.len(), LENS[i]);
+                let horiz = cells.iter().all(|c| c.0 == cells[0].0);
+                let key: Vec<usize> = cells.iter().map(|c| if horiz { c.1 } else { c.0 }).collect();
+                assert!(key.windows(2).all(|w| w[1] == w[0] + 1), "{cells:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn board_hash_matches_web_vector() {
+        // Vecteur calculé avec la version web (crypto.subtle) : voir tests/game.test.js (« c02-naval-v1 »).
+        let ships: Vec<Vec<Cell>> = vec![
+            (0..5).map(|c| (0, c)).collect(),
+            (0..4).map(|c| (1, c)).collect(),
+            (0..3).map(|c| (2, c)).collect(),
+            (0..3).map(|c| (3, c)).collect(),
+            (0..2).map(|c| (4, c)).collect(),
+        ];
+        let salt = "00112233445566778899aabbccddeeff";
+        let h = board_hash(salt, &ships);
+        assert_eq!(h.len(), 64);
+        assert_eq!(h, include_str!("../testdata/hash_vector.txt").trim());
+    }
+
+    #[test]
+    fn honest_reveal_passes_and_lies_fail() {
+        let ships = fleet();
+        let salt = new_salt();
+        let commit = board_hash(&salt, &ships);
+        let reveal = json!({"t":"reveal","salt":salt,"ships":ships.iter().map(|c| cells_json(c)).collect::<Vec<_>>()});
+        let mut enemy = vec![None; N * N];
+        assert!(check_reveal(&reveal, &commit, &enemy, 0, 0));
+        // un « raté » sur une case occupée est un mensonge
+        let (r, c) = ships[0][0];
+        enemy[r * N + c] = Some(Mark::Miss);
+        assert!(!check_reveal(&reveal, &commit, &enemy, 0, 0));
+        enemy[r * N + c] = None;
+        // un « bloqué » sans bouclier annoncé aussi
+        assert!(!check_reveal(&reveal, &commit, &enemy, 1, 0));
+        // une grille différente de l'empreinte
+        assert!(!check_reveal(&reveal, &"0".repeat(64), &enemy, 0, 0));
+    }
+
+    #[test]
+    fn xp_formula() {
+        // victoire : 100 + 17 touchés × 5 + 5 coulés × 20 + précision 17/40 × 100 + rapidité (10 min : 60 × 300/720)
+        let (p, gain) = xp_parts(true, 40, 17, 5, 600, false);
+        assert_eq!((p.base, p.hits, p.sunk, p.acc, p.time), (100, 85, 100, 43, 25));
+        assert_eq!(gain, 353);
+        let (_, half) = xp_parts(true, 40, 17, 5, 600, true);
+        assert_eq!(half, 177);
+        let (p, gain) = xp_parts(false, 10, 2, 0, 600, false);
+        assert_eq!((p.base, p.hits, p.acc, p.time), (30, 10, 6, 0));
+        assert_eq!(gain, 46);
+    }
+}

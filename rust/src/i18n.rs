@@ -6,26 +6,66 @@ pub enum Lang {
     #[default]
     Fr,
     En,
+    Pt,
+    Es,
+    De,
+    It,
 }
 
 impl Lang {
-    pub fn detect() -> Lang {
-        // Langue de Windows : français si l'interface utilisateur est en français.
-        let l = std::env::var("LANG").unwrap_or_default().to_lowercase();
-        if l.starts_with("en") {
-            return Lang::En;
+    pub const ALL: [Lang; 6] = [Lang::Fr, Lang::En, Lang::Pt, Lang::Es, Lang::De, Lang::It];
+
+    /// Indice dans les tables de `i18n_data`.
+    pub fn idx(self) -> usize {
+        self as usize
+    }
+
+    /// Nom de la langue, écrit dans cette langue.
+    pub fn label(self) -> &'static str {
+        match self {
+            Lang::Fr => "Français",
+            Lang::En => "English",
+            Lang::Pt => "Português",
+            Lang::Es => "Español",
+            Lang::De => "Deutsch",
+            Lang::It => "Italiano",
         }
+    }
+
+    #[cfg_attr(windows, allow(dead_code))]
+    fn from_code(c: &str) -> Option<Lang> {
+        match c.get(..2)?.to_lowercase().as_str() {
+            "fr" => Some(Lang::Fr),
+            "en" => Some(Lang::En),
+            "pt" => Some(Lang::Pt),
+            "es" => Some(Lang::Es),
+            "de" => Some(Lang::De),
+            "it" => Some(Lang::It),
+            _ => None,
+        }
+    }
+
+    pub fn detect() -> Lang {
+        // Langue de Windows (langue d'affichage), sinon variable LANG ; anglais pour une langue non gérée.
         #[cfg(windows)]
         {
             extern "system" {
                 fn GetUserDefaultUILanguage() -> u16;
             }
-            let id = unsafe { GetUserDefaultUILanguage() };
-            if id & 0x3ff != 0x0c {
-                return Lang::En;
-            }
+            let id = unsafe { GetUserDefaultUILanguage() } & 0x3ff;
+            return match id {
+                0x0c => Lang::Fr,
+                0x16 => Lang::Pt,
+                0x0a => Lang::Es,
+                0x07 => Lang::De,
+                0x10 => Lang::It,
+                _ => Lang::En,
+            };
         }
-        Lang::Fr
+        #[cfg(not(windows))]
+        {
+            std::env::var("LANG").ok().and_then(|l| Lang::from_code(&l)).unwrap_or(Lang::En)
+        }
     }
 }
 
@@ -43,6 +83,13 @@ pub fn fill(s: &str, p: &[(&str, String)]) -> String {
 }
 
 pub fn tr(lang: Lang, key: &str) -> &'static str {
+    let table = [crate::i18n_data::FR, crate::i18n_data::EN, crate::i18n_data::PT, crate::i18n_data::ES, crate::i18n_data::DE, crate::i18n_data::IT][lang.idx()];
+    if let Some(s) = own(lang, key) {
+        return s;
+    }
+    if let Ok(i) = table.binary_search_by(|(k, _)| (*k).cmp(key)) {
+        return table[i].1;
+    }
     let fr = lang == Lang::Fr;
     macro_rules! t {
         ($f:expr, $e:expr) => {
@@ -253,53 +300,71 @@ pub fn tr(lang: Lang, key: &str) -> &'static str {
         "updFailed" => t!("La mise à jour a échoué. Télécharge la nouvelle version sur la page des versions, puis remplace ce fichier.", "The update failed. Download the new version from the releases page, then replace this file."),
         "updOpen" => t!("Ouvrir la page des versions", "Open the releases page"),
         "updQuit" => t!("Quitter", "Quit"),
+        "rulesUnsupported" => t!(
+            "L'hôte utilise des règles personnalisées (grille ou flotte) que cette version Windows ne gère pas encore.",
+            "The host uses custom rules (grid or fleet) that this Windows version does not support yet."
+        ),
         _ => "?",
     }
 }
 
 pub fn ranks(lang: Lang) -> [&'static str; 11] {
-    match lang {
-        Lang::Fr => [
-            "Mousse", "Matelot", "Quartier-maître", "Second-maître", "Maître", "Enseigne", "Lieutenant",
-            "Capitaine de corvette", "Capitaine de frégate", "Capitaine de vaisseau", "Amiral",
-        ],
-        Lang::En => [
-            "Cabin boy", "Sailor", "Leading seaman", "Petty officer", "Chief petty officer", "Ensign", "Lieutenant",
-            "Lieutenant commander", "Commander", "Captain", "Admiral",
-        ],
+    crate::i18n_data::RANKS[lang.idx()]
+}
+
+/// Noms du bateau n° `i` de la flotte `lens` (deux bateaux de même longueur : deux noms différents).
+pub fn ship_name(lang: Lang, lens: &[usize], i: usize) -> String {
+    let len = lens[i];
+    let list: &[&str] = crate::i18n_data::SHIPS[lang.idx()].get(len.wrapping_sub(1)).copied().unwrap_or(&[]);
+    let same = lens.iter().filter(|&&l| l == len).count();
+    let occ = lens[..i].iter().filter(|&&l| l == len).count();
+    let first = list.first().copied().unwrap_or("?");
+    if same == 1 {
+        return first.to_string();
     }
+    list.get(occ).map_or_else(|| format!("{first} {}", occ + 1), |s| s.to_string())
+}
+
+pub fn theme_name(lang: Lang, k: usize) -> &'static str {
+    crate::i18n_data::THEMES[lang.idx()][k]
+}
+
+/// Pluriel : en français 0 et 1 sont au singulier, dans les autres langues seul 1 l'est.
+fn pln(lang: Lang, n: usize, one: &str, many: &str) -> String {
+    let sing = if lang == Lang::Fr { n <= 1 } else { n == 1 };
+    format!("{n} {}", if sing { one } else { many })
 }
 
 pub fn sum_radar(lang: Lang, cell: &str, n: usize, total: usize) -> String {
+    let one = total == 1;
     match lang {
         Lang::Fr => format!("Radar en {cell} : {} sur {total}.", pl(n, "case occupée", "cases occupées")),
         Lang::En => format!("Radar at {cell}: {n} of {total} square{} occupied.", if total > 1 { "s" } else { "" }),
+        Lang::Pt => format!("Radar em {cell}: {n} de {total} {}.", if one { "casa ocupada" } else { "casas ocupadas" }),
+        Lang::Es => format!("Radar en {cell}: {n} de {total} {}.", if one { "casilla ocupada" } else { "casillas ocupadas" }),
+        Lang::De => format!("Radar auf {cell}: {n} von {total} {} besetzt.", if one { "Feld" } else { "Feldern" }),
+        Lang::It => format!("Radar su {cell}: {n} di {total} {}.", if one { "casella occupata" } else { "caselle occupate" }),
     }
 }
 
 pub fn sum_shot(lang: Lang, cell: &str, v: &str, ship: &str) -> String {
-    match lang {
-        Lang::Fr => {
-            let r = match v {
-                "miss" => "raté.".to_string(),
-                "hit" => "touché !".to_string(),
-                "blocked" => "bloqué par un bouclier.".to_string(),
-                "sunk" => format!("coulé ! ({ship})"),
-                _ => String::new(),
-            };
-            format!("Tir en {cell} : {r}")
-        }
-        Lang::En => {
-            let r = match v {
-                "miss" => "miss.".to_string(),
-                "hit" => "hit!".to_string(),
-                "blocked" => "blocked by a shield.".to_string(),
-                "sunk" => format!("sunk! ({ship})"),
-                _ => String::new(),
-            };
-            format!("Shot at {cell}: {r}")
-        }
-    }
+    let (head, miss, hit, blocked, sunk) = match lang {
+        Lang::Fr => ("Tir en", "raté.", "touché !", "bloqué par un bouclier.", format!("coulé ! ({ship})")),
+        Lang::En => ("Shot at", "miss.", "hit!", "blocked by a shield.", format!("sunk! ({ship})")),
+        Lang::Pt => ("Tiro em", "água.", "acertou!", "bloqueado por um escudo.", format!("afundado! ({ship})")),
+        Lang::Es => ("Disparo en", "agua.", "¡tocado!", "bloqueado por un escudo.", format!("¡hundido! ({ship})")),
+        Lang::De => ("Schuss auf", "Wasser.", "Treffer!", "vom Schild abgewehrt.", format!("versenkt! ({ship})")),
+        Lang::It => ("Colpo su", "acqua.", "colpito!", "bloccato da uno scudo.", format!("affondata! ({ship})")),
+    };
+    let r = match v {
+        "miss" => miss.to_string(),
+        "hit" => hit.to_string(),
+        "blocked" => blocked.to_string(),
+        "sunk" => sunk,
+        _ => String::new(),
+    };
+    let colon = if lang == Lang::Fr { " :" } else { ":" };
+    format!("{head} {cell}{colon} {r}")
 }
 
 pub fn sum_cross(lang: Lang, cell: &str, hits: usize, miss: usize, blk: usize, sunk: &str, sunk_n: usize) -> String {
@@ -313,10 +378,37 @@ pub fn sum_cross(lang: Lang, cell: &str, hits: usize, miss: usize, blk: usize, s
         ),
         Lang::En => format!(
             "Cross strike at {cell}: {}, {}{}.{}",
-            pl(hits, "hit", "hits"),
-            pl(miss, "miss", "misses"),
+            pln(lang, hits, "hit", "hits"),
+            pln(lang, miss, "miss", "misses"),
             if blk > 0 { format!(", {blk} blocked") } else { String::new() },
             if sunk_n > 0 { format!(" {sunk} sunk!") } else { String::new() }
+        ),
+        Lang::Pt => format!(
+            "Ataque em cruz em {cell}: {}, {}{}.{}",
+            pln(lang, hits, "acerto", "acertos"),
+            pln(lang, miss, "falha", "falhas"),
+            if blk > 0 { format!(", {blk} bloqueado(s)") } else { String::new() },
+            if sunk_n > 0 { format!(" {sunk} afundado(s)!") } else { String::new() }
+        ),
+        Lang::Es => format!(
+            "Ataque en cruz en {cell}: {}, {}{}.{}",
+            pln(lang, hits, "tocado", "tocados"),
+            pln(lang, miss, "agua", "aguas"),
+            if blk > 0 { format!(", {blk} bloqueado(s)") } else { String::new() },
+            if sunk_n > 0 { format!(" ¡{sunk} hundido(s)!") } else { String::new() }
+        ),
+        Lang::De => format!(
+            "Kreuzschlag auf {cell}: {}, {miss} × Wasser{}.{}",
+            pln(lang, hits, "Treffer", "Treffer"),
+            if blk > 0 { format!(", {blk} abgewehrt") } else { String::new() },
+            if sunk_n > 0 { format!(" {sunk} versenkt!") } else { String::new() }
+        ),
+        Lang::It => format!(
+            "Attacco a croce su {cell}: {}, {}{}.{}",
+            pln(lang, hits, "colpo a segno", "colpi a segno"),
+            pln(lang, miss, "a vuoto", "a vuoto"),
+            if blk > 0 { format!(", {blk} bloccato/i") } else { String::new() },
+            if sunk_n > 0 { format!(" {sunk} affondata/e!") } else { String::new() }
         ),
     }
 }
@@ -324,6 +416,173 @@ pub fn sum_cross(lang: Lang, cell: &str, hits: usize, miss: usize, blk: usize, s
 pub fn end_stats(lang: Lang, shots: usize, acc: u32) -> String {
     match lang {
         Lang::Fr => format!("{}, {acc} % de précision.", pl(shots, "tir", "tirs")),
-        Lang::En => format!("{}, {acc}% accuracy.", pl(shots, "shot", "shots")),
+        Lang::En => format!("{}, {acc}% accuracy.", pln(lang, shots, "shot", "shots")),
+        Lang::Pt => format!("{}, {acc} % de precisão.", pln(lang, shots, "tiro", "tiros")),
+        Lang::Es => format!("{}, {acc} % de precisión.", pln(lang, shots, "disparo", "disparos")),
+        Lang::De => format!("{}, {acc} % Trefferquote.", pln(lang, shots, "Schuss", "Schüsse")),
+        Lang::It => format!("{}, {acc} % di precisione.", pln(lang, shots, "colpo", "colpi")),
+    }
+}
+
+/// Textes propres à l'application Windows (mise à jour, sélection de photo…) pour les langues
+/// absentes du tableau principal ; le français et l'anglais sont dans `tr`.
+fn own(lang: Lang, key: &str) -> Option<&'static str> {
+    let i = match lang {
+        Lang::Pt => 0,
+        Lang::Es => 1,
+        Lang::De => 2,
+        Lang::It => 3,
+        _ => return None,
+    };
+    let v: [&'static str; 4] = match key {
+        "yes" => ["Sim", "Sí", "Ja", "Sì"],
+        "no" => ["Não", "No", "Nein", "No"],
+        "back" => ["Voltar", "Volver", "Zurück", "Indietro"],
+        "photoPick" => ["Escolher uma foto", "Elegir una foto", "Foto auswählen", "Scegli una foto"],
+        "images" => ["Imagens", "Imágenes", "Bilder", "Immagini"],
+        "updChecking" => ["A procurar atualizações…", "Buscando actualizaciones…", "Suche nach Updates…", "Ricerca di aggiornamenti…"],
+        "updTitle" => ["Atualização obrigatória", "Actualización obligatoria", "Pflicht-Update", "Aggiornamento obbligatorio"],
+        "updText" => [
+            "A versão {to} está disponível (tens a {from}). Está a ser instalada automaticamente.",
+            "La versión {to} está disponible (tienes la {from}). Se está instalando automáticamente.",
+            "Version {to} ist verfügbar (du hast {from}). Sie wird automatisch installiert.",
+            "La versione {to} è disponibile (hai la {from}). Viene installata automaticamente.",
+        ],
+        "updDownloading" => ["A transferir… {pct}", "Descargando… {pct}", "Wird heruntergeladen… {pct}", "Download… {pct}"],
+        "updRestarting" => [
+            "Instalação concluída: a reiniciar…",
+            "Instalación terminada: reiniciando…",
+            "Update installiert: Neustart…",
+            "Installazione completata: riavvio…",
+        ],
+        "updFailed" => [
+            "A atualização falhou. Transfere a nova versão na página de versões e substitui este ficheiro.",
+            "La actualización ha fallado. Descarga la nueva versión en la página de versiones y reemplaza este archivo.",
+            "Das Update ist fehlgeschlagen. Lade die neue Version von der Release-Seite herunter und ersetze diese Datei.",
+            "L'aggiornamento non è riuscito. Scarica la nuova versione dalla pagina delle versioni e sostituisci questo file.",
+        ],
+        "updOpen" => ["Abrir a página de versões", "Abrir la página de versiones", "Release-Seite öffnen", "Apri la pagina delle versioni"],
+        "updQuit" => ["Sair", "Salir", "Beenden", "Esci"],
+        "localNote" => [
+            "As contas são guardadas neste computador.",
+            "Las cuentas se guardan en este ordenador.",
+            "Konten werden auf diesem Computer gespeichert.",
+            "Gli account sono salvati su questo computer.",
+        ],
+        "noAccounts" => [
+            "Nenhuma conta neste computador: cria a tua!",
+            "No hay cuentas en este ordenador: ¡crea la tuya!",
+            "Noch kein Konto auf diesem Computer: Erstelle deins!",
+            "Nessun account su questo computer: creane uno!",
+        ],
+        "photoT" => ["Foto de perfil", "Foto de perfil", "Profilbild", "Foto del profilo"],
+        "photoD" => [
+            "Clica também no avatar no canto superior esquerdo para a alterar.",
+            "Haz clic también en el avatar de arriba a la izquierda para cambiarla.",
+            "Klicke auch auf den Avatar oben links, um es zu ändern.",
+            "Fai clic anche sull'avatar in alto a sinistra per cambiarla.",
+        ],
+        "photoChange" => ["Mudar a foto", "Cambiar la foto", "Foto ändern", "Cambia foto"],
+        "editT" => [
+            "Alterar o nome e/ou a palavra-passe",
+            "Cambiar el nombre y/o la contraseña",
+            "Namen und/oder Passwort ändern",
+            "Cambia il nome e/o la password",
+        ],
+        "errPseudoTaken" => [
+            "Este nome já existe neste computador.",
+            "Este nombre ya existe en este ordenador.",
+            "Dieser Name existiert auf diesem Computer bereits.",
+            "Questo nome esiste già su questo computer.",
+        ],
+        "errStorage" => [
+            "Não foi possível guardar a conta no disco.",
+            "No se puede guardar la cuenta en el disco.",
+            "Das Konto konnte nicht auf der Festplatte gespeichert werden.",
+            "Impossibile salvare l'account sul disco.",
+        ],
+        "reconnecting" => [
+            "A religar ao serviço de ligação…",
+            "Reconectando con el servicio de emparejamiento…",
+            "Verbindung zum Vermittlungsdienst wird wiederhergestellt…",
+            "Riconnessione al servizio di abbinamento…",
+        ],
+        "rulesUnsupported" => [
+            "O anfitrião usa regras personalizadas (grelha ou frota) que esta versão Windows ainda não suporta.",
+            "El anfitrión usa reglas personalizadas (cuadrícula o flota) que esta versión de Windows aún no admite.",
+            "Der Gastgeber nutzt eigene Regeln (Raster oder Flotte), die diese Windows-Version noch nicht unterstützt.",
+            "L'host usa regole personalizzate (griglia o flotta) che questa versione per Windows non supporta ancora.",
+        ],
+        _ => return None,
+    };
+    Some(v[i])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n_data::*;
+
+    #[test]
+    fn tables_are_sorted_for_binary_search() {
+        for t in [FR, EN, PT, ES, DE, IT] {
+            assert!(t.windows(2).all(|w| w[0].0 < w[1].0), "table non triée");
+        }
+    }
+
+    #[test]
+    fn every_key_has_a_text_in_every_language() {
+        // les clés du tableau complet (italien) doivent exister, et être non vides, dans les six langues
+        for (k, _) in IT {
+            for l in Lang::ALL {
+                let s = tr(l, k);
+                assert!(s != "?" && !s.is_empty(), "clé {k} sans texte en {l:?}");
+            }
+        }
+        for k in ["yes", "no", "back", "photoPick", "images", "updTitle", "updText", "updQuit", "rulesUnsupported", "localNote", "photoChange"] {
+            for l in Lang::ALL {
+                assert!(tr(l, k) != "?", "clé {k} sans texte en {l:?}");
+            }
+        }
+    }
+
+    /// Toute clé de texte employée dans le code (`t("clé")`, `tf("clé", …)`) doit avoir un texte dans chaque langue.
+    #[test]
+    fn keys_used_in_code_exist() {
+        let mut checked = 0;
+        for src in [include_str!("app.rs"), include_str!("ui.rs"), include_str!("update.rs")] {
+            for pat in [".t(\"", ".tf(\"", "tr(l, \"", "tr(self.lang(), \"", "tr(self.settings.lang, \""] {
+                for part in src.split(pat).skip(1) {
+                    let Some(key) = part.split('"').next() else { continue };
+                    if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                        continue;
+                    }
+                    for l in Lang::ALL {
+                        assert!(tr(l, key) != "?", "clé « {key} » sans texte en {l:?}");
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 100, "seulement {checked} clés trouvées");
+    }
+
+    #[test]
+    fn ship_names_follow_fleet() {
+        let lens = [5, 4, 3, 3, 2];
+        assert_eq!(ship_name(Lang::En, &lens, 0), "Carrier");
+        assert_eq!(ship_name(Lang::En, &lens, 2), "Destroyer");
+        assert_eq!(ship_name(Lang::En, &lens, 3), "Submarine");
+        assert_eq!(ship_name(Lang::Fr, &lens, 4), "Torpilleur");
+    }
+
+    #[test]
+    fn summaries_in_all_languages() {
+        for l in Lang::ALL {
+            assert!(sum_radar(l, "C5", 2, 4).contains("C5"));
+            assert!(sum_shot(l, "C5", "sunk", "X").contains('X'));
+            assert!(sum_cross(l, "C5", 2, 3, 1, "X", 1).contains("C5"));
+            assert!(end_stats(l, 12, 50).contains("12"));
+        }
     }
 }

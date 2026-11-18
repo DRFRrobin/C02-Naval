@@ -15,7 +15,8 @@ La plus récente en premier :
 
 | Version | Date | Changements |
 |---|---|---|
-| [**1.2.0**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) (dernière) | 2026-11-15 | Mise à jour obligatoire depuis GitHub à chaque lancement |
+| [**1.3.0**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.3.0-windows) (dernière) | 2026-11-18 | Parité avec la version web 1.2.4 : anti-triche, revanche, chronomètre 20 s, 7 thèmes dont Rétro, 6 langues, partage du résultat |
+| [1.2.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) | 2026-11-15 | Mise à jour obligatoire depuis GitHub à chaque lancement |
 | [1.1.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.1.0-windows) | 2026-11-15 | Première version Windows en Rust |
 
 > La version 1.1.0 ne peut pas se mettre à jour toute seule : la remplacer une fois à la main par la dernière version.
@@ -29,7 +30,7 @@ La plus récente en premier :
 - Pas d'Internet (ou GitHub ne répond pas) : le jeu démarre avec la version actuelle.
 - Si le remplacement échoue (par exemple dans un dossier protégé en écriture comme `Program Files`), un lien vers la page des versions est affiché.
 
-Pour publier une mise à jour : augmenter `version` dans `Cargo.toml`, compiler, puis créer une release avec le tag `vX.Y.Z-windows` et le fichier `C02-Naval-windows-x64.exe` joint, et ajouter une ligne en haut du tableau **Versions**.
+Pour publier une mise à jour : augmenter `version` dans `Cargo.toml`, ajouter une ligne en haut du tableau **Versions**, puis pousser le tag `vX.Y.Z-windows` : le workflow `rust-windows` compile, teste et joint `C02-Naval-windows-x64.exe` à la release.
 
 ## Fonctionnalités (identiques à la version web)
 

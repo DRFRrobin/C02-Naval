@@ -6,7 +6,7 @@ use egui_phosphor::regular as ic;
 use crate::accounts::{level_of, valid_photo, xp_for, Stats};
 use crate::app::*;
 use crate::game::*;
-use crate::i18n::Lang;
+use crate::i18n::{self, Lang};
 use crate::theme::{self, *};
 
 /* =========================================================
@@ -24,7 +24,7 @@ pub struct Look {
 }
 impl Default for Look {
     fn default() -> Self {
-        Look { fill: WATER, sym: "", sym_col: TEXT, ring: None, last: false, hover: None }
+        Look { fill: pal().water, sym: "", sym_col: pal().text, ring: None, last: false, hover: None }
     }
 }
 
@@ -69,17 +69,17 @@ fn draw_grid(ui: &mut Ui, width: f32, looks: &[Look], small: bool, outline: Opti
     let hovered = resp.hover_pos().and_then(|p| g.cell_at(p));
     let p = ui.painter();
     if let Some(c) = outline {
-        p.rect_stroke(g.rect.expand(5.5), 6.0, sk(3.0, c));
+        p.rect_stroke(g.rect.expand(5.5), rd(6.0), sk(3.0, c));
     }
     let lf = reg(if small { 10.0 } else { 12.0 });
     let lfb = bold(if small { 10.0 } else { 12.0 });
     for c in 0..N {
         let cr = g.cell_rect(0, c);
-        p.text(pos2(cr.center().x, g.rect.top() + g.lab / 2.0), Align2::CENTER_CENTER, (c + 1).to_string(), lfb.clone(), DIM);
+        p.text(pos2(cr.center().x, g.rect.top() + g.lab / 2.0), Align2::CENTER_CENTER, (c + 1).to_string(), lfb.clone(), pal().dim);
     }
     for r in 0..N {
         let cr = g.cell_rect(r, 0);
-        p.text(pos2(g.rect.left() + g.lab / 2.0, cr.center().y), Align2::CENTER_CENTER, (ROWS[r] as char).to_string(), lfb.clone(), DIM);
+        p.text(pos2(g.rect.left() + g.lab / 2.0, cr.center().y), Align2::CENTER_CENTER, (ROWS[r] as char).to_string(), lfb.clone(), pal().dim);
     }
     let _ = lf;
     let sym_size = (g.cell * 0.5).clamp(9.0, if small { 13.0 } else { 18.0 });
@@ -94,12 +94,12 @@ fn draw_grid(ui: &mut Ui, width: f32, looks: &[Look], small: bool, outline: Opti
                     fill = h;
                 }
             }
-            p.rect_filled(cr, 4.0, fill);
+            p.rect_filled(cr, rd(4.0), fill);
             if let Some(rc) = l.ring {
-                p.rect_stroke(cr.shrink(1.0), 4.0, sk(2.0, rc));
+                p.rect_stroke(cr.shrink(1.0), rd(4.0), sk(2.0, rc));
             }
             if l.last {
-                p.rect_stroke(cr.shrink(1.0), 3.0, sk(2.0, YELLOW));
+                p.rect_stroke(cr.shrink(1.0), rd(3.0), sk(2.0, pal().yellow));
             }
             if !l.sym.is_empty() {
                 p.text(cr.center(), Align2::CENTER_CENTER, l.sym, bold(sym_size), l.sym_col);
@@ -198,41 +198,41 @@ impl App {
                 egui::Frame::none()
                     .fill(card())
                     .stroke(sk(1.0, border2()))
-                    .rounding(18.0)
+                    .rounding(rd(18.0))
                     .inner_margin(egui::Margin::symmetric(26.0, 28.0))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.vertical_centered(|ui| {
                             let (c, bg) = icon_colors("cyan");
                             mode_icon(ui, ic::ANCHOR, c, bg, 64.0);
-                            label(ui, "C02 Naval", bold(26.0), TEXT);
-                            label(ui, format!("v{}", crate::update::current_version()), reg(13.0), MUTED);
+                            label(ui, "C02 Naval", bold(26.0), pal().text);
+                            label(ui, format!("v{}", crate::update::current_version()), reg(13.0), pal().muted);
                             ui.add_space(12.0);
                             match &st {
                                 UpdState::Checking => {
                                     spinner(ui);
-                                    label(ui, self.t("updChecking"), reg(14.0), MUTED);
+                                    label(ui, self.t("updChecking"), reg(14.0), pal().muted);
                                 }
                                 UpdState::Downloading { version, got, total } => {
-                                    label(ui, self.t("updTitle"), bold(20.0), YELLOW);
-                                    wrapped(ui, self.tf("updText", &[("to", version.clone()), ("from", crate::update::current_version())]), reg(14.0), MUTED);
+                                    label(ui, self.t("updTitle"), bold(20.0), pal().yellow);
+                                    wrapped(ui, self.tf("updText", &[("to", version.clone()), ("from", crate::update::current_version())]), reg(14.0), pal().muted);
                                     ui.add_space(10.0);
                                     let frac = if *total > 0 { *got as f32 / *total as f32 } else { 0.0 };
                                     let w = ui.available_width();
                                     xp_bar(ui, frac, w);
                                     let pct = if *total > 0 { format!("{} %", (frac * 100.0).round()) } else { format!("{:.1} Mo", *got as f32 / 1e6) };
-                                    label(ui, self.tf("updDownloading", &[("pct", pct)]), reg(13.0), MUTED);
+                                    label(ui, self.tf("updDownloading", &[("pct", pct)]), reg(13.0), pal().muted);
                                     ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
                                 }
                                 UpdState::Restarting => {
                                     spinner(ui);
-                                    label(ui, self.t("updRestarting"), reg(14.0), GREEN);
+                                    label(ui, self.t("updRestarting"), reg(14.0), pal().green);
                                 }
                                 UpdState::Failed { version, .. } => {
-                                    label(ui, self.t("updTitle"), bold(20.0), YELLOW);
-                                    label(ui, format!("v{} → v{}", crate::update::current_version(), version), num(14.0), SKY);
+                                    label(ui, self.t("updTitle"), bold(20.0), pal().yellow);
+                                    label(ui, format!("v{} → v{}", crate::update::current_version(), version), num(14.0), pal().sky);
                                     ui.add_space(6.0);
-                                    wrapped(ui, self.t("updFailed"), reg(14.0), ERR);
+                                    wrapped(ui, self.t("updFailed"), reg(14.0), pal().err);
                                     ui.add_space(12.0);
                                     if Btn::new(&self.t("updOpen")).icon(ic::LINK).style(Bs::Primary).wide().show(ui).clicked() {
                                         let _ = std::process::Command::new("explorer").arg(crate::update::RELEASES_URL).spawn();
@@ -254,15 +254,15 @@ impl App {
     fn mini_av(&mut self, ui: &mut Ui, photo: Option<&str>, name: &str, size: f32, bot: bool) {
         let (rect, _) = ui.allocate_exact_size(vec2(size, size), Sense::hover());
         let rounding = if size < 34.0 { 8.0 } else { 10.0 };
-        ui.painter().rect(rect, rounding, rgb(0x0b, 0x1a, 0x2e), sk(1.0, border2()));
+        ui.painter().rect(rect, rounding, pal().modal, sk(1.0, border2()));
         let tex = photo.filter(|p| valid_photo(p)).and_then(|p| self.photo_tex(ui.ctx(), p));
         if let Some(t) = tex {
             paint_image(ui, &t, rect, rounding);
         } else if bot {
-            ui.painter().text(rect.center(), Align2::CENTER_CENTER, ic::ROBOT, reg(size * 0.5), GREEN);
+            ui.painter().text(rect.center(), Align2::CENTER_CENTER, ic::ROBOT, reg(size * 0.5), pal().green);
         } else {
             let ch = name.trim().chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or("?".into());
-            ui.painter().text(rect.center(), Align2::CENTER_CENTER, ch, bold(size * 0.42), SKY);
+            ui.painter().text(rect.center(), Align2::CENTER_CENTER, ch, bold(size * 0.42), pal().sky);
         }
     }
 
@@ -275,31 +275,31 @@ impl App {
             egui::Frame::none()
                 .fill(card())
                 .stroke(sk(1.0, border2()))
-                .rounding(18.0)
+                .rounding(rd(18.0))
                 .inner_margin(egui::Margin::symmetric(26.0, 28.0))
                 .shadow(egui::Shadow { offset: vec2(0.0, 20.0), blur: 50.0, spread: 0.0, color: rgba(0, 0, 0, 0.45) })
                 .show(ui, |ui| {
                     ui.vertical_centered(|ui| {
                         let (c, bg) = icon_colors("cyan");
                         let (rect, _) = ui.allocate_exact_size(vec2(64.0, 64.0), Sense::hover());
-                        ui.painter().rect(rect, 16.0, bg, sk(1.0, c.gamma_multiply(0.55)));
+                        ui.painter().rect(rect, rd(16.0), bg, sk(1.0, c.gamma_multiply(0.55)));
                         ui.painter().text(rect.center(), Align2::CENTER_CENTER, ic::ANCHOR, reg(30.0), c);
                         ui.add_space(4.0);
-                        label(ui, "C02 Naval", bold(30.0), TEXT);
-                        label(ui, self.t("tagline"), reg(14.0), MUTED);
+                        label(ui, "C02 Naval", bold(30.0), pal().text);
+                        label(ui, self.t("tagline"), reg(14.0), pal().muted);
                     });
                     ui.add_space(14.0);
                     // Onglets Connexion / Créer un compte
                     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 46.0), Sense::hover());
-                    ui.painter().rect(rect, 12.0, INPUT_BG, sk(1.0, border()));
+                    ui.painter().rect(rect, rd(12.0), pal().input, sk(1.0, border()));
                     let half = (rect.width() - 12.0) / 2.0;
                     for (i, (key, signup)) in [("tabLogin", false), ("tabSignup", true)].into_iter().enumerate() {
                         let r = Rect::from_min_size(rect.min + vec2(4.0 + i as f32 * (half + 4.0), 4.0), vec2(half, 38.0));
                         let resp = ui.interact(r, ui.id().with(key), Sense::click());
                         let on = self.auth_signup == signup;
-                        let fill = if on { PRIMARY } else if resp.hovered() { rgba(255, 255, 255, 0.04) } else { Color32::TRANSPARENT };
-                        ui.painter().rect_filled(r, 9.0, fill);
-                        ui.painter().text(r.center(), Align2::CENTER_CENTER, self.t(key), semi(14.0), if on { Color32::WHITE } else { MUTED });
+                        let fill = if on { pal().primary } else if resp.hovered() { rgba(255, 255, 255, 0.04) } else { Color32::TRANSPARENT };
+                        ui.painter().rect_filled(r, rd(9.0), fill);
+                        ui.painter().text(r.center(), Align2::CENTER_CENTER, self.t(key), semi(14.0), if on { Color32::WHITE } else { pal().muted });
                         if resp.hovered() {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
@@ -319,7 +319,7 @@ impl App {
                         self.guest();
                     }
                     ui.vertical_centered(|ui| {
-                        label(ui, self.t("localNote"), reg(12.0), MUTED);
+                        label(ui, self.t("localNote"), reg(12.0), pal().muted);
                         ui.add_space(6.0);
                         let aw = ui.available_width();
                         ui.horizontal(|ui| {
@@ -331,15 +331,60 @@ impl App {
         });
     }
 
+    /// Choix du thème : « Auto » puis une pastille par thème (couleur d'accent sur fond du thème).
+    fn theme_picker(&mut self, ui: &mut Ui) {
+        let cur = self.settings.theme.clone();
+        let lang = self.lang();
+        let mut pick: Option<Option<&'static str>> = None;
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+            for k in 0..=THEME_IDS.len() {
+                let id = if k == 0 { None } else { Some(THEME_IDS[k - 1]) };
+                let on = match id {
+                    None => cur.as_deref().map_or(true, |c| !THEME_IDS.contains(&c)),
+                    Some(i) => cur.as_deref() == Some(i),
+                };
+                let name = i18n::theme_name(lang, k);
+                let (r, resp) = ui.allocate_exact_size(vec2(if k == 0 { 214.0 } else { 150.0 }, 38.0), Sense::click());
+                let p = ui.painter();
+                p.rect(r, rd(10.0), pal().btn, sk(if on { 2.0 } else { 1.0 }, if on { pal().yellow } else { border2() }));
+                let sw = Rect::from_min_size(r.min + vec2(8.0, 9.0), vec2(20.0, 20.0));
+                match id {
+                    None => {
+                        p.rect_filled(sw, rd(5.0), Colors::from(&palettes::OCEAN).primary);
+                        p.rect_filled(Rect::from_min_max(sw.center_top(), sw.max), rd(5.0), Colors::from(&palettes::XMAS).primary);
+                    }
+                    Some(_) => {
+                        let c = Colors::from(&palettes::ALL[k - 1]);
+                        p.rect_filled(sw, rd(5.0), c.bg[0]);
+                        p.rect_filled(Rect::from_min_max(sw.center(), sw.max), rd(5.0), c.primary);
+                    }
+                }
+                let g = p.layout_no_wrap(name.to_string(), semi(13.0), pal().text);
+                p.galley(pos2(sw.max.x + 8.0, r.center().y - g.size().y / 2.0), g, pal().text);
+                if resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if resp.clicked() {
+                    pick = Some(id);
+                }
+            }
+        });
+        if let Some(id) = pick {
+            let ctx = ui.ctx().clone();
+            self.set_theme(&ctx, id);
+        }
+    }
+
     fn lang_combo(&mut self, ui: &mut Ui, id: &str, w: f32) {
         let mut l = self.lang();
-        let name = |l: Lang| if l == Lang::Fr { "Français" } else { "English" };
         egui::ComboBox::from_id_salt(id)
-            .selected_text(egui::RichText::new(name(l)).font(reg(14.0)))
+            .selected_text(egui::RichText::new(l.label()).font(reg(14.0)))
             .width(w)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut l, Lang::Fr, "Français");
-                ui.selectable_value(&mut l, Lang::En, "English");
+                for x in Lang::ALL {
+                    ui.selectable_value(&mut l, x, x.label());
+                }
             });
         if l != self.lang() {
             self.set_lang(l);
@@ -357,8 +402,8 @@ impl App {
                 let on = self.picked.as_deref() == Some(a.id.as_str());
                 let resp = egui::Frame::none()
                     .fill(card2())
-                    .stroke(sk(if on { 2.0 } else { 1.0 }, if on { SKY } else { border() }))
-                    .rounding(12.0)
+                    .stroke(sk(if on { 2.0 } else { 1.0 }, if on { pal().sky } else { border() }))
+                    .rounding(rd(12.0))
                     .inner_margin(egui::Margin::symmetric(10.0, 8.0))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
@@ -367,9 +412,9 @@ impl App {
                             ui.add_space(4.0);
                             ui.vertical(|ui| {
                                 ui.spacing_mut().item_spacing.y = 0.0;
-                                label(ui, &a.name, bold(15.0), TEXT);
+                                label(ui, &a.name, bold(15.0), pal().text);
                                 let l = level_of(a.xp);
-                                label(ui, format!("{} · {} XP", self.tf("levelN", &[("n", l.to_string())]), a.xp), reg(12.0), MUTED);
+                                label(ui, format!("{} · {} XP", self.tf("levelN", &[("n", l.to_string())]), a.xp), reg(12.0), pal().muted);
                             });
                         });
                     })
@@ -431,7 +476,7 @@ impl App {
         // Largeur des 4 boutons de navigation : s'ils ne tiennent pas à côté du joueur, on passe sur 2 lignes.
         let nav_w: f32 = ["navPlay", "navStats", "navSettings", "navLogout"]
             .iter()
-            .map(|k| ui.painter().layout_no_wrap(format!("{}  {}", ic::GEAR, self.t(k)), semi(15.0), TEXT).size().x + 32.0 + 8.0)
+            .map(|k| ui.painter().layout_no_wrap(format!("{}  {}", ic::GEAR, self.t(k)), semi(15.0), pal().text).size().x + 32.0 + 8.0)
             .sum();
         let inner = ui.available_width() - 36.0;
         let who_max = inner - 64.0 - 16.0 - nav_w - 8.0;
@@ -440,7 +485,7 @@ impl App {
         egui::Frame::none()
             .fill(card())
             .stroke(sk(1.0, border()))
-            .rounding(16.0)
+            .rounding(rd(16.0))
             .inner_margin(if narrow { egui::Margin::same(12.0) } else { egui::Margin::symmetric(18.0, 14.0) })
             .shadow(egui::Shadow { offset: vec2(0.0, 10.0), blur: 30.0, spread: 0.0, color: rgba(0, 0, 0, 0.35) })
             .show(ui, |ui| {
@@ -449,20 +494,20 @@ impl App {
                     // Avatar (clic = changer la photo)
                     let (rect, resp) = ui.allocate_exact_size(vec2(64.0, 64.0), if acc.is_some() { Sense::click() } else { Sense::hover() });
                     let photo = acc.as_ref().and_then(|a| a.photo.clone()).filter(|p| valid_photo(p));
-                    ui.painter().rect_filled(rect, 14.0, rgba(0, 0, 0, 0.2));
+                    ui.painter().rect_filled(rect, rd(14.0), rgba(0, 0, 0, 0.2));
                     match photo.and_then(|p| this.photo_tex(ui.ctx(), &p)) {
                         Some(t) => {
                             paint_image(ui, &t, rect.shrink(2.0), 12.0);
-                            ui.painter().rect_stroke(rect, 14.0, sk(2.0, border2()));
+                            ui.painter().rect_stroke(rect, rd(14.0), sk(2.0, border2()));
                         }
                         None => {
                             if acc.is_some() {
-                                dashed_rect(ui, rect.shrink(1.0), sk(2.0, SKY));
+                                dashed_rect(ui, rect.shrink(1.0), sk(2.0, pal().sky));
                             } else {
-                                ui.painter().rect_stroke(rect, 14.0, sk(2.0, SKY));
+                                ui.painter().rect_stroke(rect, rd(14.0), sk(2.0, pal().sky));
                             }
                             let i = if acc.is_some() { ic::CAMERA } else { ic::USER };
-                            ui.painter().text(rect.center(), Align2::CENTER_CENTER, i, reg(20.0), DIM);
+                            ui.painter().text(rect.center(), Align2::CENTER_CENTER, i, reg(20.0), pal().dim);
                         }
                     }
                     if acc.is_some() {
@@ -481,14 +526,14 @@ impl App {
                         ui.spacing_mut().item_spacing.y = 2.0;
                         ui.horizontal(|ui| {
                             let name = acc.as_ref().map_or(this.t("guestName"), |a| a.name.clone());
-                            label(ui, name, bold(18.0), TEXT);
+                            label(ui, name, bold(18.0), pal().text);
                             if let Some(a) = &acc {
                                 let l = level_of(a.xp);
                                 let txt = this.tf("badge", &[("n", l.to_string())]);
-                                let g = ui.painter().layout_no_wrap(txt, bold(12.0), rgb(0x67, 0xe8, 0xf9));
+                                let g = ui.painter().layout_no_wrap(txt, bold(12.0), pal().badge);
                                 let (r, _) = ui.allocate_exact_size(g.size() + vec2(14.0, 4.0), Sense::hover());
-                                ui.painter().rect(r, 6.0, rgba(14, 116, 144, 0.3), sk(1.0, rgba(34, 211, 238, 0.45)));
-                                ui.painter().galley(r.center() - g.size() / 2.0, g, TEXT);
+                                ui.painter().rect(r, rd(6.0), rgba(14, 116, 144, 0.3), sk(1.0, rgba(34, 211, 238, 0.45)));
+                                ui.painter().galley(r.center() - g.size() / 2.0, g, pal().text);
                             }
                         });
                         if let Some(a) = &acc {
@@ -497,10 +542,10 @@ impl App {
                             ui.add_space(5.0);
                             xp_bar(ui, (a.xp - lo) as f32 / (hi - lo) as f32, w);
                             ui.horizontal(|ui| {
-                                label(ui, "XP:", reg(11.0), MUTED);
-                                label(ui, format!("{} / {}", a.xp - lo, hi - lo), bold(11.0), SKY);
+                                label(ui, "XP:", reg(11.0), pal().muted);
+                                label(ui, format!("{} / {}", a.xp - lo, hi - lo), bold(11.0), pal().sky);
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    label(ui, format!("{} · {}", this.tf("levelN", &[("n", l.to_string())]), this.rank_of(l)), reg(11.0), MUTED);
+                                    label(ui, format!("{} · {}", this.tf("levelN", &[("n", l.to_string())]), this.rank_of(l)), reg(11.0), pal().muted);
                                 });
                             });
                         }
@@ -598,7 +643,7 @@ impl App {
                         let resp = egui::Frame::none()
                             .fill(card())
                             .stroke(sk(1.0, border2()))
-                            .rounding(16.0)
+                            .rounding(rd(16.0))
                             .inner_margin(egui::Margin::same(if one_col { 16.0 } else { 24.0 }))
                             .show(ui, |ui| {
                                 ui.set_width(w - if one_col { 32.0 } else { 48.0 });
@@ -609,23 +654,23 @@ impl App {
                                         mode_icon(ui, icon, c, bg, 48.0);
                                         ui.add_space(6.0);
                                         ui.vertical(|ui| {
-                                            label(ui, self.t(tk), bold(17.0), TEXT);
-                                            wrapped(ui, self.t(dk), reg(14.0), MUTED);
+                                            label(ui, self.t(tk), bold(17.0), pal().text);
+                                            wrapped(ui, self.t(dk), reg(14.0), pal().muted);
                                         });
                                     });
                                 } else {
                                     ui.set_min_height(150.0);
                                     mode_icon(ui, icon, c, bg, 48.0);
                                     ui.add_space(18.0);
-                                    label(ui, self.t(tk), bold(20.0), TEXT);
-                                    wrapped(ui, self.t(dk), reg(14.0), MUTED);
+                                    label(ui, self.t(tk), bold(20.0), pal().text);
+                                    wrapped(ui, self.t(dk), reg(14.0), pal().muted);
                                 }
                                 });
                             })
                             .response;
                         let resp = ui.interact(resp.rect, ui.id().with(tk), Sense::click());
                         if resp.hovered() {
-                            ui.painter().rect_stroke(resp.rect, 16.0, sk(1.5, rgba(56, 189, 248, 0.6)));
+                            ui.painter().rect_stroke(resp.rect, rd(16.0), sk(1.5, rgba(56, 189, 248, 0.6)));
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
                         if resp.clicked() {
@@ -653,8 +698,8 @@ impl App {
     fn panel_title(&self, ui: &mut Ui, icon: &str, key: &str) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 12.0;
-            label(ui, icon, reg(22.0), CYAN);
-            label(ui, self.t(key), bold(if ui.available_width() < 600.0 { 21.0 } else { 26.0 }), TEXT);
+            label(ui, icon, reg(22.0), pal().cyan);
+            label(ui, self.t(key), bold(if ui.available_width() < 600.0 { 21.0 } else { 26.0 }), pal().text);
         });
         ui.add_space(12.0);
         let r = ui.available_rect_before_wrap();
@@ -672,12 +717,12 @@ impl App {
                 for (icon, ic_col, val, lab, val_col) in row {
                     let (rect, _) = ui.allocate_exact_size(vec2(w, 112.0), Sense::hover());
                     let p = ui.painter();
-                    p.rect(rect, 12.0, card2(), sk(1.0, border()));
+                    p.rect(rect, rd(12.0), card2(), sk(1.0, border()));
                     let cx = rect.center().x;
                     p.text(pos2(cx, rect.top() + 30.0), Align2::CENTER_CENTER, *icon, reg(20.0), *ic_col);
                     p.text(pos2(cx, rect.top() + 62.0), Align2::CENTER_CENTER, val, num(20.0), *val_col);
-                    let g = p.layout(lab.clone(), reg(13.0), MUTED, w - 12.0);
-                    p.galley(pos2(cx - g.size().x / 2.0, rect.top() + 82.0), g, MUTED);
+                    let g = p.layout(lab.clone(), reg(13.0), pal().muted, w - 12.0);
+                    p.galley(pos2(cx - g.size().x / 2.0, rect.top() + 82.0), g, pal().muted);
                 }
             });
             ui.add_space(gap - 8.0);
@@ -695,29 +740,29 @@ impl App {
                 ui.set_width(ui.available_width());
                 self.panel_title(ui, ic::CHART_LINE, "statsTitle");
                 let career = [
-                    (ic::CLOCK, SKY, fmt_time(s.time_played), self.t("stTime"), TEXT),
-                    (ic::GAME_CONTROLLER, PURPLE, s.games.to_string(), self.t("stGames"), TEXT),
-                    (ic::TROPHY, GREEN, s.wins.to_string(), self.t("stWins"), GREEN),
-                    (ic::SKULL, RED, s.losses.to_string(), self.t("stLosses"), RED),
-                    (ic::PERCENT, SKY, pct(s.wins, s.games), self.t("stWinPct"), SKY),
-                    (ic::PERCENT, YELLOW, pct(s.losses, s.games), self.t("stLossPct"), YELLOW),
-                    (ic::TREND_UP, GREEN, rate(s.wins, s.games), self.t("stWinRate"), GREEN),
-                    (ic::TREND_DOWN, RED, rate(s.losses, s.games), self.t("stLossRate"), RED),
+                    (ic::CLOCK, pal().sky, fmt_time(s.time_played), self.t("stTime"), pal().text),
+                    (ic::GAME_CONTROLLER, pal().purple, s.games.to_string(), self.t("stGames"), pal().text),
+                    (ic::TROPHY, pal().green, s.wins.to_string(), self.t("stWins"), pal().green),
+                    (ic::SKULL, pal().red, s.losses.to_string(), self.t("stLosses"), pal().red),
+                    (ic::PERCENT, pal().sky, pct(s.wins, s.games), self.t("stWinPct"), pal().sky),
+                    (ic::PERCENT, pal().yellow, pct(s.losses, s.games), self.t("stLossPct"), pal().yellow),
+                    (ic::TREND_UP, pal().green, rate(s.wins, s.games), self.t("stWinRate"), pal().green),
+                    (ic::TREND_DOWN, pal().red, rate(s.losses, s.games), self.t("stLossRate"), pal().red),
                 ];
                 self.tile_grid(ui, &career);
                 ui.add_space(18.0);
-                label(ui, self.t("combatTitle").to_uppercase(), bold(15.0), MUTED);
+                label(ui, self.t("combatTitle").to_uppercase(), bold(15.0), pal().muted);
                 ui.add_space(8.0);
                 let fast = s.fastest_win.map_or("—".to_string(), |n| self.tf("shotsN", &[("n", n.to_string())]));
                 let combat = [
-                    (ic::CROSSHAIR, SKY, s.shots.to_string(), self.t("stShots"), TEXT),
-                    (ic::TARGET, GREEN, pct(s.hits, s.shots), self.t("stAcc"), GREEN),
-                    (ic::BOAT, RED, s.sunk.to_string(), self.t("stSunk"), TEXT),
-                    (ic::MAGIC_WAND, PURPLE, s.upgrades.to_string(), self.t("stUpg"), TEXT),
-                    (ic::FIRE, YELLOW, s.streak.to_string(), self.t("stStreak"), YELLOW),
-                    (ic::MEDAL, YELLOW, s.best_streak.to_string(), self.t("stBest"), YELLOW),
-                    (ic::LIGHTNING, SKY, fast, self.t("stFast"), TEXT),
-                    (ic::PLUGS, RED, s.interrupted.to_string(), self.t("stInt"), TEXT),
+                    (ic::CROSSHAIR, pal().sky, s.shots.to_string(), self.t("stShots"), pal().text),
+                    (ic::TARGET, pal().green, pct(s.hits, s.shots), self.t("stAcc"), pal().green),
+                    (ic::BOAT, pal().red, s.sunk.to_string(), self.t("stSunk"), pal().text),
+                    (ic::MAGIC_WAND, pal().purple, s.upgrades.to_string(), self.t("stUpg"), pal().text),
+                    (ic::FIRE, pal().yellow, s.streak.to_string(), self.t("stStreak"), pal().yellow),
+                    (ic::MEDAL, pal().yellow, s.best_streak.to_string(), self.t("stBest"), pal().yellow),
+                    (ic::LIGHTNING, pal().sky, fast, self.t("stFast"), pal().text),
+                    (ic::PLUGS, pal().red, s.interrupted.to_string(), self.t("stInt"), pal().text),
                 ];
                 self.tile_grid(ui, &combat);
                 if acc.is_none() {
@@ -738,19 +783,19 @@ impl App {
                 sub_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
-                        label(ui, ic::SPEAKER_HIGH, reg(20.0), SKY);
+                        label(ui, ic::SPEAKER_HIGH, reg(20.0), pal().sky);
                         ui.add_space(6.0);
                         ui.vertical(|ui| {
                             ui.spacing_mut().item_spacing.y = 2.0;
-                            label(ui, self.t("sndT"), bold(16.0), TEXT);
-                            wrapped(ui, self.t("sndD"), reg(13.0), MUTED);
+                            label(ui, self.t("sndT"), bold(16.0), pal().text);
+                            wrapped(ui, self.t("sndD"), reg(13.0), pal().muted);
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             let on = self.settings.sound;
                             let g = ui.painter().layout_no_wrap(if on { "ON" } else { "OFF" }.into(), bold(13.0), if on { Color32::WHITE } else { rgb(0xcb, 0xd5, 0xe1) });
                             let (r, resp) = ui.allocate_exact_size(vec2(58.0, 36.0), Sense::click());
-                            ui.painter().rect_filled(r, 9.0, if on { rgb(0x05, 0x96, 0x69) } else { rgb(0x33, 0x41, 0x55) });
-                            ui.painter().galley(r.center() - g.size() / 2.0, g, TEXT);
+                            ui.painter().rect_filled(r, rd(9.0), if on { pal().ok } else { rgb(0x33, 0x41, 0x55) });
+                            ui.painter().galley(r.center() - g.size() / 2.0, g, pal().text);
                             if resp.hovered() {
                                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                             }
@@ -764,21 +809,29 @@ impl App {
                 // Langue
                 sub_frame().show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    label(ui, self.t("langT"), bold(16.0), TEXT);
-                    label(ui, self.t("langD"), reg(13.0), MUTED);
+                    label(ui, self.t("langT"), bold(16.0), pal().text);
+                    label(ui, self.t("langD"), reg(13.0), pal().muted);
                     ui.add_space(4.0);
                     let w = ui.available_width();
                     self.lang_combo(ui, "langSel", w - 8.0);
+                });
+                ui.add_space(8.0);
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    label(ui, self.t("themeT"), bold(16.0), pal().text);
+                    wrapped(ui, self.t("themeD"), reg(13.0), pal().muted);
+                    ui.add_space(6.0);
+                    self.theme_picker(ui);
                 });
                 if let Some(a) = acc {
                     ui.add_space(8.0);
                     sub_frame().show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.horizontal(|ui| {
-                            label(ui, ic::IMAGE, reg(16.0), YELLOW);
-                            label(ui, self.t("photoT"), bold(16.0), TEXT);
+                            label(ui, ic::IMAGE, reg(16.0), pal().yellow);
+                            label(ui, self.t("photoT"), bold(16.0), pal().text);
                         });
-                        wrapped(ui, self.t("photoD"), reg(13.0), MUTED);
+                        wrapped(ui, self.t("photoD"), reg(13.0), pal().muted);
                         ui.add_space(6.0);
                         let aw = ui.available_width();
                         ui.horizontal(|ui| {
@@ -797,8 +850,8 @@ impl App {
                     sub_frame().show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.horizontal(|ui| {
-                            label(ui, ic::USER_GEAR, reg(16.0), YELLOW);
-                            wrapped(ui, self.t("editT"), bold(16.0), TEXT);
+                            label(ui, ic::USER_GEAR, reg(16.0), pal().yellow);
+                            wrapped(ui, self.t("editT"), bold(16.0), pal().text);
                         });
                         field_label(ui, &self.t("newPseudo"));
                         text_input(ui, &mut self.edit_name, false, 16, "");
@@ -818,14 +871,14 @@ impl App {
                         ui.set_width(ui.available_width());
                         let aw = ui.available_width();
                         ui.horizontal(|ui| {
-                            label(ui, ic::TRASH, reg(20.0), RED);
+                            label(ui, ic::TRASH, reg(20.0), pal().red);
                             ui.add_space(6.0);
                             let w = (aw - 110.0).max(100.0);
                             ui.vertical(|ui| {
                                 ui.set_width(w);
                                 ui.spacing_mut().item_spacing.y = 2.0;
-                                label(ui, self.t("deleteT"), bold(16.0), TEXT);
-                                wrapped(ui, self.t("deleteD"), reg(13.0), MUTED);
+                                label(ui, self.t("deleteT"), bold(16.0), pal().text);
+                                wrapped(ui, self.t("deleteD"), reg(13.0), pal().muted);
                             });
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 if Btn::new(&self.t("deleteBtn")).style(Bs::Danger).small().show(ui).clicked() {
@@ -850,7 +903,7 @@ impl App {
             egui::Frame::none()
                 .fill(card())
                 .stroke(sk(1.0, border2()))
-                .rounding(18.0)
+                .rounding(rd(18.0))
                 .inner_margin(egui::Margin::symmetric(24.0, 28.0))
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
@@ -858,18 +911,18 @@ impl App {
                         let (c, bg) = icon_colors(if host { "purple" } else { "cyan" });
                         mode_icon(ui, if host { ic::BROADCAST } else { ic::SHUFFLE }, c, bg, 48.0);
                         ui.add_space(4.0);
-                        label(ui, self.t(if host { "lobbyHostT" } else { "lobbyRandomT" }), bold(24.0), TEXT);
-                        wrapped(ui, self.t(if host { "lobbyHostD" } else { "lobbyRandomD" }), reg(15.0), MUTED);
+                        label(ui, self.t(if host { "lobbyHostT" } else { "lobbyRandomT" }), bold(24.0), pal().text);
+                        wrapped(ui, self.t(if host { "lobbyHostD" } else { "lobbyRandomD" }), reg(15.0), pal().muted);
                         if host {
                             ui.add_space(10.0);
                             let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 76.0), Sense::hover());
-                            ui.painter().rect(r, 12.0, INPUT_BG, sk(1.0, border2()));
+                            ui.painter().rect(r, rd(12.0), pal().input, sk(1.0, border2()));
                             let code = if self.s.code.is_empty() { "······".to_string() } else { self.s.code.clone() };
                             let n = code.chars().count() as f32;
                             let step = 38.0 * 1.0;
                             let x0 = r.center().x - step * (n - 1.0) / 2.0;
                             for (i, ch) in code.chars().enumerate() {
-                                ui.painter().text(pos2(x0 + i as f32 * step, r.center().y), Align2::CENTER_CENTER, ch.to_string(), num(36.0), CYAN);
+                                ui.painter().text(pos2(x0 + i as f32 * step, r.center().y), Align2::CENTER_CENTER, ch.to_string(), num(36.0), pal().cyan);
                             }
                             ui.add_space(8.0);
                             let aw = ui.available_width();
@@ -890,7 +943,7 @@ impl App {
                         spinner(ui);
                         msg(ui, &self.lobby_msg.0.clone(), self.lobby_msg.1, 14.0);
                         if let Some(left) = self.countdown_left() {
-                            label(ui, self.tf("countdown", &[("s", left.to_string())]), num(15.0), YELLOW);
+                            label(ui, self.tf("countdown", &[("s", left.to_string())]), num(15.0), pal().yellow);
                         }
                         ui.add_space(6.0);
                         if Btn::new(&self.t("cancel")).style(Bs::Ghost).wide().show(ui).clicked() {
@@ -912,22 +965,22 @@ impl App {
         egui::Frame::none()
             .fill(card())
             .stroke(sk(1.0, border()))
-            .rounding(14.0)
+            .rounding(rd(14.0))
             .inner_margin(egui::Margin::symmetric(14.0, 10.0))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     let who = |this: &mut App, ui: &mut Ui, p: &Opp| {
                         this.mini_av(ui, p.photo.as_deref(), &p.name, 30.0, p.bot);
-                        label(ui, &p.name, bold(14.0), TEXT);
+                        label(ui, &p.name, bold(14.0), pal().text);
                         if p.level > 0 {
-                            label(ui, this.tf("levelShort", &[("n", p.level.to_string())]), bold(11.0), rgb(0x67, 0xe8, 0xf9));
+                            label(ui, this.tf("levelShort", &[("n", p.level.to_string())]), bold(11.0), pal().badge);
                         }
                     };
                     who(self, ui, &me);
                     if let Some(o) = &opp {
                         ui.add_space(4.0);
-                        label(ui, self.t("vs").to_uppercase(), semi(12.0), DIM);
+                        label(ui, self.t("vs").to_uppercase(), semi(12.0), pal().dim);
                         ui.add_space(4.0);
                         who(self, ui, o);
                     }
@@ -992,17 +1045,17 @@ impl App {
         for k in 0..N * N {
             looks[k].hover = None;
             if occ[k] >= 0 {
-                looks[k].fill = SHIP;
+                looks[k].fill = pal().ship;
             }
         }
         if let Some((cells, valid)) = &pv {
             for &(r, c) in cells {
                 let l = &mut looks[r * N + c];
                 if *valid {
-                    l.fill = OK;
+                    l.fill = pal().ok;
                     l.ring = Some(rgb(0xa7, 0xf3, 0xd0));
                 } else {
-                    l.fill = HIT.gamma_multiply(0.85);
+                    l.fill = pal().hit.gamma_multiply(0.85);
                 }
             }
         }
@@ -1036,8 +1089,8 @@ impl App {
     }
 
     fn place_side(&mut self, ui: &mut Ui) {
-        label(ui, self.t("placeTitle"), bold(20.0), TEXT);
-        wrapped(ui, self.t("placeHelp"), reg(13.5), MUTED);
+        label(ui, self.t("placeTitle"), bold(20.0), pal().text);
+        wrapped(ui, self.t("placeHelp"), reg(13.5), pal().muted);
         ui.add_space(6.0);
         // Liste des bateaux (boutons qui se répartissent sur la largeur).
         let w = ui.available_width();
@@ -1057,11 +1110,11 @@ impl App {
                     let a = if placed && !sel { 0.55 } else { 1.0 };
                     let a = if self.s.me_ready { a * 0.6 } else { a };
                     let p = ui.painter();
-                    p.rect(r, 10.0, card2().gamma_multiply(a), sk(if sel { 2.0 } else { 1.0 }, if sel { YELLOW } else { border() }));
-                    p.text(r.left_top() + vec2(10.0, 8.0), Align2::LEFT_TOP, self.ship_name(i), semi(12.5), TEXT.gamma_multiply(a));
+                    p.rect(r, rd(10.0), card2().gamma_multiply(a), sk(if sel { 2.0 } else { 1.0 }, if sel { pal().yellow } else { border() }));
+                    p.text(r.left_top() + vec2(10.0, 8.0), Align2::LEFT_TOP, self.ship_name(i), semi(12.5), pal().text.gamma_multiply(a));
                     for b in 0..s.len {
                         let br = Rect::from_min_size(r.left_top() + vec2(10.0 + b as f32 * 12.0, 30.0), vec2(10.0, 10.0));
-                        p.rect_filled(br, 2.0, if placed { OK } else { SHIP }.gamma_multiply(a));
+                        p.rect_filled(br, rd(2.0), if placed { pal().ok } else { pal().ship }.gamma_multiply(a));
                     }
                     if resp.hovered() && !self.s.me_ready {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -1127,19 +1180,28 @@ impl App {
         self.ui_ghead(ui);
         // Bandeau d'état
         let (text, fill, col) = if self.s.lost {
-            (self.t("stLost"), BTN, MUTED)
+            (self.t("stLost"), pal().btn, pal().muted)
         } else if self.s.phase == Phase::Over {
-            (self.t("stOver"), BTN, MUTED)
+            (self.t("stOver"), pal().btn, pal().muted)
         } else if self.s.waiting {
             (self.t("stFiring"), rgb(0xb4, 0x53, 0x09), Color32::WHITE)
         } else if self.s.my_turn {
-            (self.t("stMyTurn"), rgb(0x05, 0x96, 0x69), Color32::WHITE)
+            match self.turn_left() {
+                Some(left) => (format!("{} · {left} s", self.t("stMyTurn")), if left <= 5 { pal().red } else { pal().ok }, Color32::WHITE),
+                None => (self.t("stMyTurn"), pal().ok, Color32::WHITE),
+            }
         } else {
-            (self.t("stOppTurn"), BTN, MUTED)
+            (self.t("stOppTurn"), pal().btn, pal().muted)
         };
         let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::hover());
-        ui.painter().rect_filled(r, 12.0, fill);
+        ui.painter().rect_filled(r, rd(12.0), fill);
         ui.painter().text(r.center(), Align2::CENTER_CENTER, text, bold(17.5), col);
+        if let (Some(left), t) = (self.turn_left(), self.s.rules.timer) {
+            // barre du temps restant sous le bandeau
+            let frac = (self.s.turn_start.map_or(0.0, |s| s.elapsed().as_secs_f32()) / t as f32).clamp(0.0, 1.0);
+            let bar = Rect::from_min_size(pos2(r.left(), r.bottom() - 4.0), vec2(r.width() * (1.0 - frac), 4.0));
+            ui.painter().rect_filled(bar, 0.0, if left <= 5 { Color32::WHITE } else { pal().yellow });
+        }
         ui.add_space(8.0);
 
         let wide = ui.available_width() >= 880.0;
@@ -1192,37 +1254,42 @@ impl App {
             let name = self.s.opp.as_ref().map_or("?".to_string(), |o| o.name.clone());
             let title = self.tf("enemyGrid", &[("name", name)]);
             let tags: Vec<(String, bool)> = (0..5).map(|i| (self.ship_name(i), self.s.enemy_sunk.contains(&i))).collect();
-            let title_w = ui.painter().layout_no_wrap(title.clone(), semi(13.0), MUTED).size().x;
-            let tags_w: f32 = tags.iter().map(|(t, _)| ui.painter().layout_no_wrap(t.clone(), reg(11.0), TEXT).size().x + 18.0).sum();
+            let title_w = ui.painter().layout_no_wrap(title.clone(), semi(13.0), pal().muted).size().x;
+            let tags_w: f32 = tags.iter().map(|(t, _)| ui.painter().layout_no_wrap(t.clone(), reg(11.0), pal().text).size().x + 18.0).sum();
             let one_line = title_w + 12.0 + tags_w <= ui.available_width();
             let draw_tags = |ui: &mut Ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
                     for (t, down) in tags.iter().rev() {
-                        let g = ui.painter().layout_no_wrap(t.clone(), reg(11.0), if *down { TEXT.gamma_multiply(0.45) } else { TEXT });
+                        let g = ui.painter().layout_no_wrap(t.clone(), reg(11.0), if *down { pal().text.gamma_multiply(0.45) } else { pal().text });
                         let (r, _) = ui.allocate_exact_size(g.size() + vec2(14.0, 4.0), Sense::hover());
-                        ui.painter().rect_filled(r, 6.0, BTN.gamma_multiply(if *down { 0.45 } else { 1.0 }));
+                        ui.painter().rect_filled(r, rd(6.0), pal().btn.gamma_multiply(if *down { 0.45 } else { 1.0 }));
                         let tp = r.center() - g.size() / 2.0;
                         let gw = g.size().x;
-                        ui.painter().galley(tp, g, TEXT);
+                        ui.painter().galley(tp, g, pal().text);
                         if *down {
-                            ui.painter().hline(tp.x..=tp.x + gw, r.center().y, sk(1.0, TEXT.gamma_multiply(0.45)));
+                            ui.painter().hline(tp.x..=tp.x + gw, r.center().y, sk(1.0, pal().text.gamma_multiply(0.45)));
                         }
                     }
                 });
             };
             if one_line {
                 ui.horizontal(|ui| {
-                    label(ui, &title, semi(13.0), MUTED);
+                    label(ui, &title, semi(13.0), pal().muted);
                     draw_tags(ui);
                 });
             } else {
-                label(ui, &title, semi(13.0), MUTED);
+                label(ui, &title, semi(13.0), pal().muted);
                 ui.horizontal(|ui| draw_tags(ui));
             }
         });
         ui.add_space(4.0);
         let mut looks = [Look::default(); N * N];
+        let aimed: Vec<usize> = match self.s.aim {
+            Some((r, c)) if live && matches!(self.s.mode, Mode::Radar | Mode::Cross) => self.aim_cells(self.s.mode, r, c).into_iter().map(|(r, c)| r * N + c).collect(),
+            _ => vec![],
+        };
+        let missed = self.opp_ship_cells();
         for k in 0..N * N {
             let v = self.s.enemy[k];
             let tg = self.targetable(k);
@@ -1231,36 +1298,46 @@ impl App {
                 None => {}
                 Some(Mark::Miss) => {
                     l.sym = "•";
-                    l.sym_col = MISS;
+                    l.sym_col = pal().miss;
                 }
                 Some(Mark::Hit) => {
-                    l.fill = HIT;
+                    l.fill = pal().hit;
                     l.sym = "✕";
                     l.sym_col = Color32::WHITE;
                 }
                 Some(Mark::Sunk) => {
-                    l.fill = SUNK;
+                    l.fill = pal().sunk;
                     l.sym = "✕";
                     l.sym_col = rgb(0xfe, 0xca, 0xca);
                 }
                 Some(Mark::Blocked) => {
-                    l.fill = rgb(0x5a, 0x4a, 0x1c);
+                    l.fill = pal().blk;
                     l.sym = SHIELD_SYM;
-                    l.sym_col = YELLOW;
+                    l.sym_col = pal().yellow;
                 }
                 Some(Mark::ScanOcc) => {
-                    l.fill = rgb(0x2c, 0x4f, 0x78);
+                    l.fill = pal().scan;
                     l.sym = "?";
-                    l.sym_col = YELLOW;
+                    l.sym_col = pal().yellow;
                 }
                 Some(Mark::ScanEmpty) => {
                     l.sym = "·";
-                    l.sym_col = MISS;
+                    l.sym_col = pal().miss;
                 }
             }
             if live && tg {
-                l.fill = if v == Some(Mark::ScanOcc) { rgb(0x3c, 0x6a, 0x9e) } else { WATER_HI };
-                l.hover = Some(WATER_HOVER);
+                l.fill = if v == Some(Mark::ScanOcc) { pal().scan_hi } else { pal().water_hi };
+                l.hover = Some(pal().water_hov);
+            }
+            if aimed.contains(&k) {
+                l.fill = pal().water_hov;
+                l.ring = Some(pal().yellow);
+            }
+            if missed.contains(&k) && v != Some(Mark::Sunk) {
+                l.ring = Some(pal().ship); // bateau adverse jamais trouvé, dévoilé en fin de partie
+                if v.is_none() || v == Some(Mark::ScanEmpty) {
+                    l.fill = pal().ship.gamma_multiply(0.55);
+                }
             }
         }
         let (resp, g) = draw_grid(ui, 460.0, &looks, false, None, Sense::click());
@@ -1275,7 +1352,7 @@ impl App {
         let pick = self.live() && self.s.mode == Mode::Shield;
         let gw = gw.min(ui.available_width());
         centered(ui, gw, |ui| {
-            label(ui, self.t("myFleet"), semi(13.0), MUTED);
+            label(ui, self.t("myFleet"), semi(13.0), pal().muted);
         });
         ui.add_space(2.0);
         let occ = self.occupancy();
@@ -1286,12 +1363,12 @@ impl App {
             let l = &mut looks[k];
             let sunk = i >= 0 && self.is_sunk(i as usize);
             if i >= 0 {
-                l.fill = if sunk { SUNK } else { SHIP };
+                l.fill = if sunk { pal().sunk } else { pal().ship };
                 if sunk {
                     l.sym_col = rgb(0xfe, 0xca, 0xca);
                 }
                 if self.s.ships[i as usize].shield == Shield::Active {
-                    l.ring = Some(YELLOW);
+                    l.ring = Some(pal().yellow);
                 }
                 if pick {
                     l.hover = Some(rgb(0x94, 0xa8, 0xc0));
@@ -1301,24 +1378,24 @@ impl App {
                 Some(Mark::Hit) => {
                     l.sym = "✕";
                     if !sunk {
-                        l.fill = HIT;
+                        l.fill = pal().hit;
                         l.sym_col = Color32::WHITE;
                     }
                 }
                 Some(Mark::Miss) => {
                     l.sym = "•";
-                    l.sym_col = MISS;
+                    l.sym_col = pal().miss;
                 }
                 Some(Mark::Blocked) => {
-                    l.fill = rgb(0x5a, 0x4a, 0x1c);
+                    l.fill = pal().blk;
                     l.sym = SHIELD_SYM;
-                    l.sym_col = YELLOW;
+                    l.sym_col = pal().yellow;
                 }
                 _ => {}
             }
             l.last = self.s.last_in.contains(&k);
         }
-        let (resp, g) = draw_grid(ui, gw, &looks, true, pick.then_some(YELLOW), Sense::click());
+        let (resp, g) = draw_grid(ui, gw, &looks, true, pick.then_some(pal().yellow), Sense::click());
         if resp.clicked() {
             if let Some((r, c)) = resp.interact_pointer_pos().and_then(|p| g.cell_at(p)) {
                 self.on_my_tap(r, c);
@@ -1327,27 +1404,32 @@ impl App {
         ui.add_space(10.0);
         // Modes de tir et améliorations
         let live = self.live();
-        let modes = [
-            (Mode::Shot, ic::CROSSHAIR, "modeShot", 0),
-            (Mode::Radar, ic::WIFI_HIGH, "modeRadar", self.s.inv.radar),
-            (Mode::Cross, ic::PLUS, "modeCross", self.s.inv.cross),
-            (Mode::Shield, ic::SHIELD, "modeShield", self.s.inv.shield),
-        ];
+        let rules = self.s.rules;
+        let modes: Vec<(Mode, &str, &str, u32)> = [
+            (Mode::Shot, ic::CROSSHAIR, "modeShot", 0, true),
+            (Mode::Radar, ic::WIFI_HIGH, "modeRadar", self.s.inv.radar, rules.radar),
+            (Mode::Cross, ic::PLUS, "modeCross", self.s.inv.cross, rules.cross),
+            (Mode::Shield, ic::SHIELD, "modeShield", self.s.inv.shield, rules.shield),
+        ]
+        .into_iter()
+        .filter(|m| m.4)
+        .map(|m| (m.0, m.1, m.2, m.3))
+        .collect();
         let aw = ui.available_width();
         ui.horizontal(|ui| {
-            let bw = (aw - 24.0) / 4.0;
+            let bw = (aw - 8.0 * (modes.len() as f32 - 1.0)) / modes.len() as f32;
             for (m, icon, key, n) in modes {
                 let enabled = live && (m == Mode::Shot || n > 0);
                 let on = live && self.s.mode == m;
                 let (r, resp) = ui.allocate_exact_size(vec2(bw, 56.0), if enabled { Sense::click() } else { Sense::hover() });
                 let a = if enabled { 1.0 } else { 0.35 };
                 let p = ui.painter();
-                let fill = if enabled && resp.hovered() { BTN_HI } else { BTN };
-                p.rect(r, 10.0, fill.gamma_multiply(a), if on { sk(2.0, YELLOW) } else { egui::Stroke::NONE });
-                p.text(r.center() - vec2(0.0, 9.0), Align2::CENTER_CENTER, icon, reg(17.0), TEXT.gamma_multiply(a));
-                p.text(r.center() + vec2(0.0, 12.0), Align2::CENTER_CENTER, self.t(key), semi(12.0), TEXT.gamma_multiply(a));
+                let fill = if enabled && resp.hovered() { pal().btn_hi } else { pal().btn };
+                p.rect(r, rd(10.0), fill.gamma_multiply(a), if on { sk(2.0, pal().yellow) } else { egui::Stroke::NONE });
+                p.text(r.center() - vec2(0.0, 9.0), Align2::CENTER_CENTER, icon, reg(17.0), pal().text.gamma_multiply(a));
+                p.text(r.center() + vec2(0.0, 12.0), Align2::CENTER_CENTER, self.t(key), semi(12.0), pal().text.gamma_multiply(a));
                 if m != Mode::Shot && n > 0 {
-                    p.text(r.right_top() + vec2(-8.0, 5.0), Align2::RIGHT_TOP, n.to_string(), num(11.0), YELLOW.gamma_multiply(a));
+                    p.text(r.right_top() + vec2(-8.0, 5.0), Align2::RIGHT_TOP, n.to_string(), num(11.0), pal().yellow.gamma_multiply(a));
                 }
                 if enabled && resp.hovered() {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -1359,9 +1441,14 @@ impl App {
         });
         // Aide et journal
         let (hint, col) = if let Some((t, _)) = &self.flash {
-            (t.clone(), ERR)
+            (t.clone(), pal().err)
         } else if self.s.phase == Phase::Game && self.s.opp_away {
-            (self.t("oppAway"), MUTED)
+            (self.t("oppAway"), pal().muted)
+        } else if live && self.s.aim.is_some() && matches!(self.s.mode, Mode::Radar | Mode::Cross) {
+            let (r, c) = self.s.aim.unwrap_or((0, 0));
+            (self.tf("hintConfirm", &[("cell", cell_name(r, c))]), pal().muted)
+        } else if self.s.phase == Phase::Over && self.opp_ship_cells().iter().any(|&k| self.s.enemy[k] != Some(Mark::Sunk)) {
+            (self.t("missedLegend"), pal().muted)
         } else if live {
             let k = match self.s.mode {
                 Mode::Shot => "hintShot",
@@ -1369,15 +1456,15 @@ impl App {
                 Mode::Cross => "hintCross",
                 Mode::Shield => "hintShield",
             };
-            (self.t(k), MUTED)
+            (self.t(k), pal().muted)
         } else {
-            (String::new(), MUTED)
+            (String::new(), pal().muted)
         };
         ui.add_space(6.0);
         ui.vertical_centered(|ui| {
             wrapped(ui, if hint.is_empty() { " ".into() } else { hint }, reg(13.0), col);
             let (log, opp) = self.s.log.clone();
-            wrapped(ui, if log.is_empty() { " ".into() } else { log }, semi(14.0), if opp { MUTED } else { TEXT });
+            wrapped(ui, if log.is_empty() { " ".into() } else { log }, semi(14.0), if opp { pal().muted } else { pal().text });
         });
     }
 
@@ -1404,9 +1491,9 @@ impl App {
             let (yes, no) = (self.t("yes"), self.t("no"));
             let mut answer = None;
             modal(ctx, "confirm", 400.0, true, |ui| {
-                label(ui, ic::WARNING, reg(34.0), YELLOW);
+                label(ui, ic::WARNING, reg(34.0), pal().yellow);
                 ui.add_space(4.0);
-                wrapped(ui, text, semi(15.0), TEXT);
+                wrapped(ui, text, semi(15.0), pal().text);
                 ui.add_space(14.0);
                 let aw = ui.available_width();
                 ui.horizontal(|ui| {
@@ -1445,8 +1532,8 @@ impl App {
             let (c, bg) = icon_colors("yellow");
             mode_icon(ui, ic::SIGN_IN, c, bg, 48.0);
             ui.add_space(6.0);
-            label(ui, title, bold(22.0), TEXT);
-            wrapped(ui, desc, reg(14.0), MUTED);
+            label(ui, title, bold(22.0), pal().text);
+            wrapped(ui, desc, reg(14.0), pal().muted);
             ui.add_space(8.0);
             let te = egui::TextEdit::singleline(&mut self.code_input)
                 .char_limit(6)
@@ -1486,34 +1573,39 @@ impl App {
     fn ui_choice_modal(&mut self, ctx: &egui::Context) {
         let title = self.t("choiceTitle");
         let sub = if self.s.choices > 1 { self.tf("choiceSubN", &[("n", self.s.choices.to_string())]) } else { self.t("choiceSub") };
-        let opts = [
-            (Mode::Radar, ic::WIFI_HIGH, self.t("upRadarN"), self.t("upRadarD")),
-            (Mode::Cross, ic::PLUS, self.t("upCrossN"), self.t("upCrossD")),
-            (Mode::Shield, ic::SHIELD, self.t("upShieldN"), self.t("upShieldD")),
-        ];
+        let rules = self.s.rules;
+        let opts: Vec<_> = [
+            (Mode::Radar, ic::WIFI_HIGH, self.t("upRadarN"), self.t("upRadarD"), rules.radar),
+            (Mode::Cross, ic::PLUS, self.t("upCrossN"), self.t("upCrossD"), rules.cross),
+            (Mode::Shield, ic::SHIELD, self.t("upShieldN"), self.t("upShieldD"), rules.shield),
+        ]
+        .into_iter()
+        .filter(|o| o.4)
+        .map(|o| (o.0, o.1, o.2, o.3))
+        .collect();
         let mut picked = None;
         modal(ctx, "choice", 380.0, false, |ui| {
-            label(ui, title, bold(22.0), TEXT);
-            label(ui, sub, reg(14.0), MUTED);
+            label(ui, title, bold(22.0), pal().text);
+            label(ui, sub, reg(14.0), pal().muted);
             ui.add_space(6.0);
             for (m, icon, name, desc) in opts {
                 let resp = egui::Frame::none()
                     .fill(card2())
                     .stroke(sk(1.0, border()))
-                    .rounding(12.0)
+                    .rounding(rd(12.0))
                     .inner_margin(egui::Margin::symmetric(14.0, 12.0))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
                         ui.horizontal(|ui| {
-                            label(ui, icon, reg(15.0), YELLOW);
-                            label(ui, &name, bold(15.0), TEXT);
+                            label(ui, icon, reg(15.0), pal().yellow);
+                            label(ui, &name, bold(15.0), pal().text);
                         });
-                        wrapped(ui, &desc, reg(13.0), MUTED);
+                        wrapped(ui, &desc, reg(13.0), pal().muted);
                     })
                     .response;
                 let resp = ui.interact(resp.rect, ui.id().with(name.as_str()), Sense::click());
                 if resp.hovered() {
-                    ui.painter().rect_stroke(resp.rect, 12.0, sk(1.0, SKY));
+                    ui.painter().rect_stroke(resp.rect, rd(12.0), sk(1.0, pal().sky));
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
                 if resp.clicked() {
@@ -1530,49 +1622,123 @@ impl App {
     fn ui_end_modal(&mut self, ctx: &egui::Context) {
         let Some(e) = self.s.end.as_ref() else { return };
         let (icon, title, text) = (e.icon, e.title.clone(), e.text.clone());
-        let (xp, bot_note, guest) = (e.xp, e.bot_note, e.guest);
+        let (xp, bot_note, guest, parts) = (e.xp, e.bot_note, e.guest, e.parts);
+        let win = self.s.win;
+        let lost = self.s.lost;
         let rank_line = xp.filter(|x| x.2).map(|(_, lvl, _, _, _)| format!("⬆ {}", self.tf("levelUp", &[("n", lvl.to_string()), ("rank", self.rank_of(lvl).to_string())])));
         let (ng, sg, bx, xg) = (self.t("newGame"), self.t("seeGrids"), self.t("botXp"), self.t("xpGuest"));
         let lvl_lbl = xp.map(|(_, lvl, _, _, _)| self.tf("levelN", &[("n", lvl.to_string())]));
+        let name = self.s.opp.as_ref().map_or(String::new(), |o| o.name.clone());
+        // contrôle de la grille adverse
+        let (verify_txt, verify_bad) = match self.s.verify {
+            Verify::Pending if self.s.record_pending => (self.t("verifyWait"), false),
+            Verify::Ok => (self.t("verifyOk"), false),
+            Verify::Cheat => (self.tf(if win { "verifyCheatWin" } else { "verifyCheat" }, &[("name", name.clone())]), true),
+            Verify::Missing if !win => (self.tf("verifyMissing", &[("name", name.clone())]), true),
+            _ => (String::new(), false),
+        };
+        let pending_xp = self.s.record_pending;
+        // revanche
+        let can_rematch = self.s.connected && !lost;
+        let rematch_note = if self.s.opp_gone {
+            self.t("rematchGone")
+        } else if self.s.rematch_me {
+            self.tf("rematchWait", &[("name", name.clone())])
+        } else if self.s.rematch_opp {
+            self.tf("rematchOpp", &[("name", name.clone())])
+        } else {
+            String::new()
+        };
+        let rematch_on = !self.s.opp_gone && !self.s.rematch_me;
+        let rematch_lbl = self.t("rematch");
+        let share_lbl = self.t("share");
+        let (share_txt, share_kind) = self.share_msg.clone();
+        let rows: Vec<(String, u64)> = if xp.is_some() && !pending_xp {
+            vec![
+                (self.t(if win { "xpBase1" } else { "xpBase0" }), parts.base),
+                (self.t("xpHits"), parts.hits),
+                (self.t("xpSunk"), parts.sunk),
+                (self.t("xpAcc"), parts.acc),
+                (self.t("xpTime"), parts.time),
+            ]
+        } else {
+            vec![]
+        };
         let mut new_game = false;
         let mut see = false;
+        let mut rematch = false;
+        let mut share = false;
         modal(ctx, "end", 380.0, true, |ui| {
-            label(ui, icon, reg(46.0), TEXT);
-            label(ui, title, bold(22.0), TEXT);
-            wrapped(ui, text, reg(14.0), MUTED);
+            label(ui, icon, reg(46.0), pal().text);
+            label(ui, title, bold(22.0), pal().text);
+            wrapped(ui, text, reg(14.0), pal().muted);
+            if !verify_txt.is_empty() {
+                wrapped(ui, verify_txt, semi(12.5), if verify_bad { pal().err } else if pending_xp { pal().muted } else { pal().green });
+            }
             if let Some((gain, _, _, inl, size)) = xp {
-                ui.add_space(4.0);
-                label(ui, format!("+{gain} XP"), num(24.0), YELLOW);
-                if let Some(r) = &rank_line {
-                    label(ui, r, bold(15.0), GREEN);
-                }
-                if bot_note {
-                    label(ui, &bx, reg(12.0), MUTED);
-                }
-                ui.add_space(4.0);
-                let w = ui.available_width();
-                xp_bar(ui, inl as f32 / size as f32, w);
-                ui.horizontal(|ui| {
-                    label(ui, "XP:", reg(11.0), MUTED);
-                    label(ui, format!("{inl} / {size}"), bold(11.0), SKY);
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        label(ui, lvl_lbl.clone().unwrap_or_default(), reg(11.0), MUTED);
+                if !pending_xp {
+                    ui.add_space(4.0);
+                    for (k, v) in &rows {
+                        ui.horizontal(|ui| {
+                            label(ui, k, reg(12.5), if *v > 0 { pal().text } else { pal().dim });
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                label(ui, if *v > 0 { format!("+{v}") } else { "—".into() }, bold(12.5), if *v > 0 { pal().green } else { pal().dim });
+                            });
+                        });
+                    }
+                    label(ui, format!("+{gain} XP"), num(24.0), pal().yellow);
+                    if let Some(r) = &rank_line {
+                        label(ui, r, bold(15.0), pal().green);
+                    }
+                    if bot_note {
+                        label(ui, &bx, reg(12.0), pal().muted);
+                    }
+                    ui.add_space(4.0);
+                    let w = ui.available_width();
+                    xp_bar(ui, inl as f32 / size as f32, w);
+                    ui.horizontal(|ui| {
+                        label(ui, "XP:", reg(11.0), pal().muted);
+                        label(ui, format!("{inl} / {size}"), bold(11.0), pal().sky);
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            label(ui, lvl_lbl.clone().unwrap_or_default(), reg(11.0), pal().muted);
+                        });
                     });
-                });
-            } else if guest {
-                label(ui, &xg, reg(12.0), MUTED);
+                }
+            } else if guest && !pending_xp {
+                label(ui, &xg, reg(12.0), pal().muted);
             }
             ui.add_space(10.0);
-            if Btn::new(&ng).style(Bs::Primary).wide().show(ui).clicked() {
+            if can_rematch {
+                if Btn::new(&rematch_lbl).icon(ic::ARROWS_CLOCKWISE).style(Bs::Primary).wide().enabled(rematch_on).show(ui).clicked() {
+                    rematch = true;
+                }
+                if !rematch_note.is_empty() {
+                    wrapped(ui, rematch_note, reg(12.5), pal().muted);
+                }
+                ui.add_space(2.0);
+            }
+            if Btn::new(&ng).style(if can_rematch { Bs::Normal } else { Bs::Primary }).wide().show(ui).clicked() {
                 new_game = true;
             }
             ui.add_space(2.0);
+            if !lost && Btn::new(&share_lbl).icon(ic::SHARE_NETWORK).style(Bs::Ghost).wide().show(ui).clicked() {
+                share = true;
+            }
+            if !share_txt.is_empty() {
+                wrapped(ui, share_txt, reg(12.5), if share_kind == MsgKind::Err { pal().err } else { pal().green });
+            }
             if Btn::new(&sg).style(Bs::Ghost).wide().show(ui).clicked() {
                 see = true;
             }
         });
         if new_game {
             self.reset_to_menu();
+        } else if rematch {
+            self.ask_rematch();
+        } else if share {
+            self.share_msg = Default::default();
+            self.s.end_show = false; // on photographie les grilles, sans la fenêtre
+            self.share_req = 1;
         } else if see {
             self.s.end_show = false;
         }
