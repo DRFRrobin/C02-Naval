@@ -526,12 +526,6 @@ fn own(lang: Lang, key: &str) -> Option<&'static str> {
             "Fai clic anche sull'avatar in alto a sinistra per cambiarla.",
         ],
         "photoChange" => ["Mudar a foto", "Cambiar la foto", "Foto ändern", "Cambia foto"],
-        "editT" => [
-            "Alterar o nome e/ou a palavra-passe",
-            "Cambiar el nombre y/o la contraseña",
-            "Namen und/oder Passwort ändern",
-            "Cambia il nome e/o la password",
-        ],
         "errPseudoTaken" => [
             "Este nome já existe neste computador.",
             "Este nombre ya existe en este ordenador.",

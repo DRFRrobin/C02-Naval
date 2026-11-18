@@ -6,6 +6,7 @@
 
 mod accounts;
 mod app;
+mod cloud;
 mod binarypack;
 mod emoji;
 mod game;

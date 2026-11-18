@@ -290,37 +290,52 @@ impl App {
                         label(ui, self.t("tagline"), reg(14.0), pal().muted);
                     });
                     ui.add_space(14.0);
-                    // Onglets Connexion / Créer un compte
-                    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 46.0), Sense::hover());
-                    ui.painter().rect(rect, rd(12.0), pal().input, sk(1.0, border()));
-                    let half = (rect.width() - 12.0) / 2.0;
-                    for (i, (key, signup)) in [("tabLogin", false), ("tabSignup", true)].into_iter().enumerate() {
-                        let r = Rect::from_min_size(rect.min + vec2(4.0 + i as f32 * (half + 4.0), 4.0), vec2(half, 38.0));
-                        let resp = ui.interact(r, ui.id().with(key), Sense::click());
-                        let on = self.auth_signup == signup;
-                        let fill = if on { pal().primary } else if resp.hovered() { rgba(255, 255, 255, 0.04) } else { Color32::TRANSPARENT };
-                        ui.painter().rect_filled(r, rd(9.0), fill);
-                        ui.painter().text(r.center(), Align2::CENTER_CENTER, self.t(key), semi(14.0), if on { Color32::WHITE } else { pal().muted });
-                        if resp.hovered() {
-                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    let ctx = ui.ctx().clone();
+                    self.probe_api(&ctx);
+                    if self.auth_cloud {
+                        // Onglets Connexion / Créer un compte
+                        let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 46.0), Sense::hover());
+                        ui.painter().rect(rect, rd(12.0), pal().input, sk(1.0, border()));
+                        let half = (rect.width() - 12.0) / 2.0;
+                        for (i, (key, signup)) in [("tabLogin", false), ("tabReg", true)].into_iter().enumerate() {
+                            let r = Rect::from_min_size(rect.min + vec2(4.0 + i as f32 * (half + 4.0), 4.0), vec2(half, 38.0));
+                            let resp = ui.interact(r, ui.id().with(key), Sense::click());
+                            let on = self.auth_signup == signup;
+                            let fill = if on { pal().primary } else if resp.hovered() { rgba(255, 255, 255, 0.04) } else { Color32::TRANSPARENT };
+                            ui.painter().rect_filled(r, rd(9.0), fill);
+                            ui.painter().text(r.center(), Align2::CENTER_CENTER, self.t(key), semi(14.0), if on { Color32::WHITE } else { pal().muted });
+                            if resp.hovered() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+                            if resp.clicked() {
+                                self.auth_msg = Default::default();
+                                self.auth_signup = signup;
+                            }
                         }
-                        if resp.clicked() {
+                        ui.add_space(2.0);
+                        self.ui_cloud_pane(ui, &ctx);
+                        msg(ui, &self.auth_msg.0.clone(), self.auth_msg.1, 14.0);
+                        label(ui, self.t("cloudNote"), reg(12.0), pal().muted);
+                        ui.add_space(6.0);
+                        if Btn::new(&self.t("goLocal")).style(Bs::Ghost).wide().show(ui).clicked() {
+                            self.auth_cloud = false;
                             self.auth_msg = Default::default();
-                            self.open_auth(Some(signup));
                         }
-                    }
-                    ui.add_space(2.0);
-                    if !self.auth_signup {
-                        self.ui_login_pane(ui);
                     } else {
-                        self.ui_signup_pane(ui);
-                    }
-                    msg(ui, &self.auth_msg.0.clone(), self.auth_msg.1, 14.0);
-                    if Btn::new(&self.t("guest")).style(Bs::Ghost).wide().show(ui).clicked() {
-                        self.guest();
+                        self.ui_local_pane(ui);
+                        msg(ui, &self.auth_msg.0.clone(), self.auth_msg.1, 14.0);
+                        if Btn::new(&self.t("guest")).style(Bs::Ghost).wide().show(ui).clicked() {
+                            self.guest();
+                        }
+                        if self.api_up != Some(false) && Btn::new(&self.t("goCloud")).style(Bs::Ghost).wide().show(ui).clicked() {
+                            self.auth_cloud = true;
+                            self.auth_msg = Default::default();
+                        }
                     }
                     ui.vertical_centered(|ui| {
-                        label(ui, self.t("localNote"), reg(12.0), pal().muted);
+                        if !self.auth_cloud {
+                            label(ui, self.t("localNote"), reg(12.0), pal().muted);
+                        }
                         ui.add_space(6.0);
                         let aw = ui.available_width();
                         ui.horizontal(|ui| {
@@ -392,72 +407,65 @@ impl App {
         }
     }
 
-    fn ui_login_pane(&mut self, ui: &mut Ui) {
-        field_label(ui, &self.t("account"));
-        let accs = self.store.sorted();
-        if accs.is_empty() {
-            msg(ui, &self.t("noAccounts"), MsgKind::Info, 14.0);
-        }
-        egui::ScrollArea::vertical().id_salt("accPick").max_height(230.0).show(ui, |ui| {
-            for a in &accs {
-                let on = self.picked.as_deref() == Some(a.id.as_str());
-                let resp = egui::Frame::none()
-                    .fill(card2())
-                    .stroke(sk(if on { 2.0 } else { 1.0 }, if on { pal().sky } else { border() }))
-                    .rounding(rd(12.0))
-                    .inner_margin(egui::Margin::symmetric(10.0, 8.0))
-                    .show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.horizontal(|ui| {
-                            self.mini_av(ui, a.photo.as_deref(), &a.name, 36.0, false);
-                            ui.add_space(4.0);
-                            ui.vertical(|ui| {
-                                ui.spacing_mut().item_spacing.y = 0.0;
-                                label(ui, &a.name, bold(15.0), pal().text);
-                                let l = level_of(a.xp);
-                                label(ui, format!("{} · {} XP", self.tf("levelN", &[("n", l.to_string())]), a.xp), reg(12.0), pal().muted);
-                            });
-                        });
-                    })
-                    .response;
-                let resp = ui.interact(resp.rect, ui.id().with(&a.id), Sense::click());
-                if resp.hovered() {
-                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                }
-                if resp.clicked() {
-                    self.picked = Some(a.id.clone());
-                    self.focus_pass = true;
-                }
-            }
-        });
+    /// Compte en ligne : pseudo et mot de passe (connexion ou création).
+    fn ui_cloud_pane(&mut self, ui: &mut Ui, ctx: &egui::Context) {
+        field_label(ui, &self.t("pseudo"));
+        text_input(ui, &mut self.c_name, false, 16, "");
         field_label(ui, &self.t("password"));
-        let r = text_input(ui, &mut self.login_pass, true, 128, "");
-        if self.focus_pass {
-            r.request_focus();
-            self.focus_pass = false;
-        }
-        if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-            self.do_login();
-        }
+        let r = text_input(ui, &mut self.c_pass, true, 128, "");
+        let enter = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
         ui.add_space(10.0);
-        if Btn::new(&self.t("btnLogin")).icon(ic::SIGN_IN).style(Bs::Primary).wide().enabled(!accs.is_empty()).show(ui).clicked() {
-            self.do_login();
+        let (key, icon) = if self.auth_signup { ("btnRegister", ic::USER_PLUS) } else { ("btnLogin", ic::SIGN_IN) };
+        let busy = self.cloud_busy;
+        if (Btn::new(&self.t(key)).icon(icon).style(Bs::Primary).wide().enabled(!busy).show(ui).clicked() || enter) && !busy {
+            let signup = self.auth_signup;
+            self.cloud_submit(ctx, signup);
         }
     }
 
-    fn ui_signup_pane(&mut self, ui: &mut Ui) {
-        field_label(ui, &self.t("pseudo"));
-        text_input(ui, &mut self.su_name, false, 16, "");
-        field_label(ui, &self.t("password"));
-        text_input(ui, &mut self.su_pass, true, 128, "");
-        field_label(ui, &self.t("passwordConfirm"));
-        let r = text_input(ui, &mut self.su_pass2, true, 128, "");
-        if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-            self.do_signup();
+    /// Sans compte : un pseudo local (le profil reste sur cet ordinateur).
+    fn ui_local_pane(&mut self, ui: &mut Ui) {
+        let accs: Vec<_> = self.store.sorted().into_iter().filter(|a| !a.cloud).collect();
+        if !accs.is_empty() {
+            field_label(ui, &self.t("recentPseudos"));
+            egui::ScrollArea::vertical().id_salt("accPick").max_height(200.0).show(ui, |ui| {
+                for a in &accs {
+                    let resp = egui::Frame::none()
+                        .fill(card2())
+                        .stroke(sk(1.0, border()))
+                        .rounding(rd(12.0))
+                        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.horizontal(|ui| {
+                                self.mini_av(ui, a.photo.as_deref(), &a.name, 36.0, false);
+                                ui.add_space(4.0);
+                                ui.vertical(|ui| {
+                                    ui.spacing_mut().item_spacing.y = 0.0;
+                                    label(ui, &a.name, bold(15.0), pal().text);
+                                    let l = level_of(a.xp);
+                                    label(ui, format!("{} · {} XP", self.tf("levelN", &[("n", l.to_string())]), a.xp), reg(12.0), pal().muted);
+                                });
+                            });
+                        })
+                        .response;
+                    let resp = ui.interact(resp.rect, ui.id().with(&a.id), Sense::click());
+                    if resp.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                    if resp.clicked() {
+                        self.do_play(&a.name);
+                    }
+                }
+            });
         }
+        field_label(ui, &self.t("pseudo"));
+        let r = text_input(ui, &mut self.su_name, false, 16, "");
+        let enter = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
         ui.add_space(10.0);
-        if Btn::new(&self.t("btnSignup")).icon(ic::USER_PLUS).style(Bs::Primary).wide().show(ui).clicked() {
-            self.do_signup();
+        if Btn::new(&self.t("btnPlay")).icon(ic::PLAY).style(Bs::Primary).wide().show(ui).clicked() || enter {
+            let n = self.su_name.clone();
+            self.do_play(&n);
         }
     }
 
@@ -1129,25 +1137,48 @@ impl App {
                         }
                     });
                     ui.add_space(8.0);
-                    sub_frame().show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.horizontal(|ui| {
-                            label(ui, ic::USER_GEAR, reg(16.0), pal().yellow);
-                            wrapped(ui, self.t("editT"), bold(16.0), pal().text);
+                    if a.cloud {
+                        // compte en ligne : le pseudo est unique et fixe ; mot de passe modifiable
+                        sub_frame().show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.horizontal(|ui| {
+                                label(ui, ic::CLOUD, reg(16.0), pal().sky);
+                                label(ui, self.t("cloudAcct"), bold(16.0), pal().text);
+                            });
+                            ui.add_space(6.0);
+                            label(ui, self.t("pwT"), semi(14.5), pal().text);
+                            wrapped(ui, self.t("pwD"), reg(13.0), pal().muted);
+                            ui.add_space(4.0);
+                            let (h1, h2) = (self.t("pwOldPh"), self.t("pwNewPh"));
+                            text_input(ui, &mut self.pw_old, true, 128, &h1);
+                            let r = text_input(ui, &mut self.pw_new, true, 128, &h2);
+                            let enter = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                            ui.add_space(8.0);
+                            if Btn::new(&self.t("pwBtn")).style(Bs::Grad).wide().show(ui).clicked() || enter {
+                                let ctx = ui.ctx().clone();
+                                self.change_password(&ctx);
+                            }
+                            msg(ui, &self.pw_msg.0.clone(), self.pw_msg.1, 14.0);
                         });
-                        field_label(ui, &self.t("newPseudo"));
-                        text_input(ui, &mut self.edit_name, false, 16, "");
-                        field_label(ui, &self.t("newPass"));
-                        let r = text_input(ui, &mut self.edit_pass, true, 128, "••••••••");
-                        if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                            self.save_profile();
-                        }
-                        ui.add_space(10.0);
-                        if Btn::new(&self.t("save")).style(Bs::Grad).wide().show(ui).clicked() {
-                            self.save_profile();
-                        }
-                        msg(ui, &self.set_msg.0.clone(), self.set_msg.1, 14.0);
-                    });
+                    } else {
+                        sub_frame().show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.horizontal(|ui| {
+                                label(ui, ic::USER_GEAR, reg(16.0), pal().yellow);
+                                wrapped(ui, self.t("editT"), bold(16.0), pal().text);
+                            });
+                            field_label(ui, &self.t("newPseudo"));
+                            let r = text_input(ui, &mut self.edit_name, false, 16, "");
+                            if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                                self.save_profile();
+                            }
+                            ui.add_space(10.0);
+                            if Btn::new(&self.t("save")).style(Bs::Grad).wide().show(ui).clicked() {
+                                self.save_profile();
+                            }
+                            msg(ui, &self.set_msg.0.clone(), self.set_msg.1, 14.0);
+                        });
+                    }
                     ui.add_space(8.0);
                     sub_frame().show(ui, |ui| {
                         ui.set_width(ui.available_width());
@@ -1168,6 +1199,12 @@ impl App {
                                 }
                             });
                         });
+                        if a.cloud {
+                            ui.add_space(4.0);
+                            let ph = self.t("delPrompt");
+                            wrapped(ui, ph, reg(12.5), pal().muted);
+                            text_input(ui, &mut self.pw_del, true, 128, "");
+                        }
                     });
                 }
             });
@@ -1807,7 +1844,14 @@ impl App {
                 Some(true) => {
                     self.confirm = None;
                     match c {
-                        Confirm::DeleteAccount => self.delete_account(),
+                        Confirm::DeleteAccount => {
+                            if self.me().is_some_and(|a| a.cloud) {
+                                let pw = self.pw_del.clone();
+                                self.delete_cloud(ctx, pw);
+                            } else {
+                                self.delete_account();
+                            }
+                        }
                         Confirm::Quit => self.quit_game(),
                     }
                 }

@@ -19,9 +19,7 @@ log = "0.4"
 ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
 native-tls = "0.2"
 rand = "0.8"
-pbkdf2 = "0.12"
 sha2 = "0.10"
-hmac = "0.12"
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 rfd = "0.14"

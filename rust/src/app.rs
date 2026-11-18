@@ -11,6 +11,7 @@ use serde_json::{json, Value as Json};
 use crate::accounts::{self, level_of, valid_photo, Account, Settings, Store};
 use crate::game::{self, *};
 use crate::i18n::{self, fill, tr, Lang};
+use crate::cloud::{self, CloudEvent};
 use crate::net::{ConnId, Net, NetEvent, PeerErr, PeerId};
 use crate::sound::Sound;
 use crate::theme::MsgKind;
@@ -417,12 +418,8 @@ pub struct App {
     pub auth_signup: bool,
     pub picked: Option<String>,
     // champs de saisie
-    pub login_pass: String,
     pub su_name: String,
-    pub su_pass: String,
-    pub su_pass2: String,
     pub edit_name: String,
-    pub edit_pass: String,
     pub code_input: String,
     // messages
     pub auth_msg: (String, MsgKind),
@@ -434,6 +431,21 @@ pub struct App {
     pub flash: Option<(String, Instant)>,
     pub share_req: u8, // 0 : rien ; 1 : capture demandée ; 2 : capture en attente
     pub share_msg: (String, MsgKind),
+    // comptes en ligne
+    cloud_tx: std::sync::mpsc::Sender<CloudEvent>,
+    cloud_rx: Receiver<CloudEvent>,
+    pub auth_cloud: bool,
+    pub api_up: Option<bool>,
+    pub cloud_busy: bool,
+    syncing: bool,
+    sync_retry: Option<Instant>,
+    pub c_name: String,
+    pub c_pass: String,
+    pub pw_old: String,
+    pub pw_new: String,
+    pub pw_msg: (String, MsgKind),
+    pub pw_del: String,
+    sync_after_record: bool,
     pub show_join: bool,
     pub confirm: Option<Confirm>,
     pub pending_code: Option<String>,
@@ -445,7 +457,6 @@ pub struct App {
     pub textures: HashMap<String, egui::TextureHandle>,
     was_minimized: bool,
     awake: bool,
-    pub focus_pass: bool,
     pub focus_code: bool,
     pub upd: crate::update::Shared,
 }
@@ -469,6 +480,7 @@ impl App {
         let settings = Settings::load();
         crate::net::set_user_turn(&settings.turn_url, &settings.turn_user, &settings.turn_cred);
         crate::theme::apply_theme(&cc.egui_ctx, theme_index(&settings));
+        let (ctx_tx, ctx_rx) = channel();
         let (tx, rx) = channel();
         let net = Net::new(tx, cc.egui_ctx.clone());
         let mut store = Store::default();
@@ -486,12 +498,8 @@ impl App {
             pane: Pane::Play,
             auth_signup: false,
             picked: None,
-            login_pass: String::new(),
             su_name: String::new(),
-            su_pass: String::new(),
-            su_pass2: String::new(),
             edit_name: String::new(),
-            edit_pass: String::new(),
             code_input: String::new(),
             auth_msg: Default::default(),
             dash_msg: Default::default(),
@@ -502,6 +510,20 @@ impl App {
             flash: None,
             share_req: 0,
             share_msg: Default::default(),
+            cloud_tx: ctx_tx,
+            cloud_rx: ctx_rx,
+            auth_cloud: true,
+            api_up: None,
+            cloud_busy: false,
+            syncing: false,
+            sync_retry: None,
+            c_name: String::new(),
+            c_pass: String::new(),
+            pw_old: String::new(),
+            pw_new: String::new(),
+            pw_msg: Default::default(),
+            pw_del: String::new(),
+            sync_after_record: false,
             show_join: false,
             confirm: None,
             pending_code,
@@ -513,7 +535,6 @@ impl App {
             textures: HashMap::new(),
             was_minimized: false,
             awake: false,
-            focus_pass: false,
             focus_code: false,
             upd: crate::update::start(cc.egui_ctx.clone()),
         };
@@ -632,7 +653,7 @@ impl App {
 
     pub fn open_auth(&mut self, signup: Option<bool>) {
         self.store.load();
-        self.auth_signup = signup.unwrap_or(self.store.accounts.is_empty());
+        self.auth_signup = signup.unwrap_or(false);
         let accs = self.store.sorted();
         if self.picked.as_ref().map_or(true, |p| !self.store.accounts.contains_key(p)) {
             self.picked = accs.first().map(|a| a.id.clone());
@@ -640,75 +661,216 @@ impl App {
         self.view = View::Auth;
     }
 
-    pub fn do_login(&mut self) {
+    /// Entre avec ce pseudo local : le profil existe déjà sur cet ordinateur (repris) ou il est créé.
+    pub fn do_play(&mut self, name: &str) {
         self.store.load();
-        let Some(mut a) = self.picked.as_ref().and_then(|p| self.store.accounts.get(p)).cloned() else {
-            self.auth_msg = (self.t("errPickAcc"), MsgKind::Err);
-            return;
-        };
-        if let Some(h) = &a.pass {
-            if !accounts::check_pass(&self.login_pass, h) {
-                self.play("blocked");
-                self.auth_msg = (self.t("errPassWrong"), MsgKind::Err);
-                return;
-            }
-        }
-        a.last_login = accounts::now_iso();
-        self.store.save(&a);
-        self.login_pass.clear();
-        self.auth_msg = Default::default();
-        self.set_session(Some(a.id.clone()));
-        self.open_dash(Pane::Play);
-        self.dash_msg = if a.pass.is_some() {
-            (self.tf("welcome", &[("name", a.name.clone())]), MsgKind::Ok)
-        } else {
-            (self.t("noPassHint"), MsgKind::Err)
-        };
-    }
-
-    pub fn do_signup(&mut self) {
-        self.store.load();
-        let name = self.su_name.split_whitespace().collect::<Vec<_>>().join(" ");
-        let n = name.chars().count();
-        if !(2..=16).contains(&n) {
+        let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !(2..=16).contains(&name.chars().count()) {
+            self.play("blocked");
             self.auth_msg = (self.t("errPseudoLen"), MsgKind::Err);
             return;
         }
-        if self.store.name_taken(&name, None) {
-            self.auth_msg = (self.t("errPseudoTaken"), MsgKind::Err);
-            return;
-        }
-        if self.su_pass.chars().count() < 4 {
-            self.auth_msg = (self.t("errPassLen"), MsgKind::Err);
-            return;
-        }
-        if self.su_pass != self.su_pass2 {
-            self.auth_msg = (self.t("errPassMatch"), MsgKind::Err);
-            return;
-        }
         let now = accounts::now_iso();
-        let acc = Account {
-            id: accounts::new_id(),
-            name: name.clone(),
-            pass: Some(accounts::hash_pass(&self.su_pass, None, 120_000)),
-            photo: None,
-            xp: 0,
-            created: now.clone(),
-            last_login: now,
-            stats: Default::default(),
+        let existing = self.store.accounts.values().find(|a| !a.cloud && a.name.to_lowercase() == name.to_lowercase()).cloned();
+        let acc = match existing {
+            Some(mut a) => {
+                a.last_login = now;
+                a
+            }
+            None => {
+                let emojis = &crate::emoji::EMOJIS;
+                Account {
+                    id: accounts::new_id(),
+                    name: name.clone(),
+                    pass: None,
+                    photo: Some(format!("emoji:{}", emojis[rand::thread_rng().gen_range(0..emojis.len())].0)),
+                    xp: 0,
+                    created: now.clone(),
+                    last_login: now,
+                    stats: Default::default(),
+                    cloud: false,
+                    tok: None,
+                    pending: vec![],
+                }
+            }
         };
         self.store.save(&acc);
         self.su_name.clear();
-        self.su_pass.clear();
-        self.su_pass2.clear();
         self.auth_msg = Default::default();
         self.set_session(Some(acc.id.clone()));
         self.open_dash(Pane::Play);
         self.dash_msg = if self.store.storage_ok {
-            (self.tf("welcome", &[("name", name)]), MsgKind::Ok)
+            (self.tf("welcome", &[("name", acc.name)]), MsgKind::Ok)
         } else {
             (self.t("errStorage"), MsgKind::Err)
         };
+    }
+
+    /* ---------- Comptes en ligne ---------- */
+
+    pub fn cloud_submit(&mut self, ctx: &egui::Context, register: bool) {
+        let name = self.c_name.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !(2..=16).contains(&name.chars().count()) {
+            self.play("blocked");
+            self.auth_msg = (self.t("errPseudoLen"), MsgKind::Err);
+            return;
+        }
+        if self.c_pass.chars().count() < 8 {
+            self.play("blocked");
+            self.auth_msg = (self.t("e_password_invalid"), MsgKind::Err);
+            return;
+        }
+        self.store.load();
+        // un profil local du même pseudo est repris (borné par le serveur)
+        let import = self
+            .store
+            .accounts
+            .values()
+            .find(|a| !a.cloud && a.name.to_lowercase() == name.to_lowercase())
+            .map(|a| json!({"xp": a.xp, "emoji": a.photo.as_deref().and_then(|p| p.strip_prefix("emoji:")), "stats": a.stats}));
+        self.cloud_busy = true;
+        self.auth_msg = ("…".into(), MsgKind::Info);
+        cloud::auth(&self.cloud_tx, ctx, register, name, self.c_pass.clone(), import);
+    }
+
+    pub fn probe_api(&mut self, ctx: &egui::Context) {
+        if self.api_up.is_none() {
+            self.api_up = Some(true); // en attendant la réponse
+            cloud::health(&self.cloud_tx, ctx);
+        }
+    }
+
+    /// Le profil du serveur fait foi : on le recopie dans le compte local (cache hors ligne).
+    fn apply_cloud(&mut self, p: cloud::Profile, tok: Option<String>) -> Account {
+        self.store.load();
+        let id = format!("c:{}", p.name.to_lowercase());
+        let prev = self.store.accounts.get(&id).cloned();
+        let acc = Account {
+            id: id.clone(),
+            name: p.name,
+            pass: None,
+            photo: p.emoji.filter(|e| crate::emoji::valid(e)).map(|e| format!("emoji:{e}")).or_else(|| prev.as_ref().and_then(|a| a.photo.clone())),
+            xp: p.xp,
+            created: prev.as_ref().map_or_else(accounts::now_iso, |a| a.created.clone()),
+            last_login: accounts::now_iso(),
+            stats: p.stats,
+            cloud: true,
+            tok: tok.or_else(|| prev.as_ref().and_then(|a| a.tok.clone())),
+            pending: prev.map(|a| a.pending).unwrap_or_default(),
+        };
+        self.store.save(&acc);
+        acc
+    }
+
+    /// Envoie les parties en attente puis recharge le profil depuis le serveur.
+    pub fn sync_cloud(&mut self, ctx: &egui::Context) {
+        let Some(a) = self.me().cloned() else { return };
+        let Some(tok) = a.tok.clone().filter(|_| a.cloud && !self.syncing) else { return };
+        self.syncing = true;
+        self.sync_retry = None;
+        let pending = a.pending.iter().map(|p| (p.kind.clone(), p.body.clone())).collect();
+        cloud::sync(&self.cloud_tx, ctx, tok, pending);
+    }
+
+    pub fn change_password(&mut self, ctx: &egui::Context) {
+        let Some(tok) = self.me().and_then(|a| a.tok.clone()) else { return };
+        if self.pw_new.chars().count() < 8 {
+            self.pw_msg = (self.t("e_password_invalid"), MsgKind::Err);
+            return;
+        }
+        cloud::change_password(&self.cloud_tx, ctx, tok, self.pw_old.clone(), self.pw_new.clone());
+    }
+
+    pub fn delete_cloud(&mut self, ctx: &egui::Context, password: String) {
+        if let Some(tok) = self.me().and_then(|a| a.tok.clone()) {
+            cloud::delete(&self.cloud_tx, ctx, tok, password);
+        }
+    }
+
+    fn cloud_err_text(&self, e: &cloud::CloudErr) -> String {
+        if e.code == "locked" {
+            return self.tf("e_locked", &[("min", (e.retry_after.unwrap_or(900).div_ceil(60).max(1)).to_string())]);
+        }
+        self.t(&cloud::err_key(e))
+    }
+
+    fn handle_cloud(&mut self, ctx: &egui::Context, ev: CloudEvent) {
+        match ev {
+            CloudEvent::Auth(res) => {
+                self.cloud_busy = false;
+                match res {
+                    Ok((tok, profile)) => {
+                        let acc = self.apply_cloud(profile, Some(tok));
+                        self.c_name.clear();
+                        self.c_pass.clear();
+                        self.auth_msg = Default::default();
+                        self.set_session(Some(acc.id.clone()));
+                        self.open_dash(Pane::Play);
+                        self.dash_msg = (self.tf("welcome", &[("name", acc.name)]), MsgKind::Ok);
+                    }
+                    Err(e) => {
+                        self.play("blocked");
+                        self.auth_msg = (self.cloud_err_text(&e), MsgKind::Err);
+                    }
+                }
+            }
+            CloudEvent::Synced(done, res) => {
+                self.syncing = false;
+                // les parties envoyées (ou refusées) sortent de la file
+                self.store.load();
+                if let Some(mut a) = self.me().cloned() {
+                    let n = done.min(a.pending.len());
+                    a.pending.drain(..n);
+                    self.store.save(&a);
+                }
+                match res {
+                    Ok(p) => {
+                        self.apply_cloud(p, None);
+                    }
+                    Err(e) if e.status == 401 => {
+                        if let Some(mut a) = self.me().cloned() {
+                            a.tok = None;
+                            self.store.save(&a);
+                        }
+                        self.clear_session();
+                        self.open_auth(Some(false));
+                        self.auth_msg = (self.t("e_session"), MsgKind::Err);
+                    }
+                    Err(e) if e.status == 429 || e.code == "network" => {
+                        self.sync_retry = Some(Instant::now() + Duration::from_secs(20)); // trop vite / hors ligne : on réessaie
+                    }
+                    Err(_) => {}
+                }
+            }
+            CloudEvent::Password(res) => {
+                self.pw_msg = match res {
+                    Ok(()) => {
+                        self.pw_old.clear();
+                        self.pw_new.clear();
+                        (self.t("pwDone"), MsgKind::Ok)
+                    }
+                    Err(e) => (self.cloud_err_text(&e), MsgKind::Err),
+                };
+            }
+            CloudEvent::Deleted(res) => match res {
+                Ok(()) => {
+                    if let Some(id) = self.cur_id.clone() {
+                        self.store.delete(&id);
+                    }
+                    self.clear_session();
+                    self.open_auth(None);
+                }
+                Err(e) => self.pw_msg = (self.cloud_err_text(&e), MsgKind::Err),
+            },
+            CloudEvent::Health(ok) => {
+                self.api_up = Some(ok);
+                if !ok && self.view == View::Auth && self.auth_cloud {
+                    self.auth_cloud = false; // comptes en ligne indisponibles : pseudo local
+                    self.auth_msg = (self.t("apiDown"), MsgKind::Info);
+                }
+            }
+        }
+        let _ = ctx;
     }
 
     pub fn guest(&mut self) {
@@ -738,6 +900,7 @@ impl App {
             self.edit_name = a.name.clone();
         }
         self.view = View::Dash;
+        self.sync_after_record = self.me().is_some_and(|a| a.cloud); // compte en ligne : on se resynchronise
         if let Some(c) = self.pending_code.take() {
             self.open_join(&c);
         }
@@ -766,26 +929,20 @@ impl App {
             self.set_msg = (self.t("errPseudoTaken"), MsgKind::Err);
             return;
         }
-        let pw = self.edit_pass.clone();
-        if !pw.is_empty() && pw.chars().count() < 4 {
-            self.set_msg = (self.t("errPassLen"), MsgKind::Err);
-            return;
-        }
-        if name == a.name && pw.is_empty() {
+        if name == a.name {
             self.set_msg = (self.t("nothingChanged"), MsgKind::Info);
             return;
         }
-        if !pw.is_empty() {
-            a.pass = Some(accounts::hash_pass(&pw, None, 120_000));
-        }
         a.name = name;
         self.store.save(&a);
-        self.edit_pass.clear();
         self.set_msg = (self.t("saved"), MsgKind::Ok);
     }
 
     pub fn delete_account(&mut self) {
         let Some(id) = self.cur_id.clone() else { return };
+        if self.me().is_some_and(|a| a.cloud) {
+            return; // un compte en ligne se supprime avec son mot de passe (delete_cloud)
+        }
         self.store.delete(&id);
         self.clear_session();
         self.open_auth(None);
@@ -816,6 +973,9 @@ impl App {
         self.store.load();
         if let Some(mut a) = self.me().cloned() {
             a.photo = Some(format!("emoji:{e}"));
+            if let Some(tok) = a.tok.clone().filter(|_| a.cloud) {
+                cloud::set_emoji(tok, Some(e.to_string()));
+            }
             self.store.save(&a);
         }
     }
@@ -848,7 +1008,7 @@ impl App {
 
     /* ---------- Enregistrement des parties ---------- */
 
-    fn record_game(&mut self, win: bool, _forfeit: bool) -> Option<(u64, u64, bool)> {
+    fn record_game(&mut self, win: bool, forfeit: bool) -> Option<(u64, u64, bool)> {
         self.store.load();
         let mut a = self.me().cloned()?;
         let m = self.s.m;
@@ -874,7 +1034,19 @@ impl App {
             s.streak = 0;
         }
         let lvl = level_of(a.xp);
+        if a.cloud {
+            // le serveur recalcule l'XP lui-même : on lui envoie seulement ce qui s'est passé
+            let dur = m.start.map_or(5, |t| t.elapsed().as_secs()).clamp(5, 7200);
+            let shots = m.shots.min(500);
+            let hits = m.hits.min(shots);
+            a.pending.push(accounts::Pending {
+                kind: "r".into(),
+                body: json!({"win":win,"shots":shots,"hits":hits,"sunk":m.sunk.min(hits).min(12),"upgrades":m.upgrades.min(30),"duration":dur,
+                    "bot":self.s.vs_bot,"std":self.current_cfg().is_std(),"forfeit":win && forfeit}),
+            });
+        }
         self.store.save(&a);
+        self.sync_after_record = a.cloud;
         Some((gain, lvl, lvl > before))
     }
 
@@ -889,8 +1061,13 @@ impl App {
         self.store.load();
         let Some(mut a) = self.me().cloned() else { return };
         a.stats.interrupted += 1;
-        a.stats.time_played += self.s.m.start.map_or(0, |t| t.elapsed().as_secs_f64().round() as u64);
+        let dur = self.s.m.start.map_or(0, |t| t.elapsed().as_secs_f64().round() as u64);
+        a.stats.time_played += dur;
+        if a.cloud {
+            a.pending.push(accounts::Pending { kind: "i".into(), body: json!({"duration": dur.min(7200)}) });
+        }
         self.store.save(&a);
+        self.sync_after_record = a.cloud;
     }
 
     /* =========================================================
@@ -2629,6 +2806,15 @@ impl App {
     pub fn tick(&mut self, ctx: &egui::Context) {
         while let Ok(e) = self.ev_rx.try_recv() {
             self.handle_net(e);
+        }
+        if std::mem::take(&mut self.sync_after_record) {
+            self.sync_cloud(ctx);
+        }
+        while let Ok(ev) = self.cloud_rx.try_recv() {
+            self.handle_cloud(ctx, ev);
+        }
+        if self.sync_retry.is_some_and(|t| Instant::now() >= t) {
+            self.sync_cloud(ctx);
         }
         let now = Instant::now();
         // Minuteurs arrivés à échéance.
