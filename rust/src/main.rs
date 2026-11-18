@@ -7,6 +7,7 @@
 mod accounts;
 mod app;
 mod binarypack;
+mod emoji;
 mod game;
 mod i18n;
 mod i18n_data;

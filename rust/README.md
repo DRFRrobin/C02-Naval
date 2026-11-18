@@ -85,3 +85,7 @@ Tests : `cargo test --release` (format BinaryPack, PBKDF2, flotte aléatoire val
 | `src/i18n.rs` | Textes français / anglais |
 | `src/update.rs` | Mise à jour obligatoire depuis les releases GitHub |
 | `tools/` | Scripts de test (capture de fenêtre, clics simulés) |
+
+## Crédits
+
+Les emojis d'avatar sont des images [Twemoji](https://github.com/jdecked/twemoji) (© Twitter, Inc. et contributeurs), sous licence [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).

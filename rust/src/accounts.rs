@@ -121,6 +121,9 @@ pub fn level_of(xp: u64) -> u64 {
 }
 
 pub fn valid_photo(p: &str) -> bool {
+    if let Some(e) = p.strip_prefix("emoji:") {
+        return crate::emoji::valid(e); // avatar emoji (même liste que la version web)
+    }
     let ok_prefix = ["data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,"];
     p.len() < 90000
         && ok_prefix.iter().any(|pre| {
@@ -232,6 +235,10 @@ pub fn make_photo(path: &std::path::Path) -> Option<String> {
 pub fn decode_photo(url: &str) -> Option<(usize, usize, Vec<u8>)> {
     if !valid_photo(url) {
         return None;
+    }
+    if let Some(e) = url.strip_prefix("emoji:") {
+        let img = image::load_from_memory(crate::emoji::bytes(e)?).ok()?.to_rgba8();
+        return Some((img.width() as usize, img.height() as usize, img.into_raw()));
     }
     let b64 = url.split_once(',')?.1;
     let bytes = B64.decode(b64).ok()?;

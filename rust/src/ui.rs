@@ -907,6 +907,31 @@ impl App {
                                 self.remove_photo();
                             }
                         });
+                        ui.add_space(8.0);
+                        label(ui, self.t("emojiPick"), semi(14.0), pal().text);
+                        wrapped(ui, self.t("emojiNote"), reg(12.5), pal().muted);
+                        ui.add_space(4.0);
+                        let mut chosen: Option<&str> = None;
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                            for (e, _) in crate::emoji::EMOJIS.iter() {
+                                let on = a.photo.as_deref() == Some(format!("emoji:{e}").as_str());
+                                let (r, resp) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
+                                ui.painter().rect(r, rd(8.0), pal().btn, sk(if on { 2.0 } else { 1.0 }, if on { pal().yellow } else { border2() }));
+                                if let Some(t) = self.photo_tex(ui.ctx(), &format!("emoji:{e}")) {
+                                    paint_image(ui, &t, r.shrink(5.0), 0.0);
+                                }
+                                if resp.hovered() {
+                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
+                                if resp.clicked() {
+                                    chosen = Some(e);
+                                }
+                            }
+                        });
+                        if let Some(e) = chosen {
+                            self.set_emoji(e);
+                        }
                     });
                     ui.add_space(8.0);
                     sub_frame().show(ui, |ui| {

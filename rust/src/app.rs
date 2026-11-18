@@ -820,6 +820,14 @@ impl App {
         }
     }
 
+    pub fn set_emoji(&mut self, e: &str) {
+        self.store.load();
+        if let Some(mut a) = self.me().cloned() {
+            a.photo = Some(format!("emoji:{e}"));
+            self.store.save(&a);
+        }
+    }
+
     pub fn remove_photo(&mut self) {
         self.store.load();
         if let Some(mut a) = self.me().cloned() {
@@ -1222,6 +1230,10 @@ impl App {
                 if self.s.conn == Some(conn) {
                     let me = self.my_identity();
                     let mut hello = json!({"t":"hello","name":me.name,"photo":me.photo,"level":me.level});
+                    if let Some(e) = me.photo.as_deref().and_then(|p| p.strip_prefix("emoji:")) {
+                        hello["emoji"] = json!(e); // la version web n'affiche que des emojis
+                        hello["photo"] = Json::Null;
+                    }
                     if self.s.kind == Some(Kind::Host) {
                         hello["rules"] = self.s.rules.to_json(); // l'hôte annonce les règles de la partie
                     }
@@ -1532,7 +1544,11 @@ impl App {
             }
             "hello" => {
                 let name: String = m["name"].as_str().unwrap_or("?").chars().take(16).collect();
-                let photo = m["photo"].as_str().filter(|p| valid_photo(p)).map(|s| s.to_string());
+                let photo = m["emoji"]
+                    .as_str()
+                    .filter(|e| crate::emoji::valid(e))
+                    .map(|e| format!("emoji:{e}"))
+                    .or_else(|| m["photo"].as_str().filter(|p| valid_photo(p) && !p.starts_with("emoji:")).map(|s| s.to_string()));
                 let level = m["level"].as_u64().or_else(|| m["level"].as_f64().map(|f| f as u64)).unwrap_or(0).min(999);
                 let bot = m["bot"].as_bool().unwrap_or(false) && self.s.vs_bot;
                 if !self.s.connected && self.s.kind == Some(Kind::Join) {
