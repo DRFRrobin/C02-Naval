@@ -23,8 +23,8 @@ pub const HEARTBEAT: Duration = Duration::from_secs(2);
 pub const TIMEOUT: Duration = Duration::from_secs(20);
 pub const AWAY_TIMEOUT: Duration = Duration::from_secs(120);
 pub const JOIN_TIMEOUT: Duration = Duration::from_secs(15);
-/// Compte à rebours de chaque coup contre un adversaire aléatoire (ou son bot de secours), en secondes.
-pub const MATCH_TIMER: u32 = 20;
+/// Temps laissé pour placer sa flotte quand un chronomètre de tour est actif.
+pub const PLACE_LIMIT: Duration = Duration::from_secs(90);
 /// Durée maximale d'attente de la grille dévoilée par l'adversaire en fin de partie.
 pub const VERIFY_WAIT: Duration = Duration::from_secs(10);
 /// Durée pendant laquelle on tente de reprendre une partie dont la liaison est coupée.
@@ -43,6 +43,7 @@ pub enum View {
 pub enum Pane {
     Play,
     Stats,
+    Rules,
     Settings,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -97,25 +98,8 @@ impl Rules {
     pub fn any_upgrade(&self) -> bool {
         self.radar || self.cross || self.shield
     }
-    pub fn to_json(&self) -> Json {
-        json!({"size":N,"fleet":LENS,"radar":self.radar,"cross":self.cross,"shield":self.shield,"timer":self.timer})
-    }
-    /// Lit les règles annoncées par l'hôte. `Err` : grille ou flotte personnalisées, non gérées ici.
-    pub fn from_json(j: &Json) -> Result<Rules, ()> {
-        if !j.is_object() {
-            return Ok(Rules::default());
-        }
-        let fleet: Vec<usize> = j["fleet"].as_array().map(|a| a.iter().filter_map(|x| x.as_u64().map(|v| v as usize)).collect()).unwrap_or_default();
-        if j["size"].as_u64() != Some(N as u64) || fleet != LENS {
-            return Err(());
-        }
-        let timer = j["timer"].as_u64().unwrap_or(0) as u32;
-        Ok(Rules {
-            radar: j["radar"].as_bool() != Some(false),
-            cross: j["cross"].as_bool() != Some(false),
-            shield: j["shield"].as_bool() != Some(false),
-            timer: if [0, 10, 15, 20, 30, 45, 60, 90, 120].contains(&timer) { timer } else { 0 },
-        })
+    pub fn of(c: &RulesCfg) -> Rules {
+        Rules { radar: c.radar, cross: c.cross, shield: c.shield, timer: c.timer }
     }
 }
 
@@ -269,6 +253,7 @@ pub struct GameState {
     pub rules: Rules,
     pub turn_start: Option<Instant>,
     pub last_beep: u32,
+    pub place_deadline: Option<Instant>,
     pub aim: Option<Cell>,
     // boucliers et anti-triche
     pub opp_used: u32,
@@ -333,8 +318,8 @@ impl GameState {
             my_turn: false,
             waiting: false,
             mode: Mode::Shot,
-            enemy: vec![None; N * N],
-            incoming: vec![None; N * N],
+            enemy: vec![None; n() * n()],
+            incoming: vec![None; n() * n()],
             enemy_sunk: vec![],
             inv: Inv::default(),
             choices: 0,
@@ -358,6 +343,7 @@ impl GameState {
             rules: Rules::default(),
             turn_start: None,
             last_beep: 0,
+            place_deadline: None,
             aim: None,
             opp_used: 0,
             opp_shields: 0,
@@ -555,7 +541,7 @@ impl App {
         fill(tr(self.settings.lang, key), p)
     }
     pub fn ship_name(&self, i: usize) -> String {
-        i18n::ship_name(self.settings.lang, &LENS, i)
+        i18n::ship_name(self.settings.lang, &lens(), i)
     }
     pub fn rank_of(&self, l: u64) -> &'static str {
         let r = i18n::ranks(self.settings.lang);
@@ -588,7 +574,7 @@ impl App {
             None => Opp { name: self.t("guestName"), photo: None, level: 0, bot: false },
         }
     }
-    pub fn occupancy(&self) -> [i32; N * N] {
+    pub fn occupancy(&self) -> Vec<i32> {
         occ_of(&self.s.ships)
     }
     pub fn is_sunk(&self, i: usize) -> bool {
@@ -615,6 +601,12 @@ impl App {
     pub fn set_lang(&mut self, l: Lang) {
         self.settings.lang = l;
         self.settings.save();
+    }
+    pub fn set_rules(&mut self, c: RulesCfg) {
+        if let Some(ok) = c.sanitize() {
+            self.settings.rules = ok;
+            self.settings.save();
+        }
     }
     pub fn set_bot_enabled(&mut self, on: bool) {
         self.settings.bot = on;
@@ -921,6 +913,8 @@ impl App {
 
     // Salon privé
     pub fn host_game(&mut self) {
+        let cfg = self.settings.rules.clone();
+        self.apply_cfg(&cfg);
         self.s.kind = Some(Kind::Host);
         self.s.is_host = true;
         self.s.code = gen_code();
@@ -993,7 +987,7 @@ impl App {
     // et s'il est déjà pris, quelqu'un y attend : on le rejoint. Bot au bout de 45 s.
     pub fn find_random(&mut self) {
         self.s.kind = Some(Kind::Random);
-        self.s.rules = Rules { timer: MATCH_TIMER, ..Rules::default() };
+        self.apply_cfg(&RulesCfg::match_rules());
         self.s.phase = Phase::Lobby;
         self.s.mm_stopped = false;
         self.setup_lobby(false);
@@ -1235,7 +1229,7 @@ impl App {
                         hello["photo"] = Json::Null;
                     }
                     if self.s.kind == Some(Kind::Host) {
-                        hello["rules"] = self.s.rules.to_json(); // l'hôte annonce les règles de la partie
+                        hello["rules"] = self.current_cfg().to_json(); // l'hôte annonce les règles de la partie
                     }
                     if self.s.is_host && self.s.kind != Some(Kind::Join) {
                         // identifiant de partie et point de reprise après coupure
@@ -1456,6 +1450,24 @@ impl App {
     }
 
     /// Équivalent de « recharger la page » : on repart du tableau de bord.
+    /// Règles de la partie en cours (taille de grille, flotte, améliorations, chronomètre).
+    pub fn current_cfg(&self) -> RulesCfg {
+        let r = self.s.rules;
+        RulesCfg { size: n(), fleet: lens(), radar: r.radar, cross: r.cross, shield: r.shield, timer: r.timer }
+    }
+
+    /// Applique des règles : taille de grille, flotte vierge, grilles vides.
+    pub fn apply_cfg(&mut self, c: &RulesCfg) {
+        set_board(c.size, &c.fleet);
+        self.s.rules = Rules::of(c);
+        self.s.ships = Ship::fleet();
+        self.s.enemy = vec![None; n() * n()];
+        self.s.incoming = vec![None; n() * n()];
+        self.s.enemy_sunk.clear();
+        self.s.sel = 0;
+        self.s.preview = None;
+    }
+
     pub fn reset_to_menu(&mut self) {
         self.flush_pending_loss();
         if self.s.connected && !self.s.vs_bot && !self.s.lost && self.s.phase == Phase::Over {
@@ -1469,6 +1481,7 @@ impl App {
         }
         self.net.destroy_all();
         self.timers.clear();
+        set_board(DEFAULT_SIZE, &DEFAULT_FLEET);
         self.s = GameState::new();
         self.flash = None;
         self.place_msg = Default::default();
@@ -1552,18 +1565,9 @@ impl App {
                 let level = m["level"].as_u64().or_else(|| m["level"].as_f64().map(|f| f as u64)).unwrap_or(0).min(999);
                 let bot = m["bot"].as_bool().unwrap_or(false) && self.s.vs_bot;
                 if !self.s.connected && self.s.kind == Some(Kind::Join) {
-                    match Rules::from_json(&m["rules"]) {
-                        Ok(r) => self.s.rules = r,
-                        Err(()) => {
-                            // grille ou flotte personnalisées : cette version ne sait pas y jouer
-                            let t = self.t("rulesUnsupported");
-                            if let Some(c) = self.s.conn {
-                                self.net.close_conn(c);
-                            }
-                            self.join_fail(t);
-                            return;
-                        }
-                    }
+                    // règles de l'hôte (règles standard si absentes ou invalides, comme sur le web)
+                    let cfg = RulesCfg::from_json(&m["rules"]).unwrap_or_default();
+                    self.apply_cfg(&cfg);
                 }
                 if !self.s.connected && !self.s.is_host && !self.s.vs_bot {
                     if let (Some(sid), Some(rid)) = (m["sid"].as_str(), m["rid"].as_str()) {
@@ -1633,6 +1637,9 @@ impl App {
             self.dash_msg = (self.t("botOff"), MsgKind::Err);
             return;
         }
+        // bot de secours du mode aléatoire : mêmes règles que le mode aléatoire ; sinon règles du joueur
+        let cfg = if self.s.kind == Some(Kind::Random) { RulesCfg::match_rules() } else { self.settings.rules.clone() };
+        self.apply_cfg(&cfg);
         self.s.kind = Some(Kind::Bot);
         self.s.vs_bot = true;
         self.s.is_host = true;
@@ -1684,6 +1691,7 @@ impl App {
         self.s.phase = Phase::Place;
         self.s.sel = 0;
         self.s.preview = None;
+        self.s.place_deadline = (self.s.rules.timer > 0).then(|| Instant::now() + PLACE_LIMIT);
         self.view = View::Place;
         self.place_msg = Default::default();
         if !self.s.vs_bot {
@@ -1711,7 +1719,7 @@ impl App {
                 valid = false;
                 continue;
             }
-            if occ[rr as usize * N + cc as usize] != -1 {
+            if occ[rr as usize * n() + cc as usize] != -1 {
                 valid = false;
             }
             cells.push((rr as usize, cc as usize));
@@ -1794,7 +1802,7 @@ impl App {
                 return;
             }
         }
-        let idx = self.occupancy()[r * N + c];
+        let idx = self.occupancy()[r * n() + c];
         if idx >= 0 {
             self.select_ship(idx as usize);
             return;
@@ -1827,9 +1835,9 @@ impl App {
                 // s'il sort de la grille en pivotant, on le recale à l'intérieur
                 let len = self.s.ships[self.s.sel as usize].len as i32;
                 if p.h {
-                    p.c = p.c.min(N as i32 - len);
+                    p.c = p.c.min(n() as i32 - len);
                 } else {
-                    p.r = p.r.min(N as i32 - len);
+                    p.r = p.r.min(n() as i32 - len);
                 }
                 self.s.preview = Some(p);
             }
@@ -1871,7 +1879,7 @@ impl App {
         }
         self.s.lifted = None;
         self.s.preview = None;
-        for (i, cells) in random_cells(&LENS).into_iter().enumerate() {
+        for (i, cells) in random_cells(&lens()).into_iter().enumerate() {
             self.s.ships[i].cells = Some(cells);
         }
         self.s.sel = -1;
@@ -1907,7 +1915,7 @@ impl App {
             return;
         }
         let on_preview = self.preview_info().is_some_and(|(cells, _)| cells.contains(&(r, c)));
-        let idx = self.occupancy()[r * N + c];
+        let idx = self.occupancy()[r * n() + c];
         let mut d = Drag { r, c, moved: false, ship: false, was_selected: on_preview, off: (0, 0) };
         if idx >= 0 && !on_preview {
             self.select_ship(idx as usize); // soulève le bateau touché
@@ -2015,7 +2023,7 @@ impl App {
                 return;
             }
             Mode::Shot => {
-                if !self.targetable(r * N + c) {
+                if !self.targetable(r * n() + c) {
                     let t = self.t("fAlready");
                     self.flash_hint(t);
                     return;
@@ -2025,7 +2033,7 @@ impl App {
             Mode::Radar => {
                 let v: Vec<Cell> = [(ri, ci), (ri, ci + 1), (ri + 1, ci), (ri + 1, ci + 1)]
                     .into_iter()
-                    .filter(|&(a, b)| inside(a, b) && self.s.enemy[a as usize * N + b as usize].is_none())
+                    .filter(|&(a, b)| inside(a, b) && self.s.enemy[a as usize * n() + b as usize].is_none())
                     .map(|(a, b)| (a as usize, b as usize))
                     .collect();
                 if v.is_empty() {
@@ -2045,7 +2053,7 @@ impl App {
             Mode::Cross => {
                 let v: Vec<Cell> = [(ri, ci), (ri - 1, ci), (ri + 1, ci), (ri, ci - 1), (ri, ci + 1)]
                     .into_iter()
-                    .filter(|&(a, b)| inside(a, b) && self.targetable(a as usize * N + b as usize))
+                    .filter(|&(a, b)| inside(a, b) && self.targetable(a as usize * n() + b as usize))
                     .map(|(a, b)| (a as usize, b as usize))
                     .collect();
                 if v.is_empty() {
@@ -2085,7 +2093,7 @@ impl App {
             _ => vec![(ri, ci)],
         };
         list.into_iter()
-            .filter(|&(a, b)| inside(a, b) && if mode == Mode::Radar { self.s.enemy[a as usize * N + b as usize].is_none() } else { self.targetable(a as usize * N + b as usize) })
+            .filter(|&(a, b)| inside(a, b) && if mode == Mode::Radar { self.s.enemy[a as usize * n() + b as usize].is_none() } else { self.targetable(a as usize * n() + b as usize) })
             .map(|(a, b)| (a as usize, b as usize))
             .collect()
     }
@@ -2094,7 +2102,7 @@ impl App {
         if self.s.phase != Phase::Game || self.s.mode != Mode::Shield || !self.s.my_turn || self.s.waiting {
             return;
         }
-        let idx = self.occupancy()[r * N + c];
+        let idx = self.occupancy()[r * n() + c];
         if idx < 0 {
             let t = self.t("fTouchShip");
             self.flash_hint(t);
@@ -2189,7 +2197,7 @@ impl App {
         let (results, over) = resolve_on(&mut self.s.ships, &mut self.s.incoming, kind, &cells);
         self.send(json!({"t":"res","kind":kind.as_str(),"at":m["at"],"results":results.iter().map(ShotRes::to_json).collect::<Vec<_>>(),"over":over}));
         let at = sanitize_cells(&json!([m["at"]])).first().copied().or(cells.first().copied()).unwrap_or((0, 0));
-        self.s.last_in = if kind == ActKind::Radar { vec![] } else { cells.iter().map(|&(r, c)| r * N + c).collect() };
+        self.s.last_in = if kind == ActKind::Radar { vec![] } else { cells.iter().map(|&(r, c)| r * n() + c).collect() };
         let name = self.s.opp.as_ref().map_or("?".to_string(), |o| o.name.clone());
         let t = self.tf("oppPrefix", &[("name", name)]) + &self.summarize(kind, at, &results);
         self.set_log(t, true);
@@ -2221,7 +2229,7 @@ impl App {
         for x in &results {
             if x.v == "sunk" {
                 for &(r, c) in x.ship.as_deref().unwrap_or(&[(x.r, x.c)]) {
-                    self.s.enemy[r * N + c] = Some(Mark::Sunk);
+                    self.s.enemy[r * n() + c] = Some(Mark::Sunk);
                 }
                 if let Some(si) = x.si {
                     if !self.s.enemy_sunk.contains(&si) {
@@ -2239,7 +2247,7 @@ impl App {
                     _ => None,
                 };
                 if st.is_some() {
-                    self.s.enemy[x.r * N + x.c] = st;
+                    self.s.enemy[x.r * n() + x.c] = st;
                 }
             }
         }
@@ -2316,7 +2324,7 @@ impl App {
                 _ => {}
             }
         }
-        open < LENS.iter().sum::<usize>() - touched
+        open < lens().iter().sum::<usize>() - touched
     }
 
     fn end_game(&mut self, win: bool, kind: EndKind) {
@@ -2396,8 +2404,7 @@ impl App {
         let sunk = m.sunk.min(hits).min(12);
         let dur = m.start.map_or(5, |t| t.elapsed().as_secs()).clamp(5, 7200);
         // XP complète en partie standard (règles par défaut, ou 20 s par coup en mode aléatoire) ; moitié contre le bot
-        let std = self.s.rules == Rules::default() || self.s.rules == Rules { timer: MATCH_TIMER, ..Rules::default() };
-        xp_parts(win, shots, hits, sunk, dur, self.s.vs_bot || !std)
+        xp_parts(win, shots, hits, sunk, dur, self.s.vs_bot || !self.current_cfg().is_std())
     }
 
     fn send_reveal(&mut self) {
@@ -2444,14 +2451,14 @@ impl App {
             if let Some(b) = &self.s.bot {
                 for s in &b.ships {
                     for &(r, c) in s.cells.iter().flatten() {
-                        v.push(r * N + c);
+                        v.push(r * n() + c);
                     }
                 }
             }
         } else if self.s.verify == Verify::Ok {
             if let Some(m) = &self.s.opp_reveal {
                 for c in sanitize_cells(&json!(m["ships"].as_array().map(|a| a.iter().flat_map(|x| x.as_array().cloned().unwrap_or_default()).collect::<Vec<_>>()))) {
-                    v.push(c.0 * N + c.1);
+                    v.push(c.0 * n() + c.1);
                 }
             }
         }
@@ -2511,6 +2518,24 @@ impl App {
         }
         let used = self.s.turn_start?.elapsed().as_secs_f32();
         Some(((t as f32 - used).ceil().max(0.0)) as u32)
+    }
+
+    /// Temps de placement écoulé : les bateaux restants sont posés au hasard, puis on se déclare prêt.
+    fn place_tick(&mut self, now: Instant) {
+        if self.s.phase != Phase::Place || self.s.me_ready || self.s.reconnecting || !self.s.place_deadline.is_some_and(|d| now > d) {
+            return;
+        }
+        self.s.place_deadline = None;
+        if let Some(l) = self.s.lifted.take() {
+            self.s.ships[l.idx].cells = Some(l.cells); // le bateau soulevé retourne à sa place
+        }
+        self.s.preview = None;
+        if !fill_missing(&mut self.s.ships) {
+            for (i, cells) in random_cells(&lens()).into_iter().enumerate() {
+                self.s.ships[i].cells = Some(cells);
+            }
+        }
+        self.set_ready();
     }
 
     fn turn_tick(&mut self) {
@@ -2582,9 +2607,9 @@ impl App {
 
     /// Temps écoulé : tir au hasard sur une case encore inconnue (sinon une case scannée par le radar).
     fn auto_shot(&mut self) {
-        let mut free: Vec<usize> = (0..N * N).filter(|&k| self.s.enemy[k].is_none()).collect();
+        let mut free: Vec<usize> = (0..n() * n()).filter(|&k| self.s.enemy[k].is_none()).collect();
         if free.is_empty() {
-            free = (0..N * N).filter(|&k| self.targetable(k)).collect();
+            free = (0..n() * n()).filter(|&k| self.targetable(k)).collect();
         }
         if free.is_empty() {
             return;
@@ -2594,7 +2619,7 @@ impl App {
         self.s.aim = None;
         let t = self.t("autoShot");
         self.flash_hint(t);
-        self.on_enemy_tap(k / N, k % N);
+        self.on_enemy_tap(k / n(), k % n());
     }
 
     /* =========================================================
@@ -2652,6 +2677,7 @@ impl App {
             }
         }
         self.turn_tick();
+        self.place_tick(now);
         self.share_tick(ctx);
         if self.s.verify == Verify::Pending && self.s.verify_deadline.is_some_and(|d| now >= d) {
             self.finish_verify(Verify::Missing); // grille jamais dévoilée
@@ -2672,7 +2698,7 @@ impl App {
         if let Some(t) = self.timers.iter().map(|(t, _)| *t).min() {
             next = next.min(t.saturating_duration_since(now));
         }
-        if self.s.reconnecting || self.s.mm_deadline.is_some() || (self.s.rules.timer > 0 && self.s.phase == Phase::Game) {
+        if self.s.reconnecting || self.s.place_deadline.is_some() || self.s.mm_deadline.is_some() || (self.s.rules.timer > 0 && self.s.phase == Phase::Game) {
             next = next.min(Duration::from_millis(250));
         }
         ctx.request_repaint_after(next);

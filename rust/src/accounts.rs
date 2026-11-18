@@ -37,6 +37,8 @@ pub struct Settings {
     #[serde(default = "skill_default")]
     pub skill: u8, // niveau du bot : 0 facile, 1 moyen, 2 difficile
     #[serde(default)]
+    pub rules: crate::game::RulesCfg, // règles choisies par le joueur (hôte et bot)
+    #[serde(default)]
     pub turn_url: String, // relais TURN personnel (facultatif)
     #[serde(default)]
     pub turn_user: String,
@@ -56,7 +58,7 @@ impl Settings {
         fs::read_to_string(data_dir().join("settings.json"))
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None, theme: None, bot: true, skill: 2, turn_url: String::new(), turn_user: String::new(), turn_cred: String::new() })
+            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None, theme: None, bot: true, skill: 2, rules: crate::game::RulesCfg::default(), turn_url: String::new(), turn_user: String::new(), turn_cred: String::new() })
     }
     pub fn save(&self) {
         let _ = fs::create_dir_all(data_dir());

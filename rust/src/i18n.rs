@@ -424,6 +424,49 @@ pub fn end_stats(lang: Lang, shots: usize, acc: u32) -> String {
     }
 }
 
+/// Mots des résumés de règles, par langue : (bateau, bateaux, case, cases, « Règles », « grille », « sans améliorations »).
+fn rules_words(l: Lang) -> (&'static str, &'static str, &'static str, &'static str, &'static str, &'static str, &'static str, &'static str) {
+    match l {
+        Lang::Fr => ("bateau", "bateaux", "case", "cases", "Règles : grille", "de la grille", ", sans améliorations", ""),
+        Lang::En => ("ship", "ships", "square", "squares", "Rules:", "of the grid", ", no upgrades", "grid"),
+        Lang::Pt => ("navio", "navios", "casa", "casas", "Regras: grelha", "da grelha", ", sem melhorias", ""),
+        Lang::Es => ("barco", "barcos", "casilla", "casillas", "Reglas: cuadrícula", "de la cuadrícula", ", sin mejoras", ""),
+        Lang::De => ("Schiff", "Schiffe", "Feld", "Felder", "Regeln: Feld", "des Spielfelds", ", ohne Extras", ""),
+        Lang::It => ("nave", "navi", "casella", "caselle", "Regole: griglia", "della griglia", ", senza potenziamenti", ""),
+    }
+}
+
+/// Total de la flotte : « 5 bateaux · 17 cases (17 % de la grille) ».
+pub fn fleet_total(lang: Lang, ships: usize, cells: usize, pct: usize) -> String {
+    let w = rules_words(lang);
+    let sep = if lang == Lang::En { "" } else { " " };
+    format!("{} · {} ({pct}{sep}% {})", pln(lang, ships, w.0, w.1), pln(lang, cells, w.2, w.3), w.5).replace(" % of", "% of")
+}
+
+/// Résumé des règles affiché au placement.
+pub fn rules_info(lang: Lang, size: usize, ships: usize, upgrades: bool) -> String {
+    let w = rules_words(lang);
+    let up = if upgrades { "" } else { w.6 };
+    match lang {
+        Lang::En => format!("Rules: {size} × {size} grid, {}{up}.", pln(lang, ships, w.0, w.1)),
+        _ => format!("{} {size} × {size}, {}{up}.", w.4, pln(lang, ships, w.0, w.1)),
+    }
+}
+
+/// Résumé des règles personnalisées (accueil).
+pub fn rules_custom(lang: Lang, size: usize, ships: usize) -> String {
+    let w = rules_words(lang);
+    let head = match lang {
+        Lang::Fr => "Règles :",
+        Lang::En => "Rules:",
+        Lang::Pt => "Regras:",
+        Lang::Es => "Reglas:",
+        Lang::De => "Regeln:",
+        Lang::It => "Regole:",
+    };
+    format!("{head} {size} × {size}, {}", pln(lang, ships, w.0, w.1))
+}
+
 /// Textes propres à l'application Windows (mise à jour, sélection de photo…) pour les langues
 /// absentes du tableau principal ; le français et l'anglais sont dans `tr`.
 fn own(lang: Lang, key: &str) -> Option<&'static str> {
@@ -565,6 +608,19 @@ mod tests {
             }
         }
         assert!(checked > 100, "seulement {checked} clés trouvées");
+    }
+
+    #[test]
+    fn rules_texts() {
+        assert_eq!(fleet_total(Lang::Fr, 5, 17, 17), "5 bateaux · 17 cases (17 % de la grille)");
+        assert_eq!(fleet_total(Lang::En, 1, 1, 1), "1 ship · 1 square (1% of the grid)");
+        assert_eq!(rules_info(Lang::Fr, 10, 5, false), "Règles : grille 10 × 10, 5 bateaux, sans améliorations.");
+        assert_eq!(rules_info(Lang::En, 8, 3, true), "Rules: 8 × 8 grid, 3 ships.");
+        for l in Lang::ALL {
+            assert!(rules_info(l, 10, 5, true).contains("10 × 10"));
+            assert!(rules_custom(l, 12, 4).contains("12 × 12"));
+            assert!(fleet_total(l, 5, 17, 17).contains("17"));
+        }
     }
 
     #[test]

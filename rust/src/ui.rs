@@ -37,9 +37,10 @@ struct Geom {
 impl Geom {
     fn new(min: egui::Pos2, w: f32) -> Geom {
         let gap = 2.0;
-        let cell = (w - 10.0 * gap) / 10.7;
+        let nn = n() as f32;
+        let cell = (w - nn * gap) / (nn + 0.7);
         let lab = 0.7 * cell;
-        let h = lab + gap + 10.0 * (cell + gap) - gap;
+        let h = lab + gap + nn * (cell + gap) - gap;
         Geom { rect: Rect::from_min_size(min, vec2(w, h)), lab, cell, gap }
     }
     fn cell_rect(&self, r: usize, c: usize) -> Rect {
@@ -55,7 +56,7 @@ impl Geom {
         }
         let c = (x / (self.cell + self.gap)) as usize;
         let r = (y / (self.cell + self.gap)) as usize;
-        (r < N && c < N).then_some((r, c))
+        (r < n() && c < n()).then_some((r, c))
     }
 }
 
@@ -73,19 +74,19 @@ fn draw_grid(ui: &mut Ui, width: f32, looks: &[Look], small: bool, outline: Opti
     }
     let lf = reg(if small { 10.0 } else { 12.0 });
     let lfb = bold(if small { 10.0 } else { 12.0 });
-    for c in 0..N {
+    for c in 0..n() {
         let cr = g.cell_rect(0, c);
         p.text(pos2(cr.center().x, g.rect.top() + g.lab / 2.0), Align2::CENTER_CENTER, (c + 1).to_string(), lfb.clone(), pal().dim);
     }
-    for r in 0..N {
+    for r in 0..n() {
         let cr = g.cell_rect(r, 0);
         p.text(pos2(g.rect.left() + g.lab / 2.0, cr.center().y), Align2::CENTER_CENTER, (ROWS[r] as char).to_string(), lfb.clone(), pal().dim);
     }
     let _ = lf;
     let sym_size = (g.cell * 0.5).clamp(9.0, if small { 13.0 } else { 18.0 });
-    for r in 0..N {
-        for c in 0..N {
-            let k = r * N + c;
+    for r in 0..n() {
+        for c in 0..n() {
+            let k = r * n() + c;
             let l = looks[k];
             let cr = g.cell_rect(r, c);
             let mut fill = l.fill;
@@ -106,7 +107,7 @@ fn draw_grid(ui: &mut Ui, width: f32, looks: &[Look], small: bool, outline: Opti
             }
         }
     }
-    if hovered.is_some_and(|(r, c)| looks[r * N + c].hover.is_some()) {
+    if hovered.is_some_and(|(r, c)| looks[r * n() + c].hover.is_some()) {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     (resp, g)
@@ -467,6 +468,7 @@ impl App {
         match self.pane {
             Pane::Play => self.ui_play(ui),
             Pane::Stats => self.ui_stats(ui),
+            Pane::Rules => self.ui_rules(ui),
             Pane::Settings => self.ui_settings(ui),
         }
     }
@@ -474,7 +476,7 @@ impl App {
     fn ui_topbar(&mut self, ui: &mut Ui) {
         let tiny = ui.available_width() < 520.0;
         // Largeur des 4 boutons de navigation : s'ils ne tiennent pas à côté du joueur, on passe sur 2 lignes.
-        let nav_w: f32 = ["navPlay", "navStats", "navSettings", "navLogout"]
+        let nav_w: f32 = ["navPlay", "navStats", "navRules", "navSettings", "navLogout"]
             .iter()
             .map(|k| ui.painter().layout_no_wrap(format!("{}  {}", ic::GEAR, self.t(k)), semi(15.0), pal().text).size().x + 32.0 + 8.0)
             .sum();
@@ -555,6 +557,7 @@ impl App {
                     let items = [
                         (Some(Pane::Play), ic::CROSSHAIR, "navPlay"),
                         (Some(Pane::Stats), ic::CHART_PIE, "navStats"),
+                        (Some(Pane::Rules), ic::RULER, "navRules"),
                         (Some(Pane::Settings), ic::GEAR, "navSettings"),
                         (None, ic::POWER, "navLogout"),
                     ];
@@ -586,7 +589,7 @@ impl App {
                     ui.add_space(6.0);
                     let aw = ui.available_width();
                     ui.horizontal(|ui| {
-                        let w = (aw - 3.0 * 8.0) / 4.0;
+                        let w = (aw - 4.0 * 8.0) / 5.0;
                         nav(self, ui, Some(w));
                     });
                 } else {
@@ -597,6 +600,7 @@ impl App {
                             let mut tmp: Vec<(Option<Pane>, &str, &str)> = vec![
                                 (Some(Pane::Play), ic::CROSSHAIR, "navPlay"),
                                 (Some(Pane::Stats), ic::CHART_PIE, "navStats"),
+                                (Some(Pane::Rules), ic::RULER, "navRules"),
                                 (Some(Pane::Settings), ic::GEAR, "navSettings"),
                                 (None, ic::POWER, "navLogout"),
                             ];
@@ -682,6 +686,24 @@ impl App {
                 ui.add_space(gap - 8.0);
             }
             msg(ui, &self.dash_msg.0.clone(), self.dash_msg.1, 14.0);
+            // résumé des règles et lien pour les modifier
+            let cfg = self.settings.rules.clone();
+            let sum = if cfg.is_std() { self.t("rSumStd") } else { i18n::rules_custom(self.lang(), cfg.size, cfg.fleet.len()) };
+            ui.vertical_centered(|ui| {
+                ui.horizontal(|ui| {
+                    let edit = self.t("rEdit");
+                    let w = ui.painter().layout_no_wrap(format!("{sum} — {edit}"), reg(13.5), pal().muted).size().x;
+                    ui.add_space(((ui.available_width() - w) / 2.0).max(0.0));
+                    label(ui, format!("{sum} —"), reg(13.5), pal().muted);
+                    let l = ui.add(egui::Label::new(egui::RichText::new(edit).font(reg(13.5)).color(pal().sky).underline()).sense(Sense::click()));
+                    if l.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                    if l.clicked() {
+                        self.pane = Pane::Rules;
+                    }
+                });
+            });
         });
         if let Some(k) = clicked {
             self.play("click");
@@ -772,6 +794,222 @@ impl App {
         });
     }
 
+    /// Pastille « − valeur + » ; renvoie -1, 0 ou +1.
+    fn stepper(&self, ui: &mut Ui, val: &str, minus: bool, plus: bool) -> i32 {
+        let mut d = 0;
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            if Btn::new("+").small().width(34.0).enabled(plus).show(ui).clicked() {
+                d = 1;
+            }
+            let (r, _) = ui.allocate_exact_size(vec2(86.0, 34.0), Sense::hover());
+            ui.painter().text(r.center(), Align2::CENTER_CENTER, val, bold(14.0), pal().text);
+            if Btn::new("−").small().width(34.0).enabled(minus).show(ui).clicked() {
+                d = -1;
+            }
+        });
+        d
+    }
+
+    fn ui_rules(&mut self, ui: &mut Ui) {
+        ui.add_space(24.0);
+        let lang = self.lang();
+        let mut r = self.settings.rules.clone();
+        let before = r.clone();
+        centered(ui, 770.0, |ui| {
+            panel_frame().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                self.panel_title(ui, ic::RULER, "rulesTitle");
+                wrapped(ui, self.t("rulesIntro"), reg(13.5), pal().muted);
+                ui.add_space(8.0);
+                // Taille de la grille
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        label(ui, ic::TABLE, reg(20.0), pal().sky);
+                        ui.add_space(6.0);
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            label(ui, self.t("rGridT"), bold(16.0), pal().text);
+                            wrapped(ui, self.t("rGridD"), reg(13.0), pal().muted);
+                        });
+                        let d = self.stepper(ui, &format!("{0} × {0}", r.size), r.size > MIN_SIZE, r.size < MAX_SIZE);
+                        if d != 0 {
+                            r.size = (r.size as i32 + d) as usize;
+                            r.fleet.sort_unstable_by(|a, b| b.cmp(a));
+                            while r.fleet.len() > 1 && r.total_cells() > max_cells(r.size) {
+                                r.fleet.remove(0); // flotte trop grande : on retire les plus gros bateaux
+                            }
+                        }
+                    });
+                });
+                ui.add_space(8.0);
+                // Flotte
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        label(ui, ic::BOAT, reg(18.0), pal().yellow);
+                        label(ui, self.t("rFleetT"), bold(16.0), pal().text);
+                    });
+                    wrapped(ui, self.t("rFleetD"), reg(13.0), pal().muted);
+                    ui.add_space(4.0);
+                    let tot = r.total_cells();
+                    let cap = max_cells(r.size);
+                    for len in (1..=MAX_LEN).rev() {
+                        let cnt = r.fleet.iter().filter(|&&l| l == len).count();
+                        ui.horizontal(|ui| {
+                            let name = i18n::ship_name(lang, &[len], 0);
+                            ui.allocate_ui(vec2(150.0, 34.0), |ui| {
+                                ui.set_width(150.0);
+                                label(ui, name, semi(13.5), pal().text);
+                            });
+                            let (br, _) = ui.allocate_exact_size(vec2(len as f32 * 13.0, 12.0), Sense::hover());
+                            for b in 0..len {
+                                let c = Rect::from_min_size(br.min + vec2(b as f32 * 13.0, 0.0), vec2(11.0, 11.0));
+                                ui.painter().rect_filled(c, rd(2.0), pal().ship);
+                            }
+                            let d = self.stepper(ui, &cnt.to_string(), cnt > 0 && r.fleet.len() > 1, r.fleet.len() < MAX_SHIPS && tot + len <= cap);
+                            if d > 0 {
+                                r.fleet.push(len);
+                            } else if d < 0 {
+                                if let Some(i) = r.fleet.iter().position(|&l| l == len) {
+                                    r.fleet.remove(i);
+                                }
+                            }
+                        });
+                    }
+                    let pct = (tot as f32 / (r.size * r.size) as f32 * 100.0).round() as usize;
+                    label(ui, i18n::fleet_total(lang, r.fleet.len(), tot, pct), reg(13.0), pal().sky);
+                });
+                ui.add_space(8.0);
+                // Améliorations
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        label(ui, ic::MAGIC_WAND, reg(18.0), pal().purple);
+                        label(ui, self.t("rUpT"), bold(16.0), pal().text);
+                    });
+                    wrapped(ui, self.t("rUpD"), reg(13.0), pal().muted);
+                    let items = [
+                        (ic::WIFI_HIGH, "upRadarN", "upRadarD", 0),
+                        (ic::PLUS, "upCrossN", "upCrossD", 1),
+                        (ic::SHIELD, "upShieldN", "upShieldD", 2),
+                    ];
+                    for (icon, nk, dk, which) in items {
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            label(ui, icon, reg(18.0), pal().yellow);
+                            ui.add_space(6.0);
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 2.0;
+                                label(ui, self.t(nk), bold(14.5), pal().text);
+                                wrapped(ui, self.t(dk), reg(12.5), pal().muted);
+                            });
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                let on = match which {
+                                    0 => r.radar,
+                                    1 => r.cross,
+                                    _ => r.shield,
+                                };
+                                if self.on_off(ui, on) {
+                                    match which {
+                                        0 => r.radar = !on,
+                                        1 => r.cross = !on,
+                                        _ => r.shield = !on,
+                                    }
+                                }
+                            });
+                        });
+                    }
+                });
+                ui.add_space(8.0);
+                // Chronomètre
+                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        label(ui, ic::TIMER, reg(20.0), pal().cyan);
+                        ui.add_space(6.0);
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            label(ui, self.t("rTimerT"), bold(16.0), pal().text);
+                            wrapped(ui, self.t("rTimerD"), reg(13.0), pal().muted);
+                        });
+                        let idx = TIMER_CHOICES.iter().position(|&t| t == r.timer).unwrap_or(0);
+                        let txt = if r.timer == 0 { self.t("timerOff") } else { self.tf("timerN", &[("n", r.timer.to_string())]) };
+                        let d = self.stepper(ui, &txt, idx > 0, idx + 1 < TIMER_CHOICES.len());
+                        if d != 0 {
+                            r.timer = TIMER_CHOICES[(idx as i32 + d) as usize];
+                        }
+                    });
+                });
+                ui.add_space(8.0);
+                                sub_frame().show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        label(ui, ic::ROBOT, reg(20.0), pal().green);
+                        ui.add_space(6.0);
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            label(ui, self.t("rBotT"), bold(16.0), pal().text);
+                            wrapped(ui, self.t("rBotD"), reg(13.0), pal().muted);
+                        });
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            let on = self.settings.bot;
+                            let (r, resp) = ui.allocate_exact_size(vec2(58.0, 36.0), Sense::click());
+                            ui.painter().rect_filled(r, rd(9.0), if on { pal().ok } else { rgb(0x33, 0x41, 0x55) });
+                            let g = ui.painter().layout_no_wrap(if on { "ON" } else { "OFF" }.into(), bold(13.0), if on { Color32::WHITE } else { rgb(0xcb, 0xd5, 0xe1) });
+                            ui.painter().galley(r.center() - g.size() / 2.0, g, pal().text);
+                            if resp.hovered() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+                            if resp.clicked() {
+                                self.set_bot_enabled(!on);
+                            }
+                        });
+                    });
+                    ui.add_space(6.0);
+                    label(ui, self.t("rSkillT"), semi(14.0), pal().text);
+                    let mut sk_sel = self.settings.skill.min(2);
+                    let names = [self.t("skill0"), self.t("skill1"), self.t("skill2")];
+                    ui.add_enabled_ui(self.settings.bot, |ui| {
+                        egui::ComboBox::from_id_salt("skillSel")
+                            .selected_text(egui::RichText::new(names[sk_sel as usize].clone()).font(reg(14.0)))
+                            .width(ui.available_width() - 8.0)
+                            .show_ui(ui, |ui| {
+                                for (i, n) in names.iter().enumerate() {
+                                    ui.selectable_value(&mut sk_sel, i as u8, n.as_str());
+                                }
+                            });
+                    });
+                    if sk_sel != self.settings.skill {
+                        self.set_skill(sk_sel);
+                    }
+                });
+
+                ui.add_space(12.0);
+                if Btn::new(&self.t("rReset")).icon(ic::ARROW_COUNTER_CLOCKWISE).show(ui).clicked() {
+                    self.play("click");
+                    r = RulesCfg::default();
+                }
+            });
+        });
+        if r != before {
+            self.set_rules(r);
+        }
+    }
+
+    /// Bouton ON / OFF ; renvoie `true` s'il vient d'être cliqué.
+    fn on_off(&self, ui: &mut Ui, on: bool) -> bool {
+        let (r, resp) = ui.allocate_exact_size(vec2(58.0, 36.0), Sense::click());
+        ui.painter().rect_filled(r, rd(9.0), if on { pal().ok } else { rgb(0x33, 0x41, 0x55) });
+        let g = ui.painter().layout_no_wrap(self.t(if on { "rOn" } else { "rOff" }), bold(13.0), if on { Color32::WHITE } else { rgb(0xcb, 0xd5, 0xe1) });
+        ui.painter().galley(r.center() - g.size() / 2.0, g, pal().text);
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        resp.clicked()
+    }
+
     fn ui_settings(&mut self, ui: &mut Ui) {
         ui.add_space(24.0);
         let acc = self.me().cloned();
@@ -814,49 +1052,6 @@ impl App {
                     ui.add_space(4.0);
                     let w = ui.available_width();
                     self.lang_combo(ui, "langSel", w - 8.0);
-                });
-                ui.add_space(8.0);
-                sub_frame().show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal(|ui| {
-                        label(ui, ic::ROBOT, reg(20.0), pal().green);
-                        ui.add_space(6.0);
-                        ui.vertical(|ui| {
-                            ui.spacing_mut().item_spacing.y = 2.0;
-                            label(ui, self.t("rBotT"), bold(16.0), pal().text);
-                            wrapped(ui, self.t("rBotD"), reg(13.0), pal().muted);
-                        });
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            let on = self.settings.bot;
-                            let (r, resp) = ui.allocate_exact_size(vec2(58.0, 36.0), Sense::click());
-                            ui.painter().rect_filled(r, rd(9.0), if on { pal().ok } else { rgb(0x33, 0x41, 0x55) });
-                            let g = ui.painter().layout_no_wrap(if on { "ON" } else { "OFF" }.into(), bold(13.0), if on { Color32::WHITE } else { rgb(0xcb, 0xd5, 0xe1) });
-                            ui.painter().galley(r.center() - g.size() / 2.0, g, pal().text);
-                            if resp.hovered() {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                            }
-                            if resp.clicked() {
-                                self.set_bot_enabled(!on);
-                            }
-                        });
-                    });
-                    ui.add_space(6.0);
-                    label(ui, self.t("rSkillT"), semi(14.0), pal().text);
-                    let mut sk_sel = self.settings.skill.min(2);
-                    let names = [self.t("skill0"), self.t("skill1"), self.t("skill2")];
-                    ui.add_enabled_ui(self.settings.bot, |ui| {
-                        egui::ComboBox::from_id_salt("skillSel")
-                            .selected_text(egui::RichText::new(names[sk_sel as usize].clone()).font(reg(14.0)))
-                            .width(ui.available_width() - 8.0)
-                            .show_ui(ui, |ui| {
-                                for (i, n) in names.iter().enumerate() {
-                                    ui.selectable_value(&mut sk_sel, i as u8, n.as_str());
-                                }
-                            });
-                    });
-                    if sk_sel != self.settings.skill {
-                        self.set_skill(sk_sel);
-                    }
                 });
                 ui.add_space(8.0);
                 sub_frame().show(ui, |ui| {
@@ -1128,8 +1323,8 @@ impl App {
     fn place_grid(&mut self, ui: &mut Ui) {
         let occ = self.occupancy();
         let pv = self.preview_info();
-        let mut looks = [Look::default(); N * N];
-        for k in 0..N * N {
+        let mut looks = vec![Look::default(); n() * n()];
+        for k in 0..n() * n() {
             looks[k].hover = None;
             if occ[k] >= 0 {
                 looks[k].fill = pal().ship;
@@ -1137,7 +1332,7 @@ impl App {
         }
         if let Some((cells, valid)) = &pv {
             for &(r, c) in cells {
-                let l = &mut looks[r * N + c];
+                let l = &mut looks[r * n() + c];
                 if *valid {
                     l.fill = pal().ok;
                     l.ring = Some(rgb(0xa7, 0xf3, 0xd0));
@@ -1151,7 +1346,7 @@ impl App {
             return;
         }
         if resp.hover_pos().and_then(|p| g.cell_at(p)).is_some() {
-            let grab = resp.hover_pos().and_then(|p| g.cell_at(p)).is_some_and(|(r, c)| occ[r * N + c] >= 0);
+            let grab = resp.hover_pos().and_then(|p| g.cell_at(p)).is_some_and(|(r, c)| occ[r * n() + c] >= 0);
             ui.ctx().set_cursor_icon(if grab { egui::CursorIcon::Grab } else { egui::CursorIcon::PointingHand });
         }
         let (pressed, released, down, pos, secondary) = ui.input(|i| {
@@ -1178,13 +1373,23 @@ impl App {
     fn place_side(&mut self, ui: &mut Ui) {
         label(ui, self.t("placeTitle"), bold(20.0), pal().text);
         wrapped(ui, self.t("placeHelp"), reg(13.5), pal().muted);
+        let rules = self.s.rules;
+        let mut info = i18n::rules_info(self.lang(), n(), lens().len(), rules.any_upgrade());
+        if rules.timer > 0 {
+            info += &format!(
+                " {} {}",
+                self.tf("placeLimit", &[("s", (PLACE_LIMIT.as_secs()).to_string())]),
+                self.tf("turnLimit", &[("s", rules.timer.to_string())])
+            );
+        }
+        wrapped(ui, info, reg(12.5), pal().sky);
         ui.add_space(6.0);
         // Liste des bateaux (boutons qui se répartissent sur la largeur).
         let w = ui.available_width();
         let gap = 6.0;
         let per_row = (((w + gap) / (120.0 + gap)).floor() as usize).max(1);
         let mut clicked = None;
-        for row in (0..5).collect::<Vec<_>>().chunks(per_row) {
+        for row in (0..self.s.ships.len()).collect::<Vec<_>>().chunks(per_row) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = gap;
                 let bw = (w - gap * (row.len() as f32 - 1.0)) / row.len() as f32;
@@ -1375,13 +1580,13 @@ impl App {
             }
         });
         ui.add_space(4.0);
-        let mut looks = [Look::default(); N * N];
+        let mut looks = vec![Look::default(); n() * n()];
         let aimed: Vec<usize> = match self.s.aim {
-            Some((r, c)) if live && matches!(self.s.mode, Mode::Radar | Mode::Cross) => self.aim_cells(self.s.mode, r, c).into_iter().map(|(r, c)| r * N + c).collect(),
+            Some((r, c)) if live && matches!(self.s.mode, Mode::Radar | Mode::Cross) => self.aim_cells(self.s.mode, r, c).into_iter().map(|(r, c)| r * n() + c).collect(),
             _ => vec![],
         };
         let missed = self.opp_ship_cells();
-        for k in 0..N * N {
+        for k in 0..n() * n() {
             let v = self.s.enemy[k];
             let tg = self.targetable(k);
             let l = &mut looks[k];
@@ -1447,8 +1652,8 @@ impl App {
         });
         ui.add_space(2.0);
         let occ = self.occupancy();
-        let mut looks = [Look::default(); N * N];
-        for k in 0..N * N {
+        let mut looks = vec![Look::default(); n() * n()];
+        for k in 0..n() * n() {
             let i = occ[k];
             let v = self.s.incoming[k];
             let l = &mut looks[k];
