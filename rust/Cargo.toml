@@ -21,6 +21,7 @@ native-tls = "0.2"
 rand = "0.8"
 sha2 = "0.10"
 base64 = "0.22"
+ab_glyph = "0.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 rfd = "0.14"
 arboard = { version = "3", default-features = false, features = ["image-data"] }

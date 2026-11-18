@@ -268,6 +268,7 @@ pub struct GameState {
     pub verify_deadline: Option<Instant>,
     pub record_pending: bool,
     pub win: bool,
+    pub forfeit: bool,
     // revanche
     pub rounds: u32,
     pub rematch_me: bool,
@@ -357,6 +358,7 @@ impl GameState {
             verify_deadline: None,
             record_pending: false,
             win: false,
+            forfeit: false,
             rounds: 0,
             rematch_me: false,
             rematch_opp: false,
@@ -429,7 +431,6 @@ pub struct App {
     pub join_msg: (String, MsgKind),
     pub place_msg: (String, MsgKind),
     pub flash: Option<(String, Instant)>,
-    pub share_req: u8, // 0 : rien ; 1 : capture demandée ; 2 : capture en attente
     pub share_msg: (String, MsgKind),
     // comptes en ligne
     cloud_tx: std::sync::mpsc::Sender<CloudEvent>,
@@ -508,7 +509,6 @@ impl App {
             join_msg: Default::default(),
             place_msg: Default::default(),
             flash: None,
-            share_req: 0,
             share_msg: Default::default(),
             cloud_tx: ctx_tx,
             cloud_rx: ctx_rx,
@@ -2510,6 +2510,7 @@ impl App {
         self.s.waiting = false;
         self.s.aim = None;
         self.s.win = win;
+        self.s.forfeit = kind == EndKind::Forfeit;
         self.cancel(|t| matches!(t, Timer::BotEmit(_) | Timer::BotMove));
         self.s.show_choice = false;
         let shots = self.s.m.shots;
@@ -2737,47 +2738,112 @@ impl App {
 
     /* ---------- Partage du résultat ---------- */
 
-    /// Capture d'écran des grilles (sans la fenêtre de fin) : enregistrée dans « Images » et copiée dans le presse-papiers.
-    fn share_tick(&mut self, ctx: &egui::Context) {
-        match self.share_req {
-            1 => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
-                self.share_req = 2;
-                ctx.request_repaint();
-            }
-            2 => {
-                let img = ctx.input(|i| {
-                    i.events.iter().find_map(|e| match e {
-                        egui::Event::Screenshot { image, .. } => Some(image.clone()),
-                        _ => None,
-                    })
-                });
-                if let Some(img) = img {
-                    self.share_req = 0;
-                    self.s.end_show = true;
-                    self.share_msg = match self.save_share(&img) {
-                        Ok(()) => (self.t("shareSaved"), MsgKind::Ok),
-                        Err(_) => (self.t("shareFail"), MsgKind::Err),
-                    };
-                } else {
-                    ctx.request_repaint();
-                }
-            }
-            _ => {}
+    /// Image du résultat (même mise en page que la version web), enregistrée dans « Images » et copiée
+    /// dans le presse-papiers pour la coller directement dans une conversation.
+    pub fn share_result(&mut self) {
+        use crate::shareimg::{self, Kind};
+        if self.s.phase != Phase::Over || self.s.lost {
+            return;
         }
+        self.play("click");
+        let size = n();
+        let occ = self.occupancy();
+        let mine: Vec<Kind> = (0..size * size)
+            .map(|k| {
+                let i = occ[k];
+                if i >= 0 && self.is_sunk(i as usize) {
+                    return Kind::Sunk;
+                }
+                match self.s.incoming[k] {
+                    Some(Mark::Hit) => Kind::Hit,
+                    Some(Mark::Blocked) => Kind::Blocked,
+                    Some(Mark::Miss) => Kind::Miss,
+                    _ if i >= 0 => Kind::Ship,
+                    _ => Kind::Empty,
+                }
+            })
+            .collect();
+        let missed = self.opp_ship_cells();
+        let theirs: Vec<Kind> = (0..size * size)
+            .map(|k| match self.s.enemy[k] {
+                Some(Mark::Sunk) => Kind::Sunk,
+                Some(Mark::Hit) => Kind::Hit,
+                Some(Mark::Miss) => Kind::Miss,
+                Some(Mark::Blocked) => Kind::Blocked,
+                _ if missed.contains(&k) => Kind::Missed,
+                Some(Mark::ScanOcc) => Kind::Scan,
+                _ => Kind::Empty,
+            })
+            .collect();
+        let me = self.my_identity().name;
+        let opp = self.s.opp.as_ref().map_or("?".to_string(), |o| o.name.clone());
+        let m = self.s.m;
+        let acc = if m.shots > 0 { (m.hits as f64 / m.shots as f64 * 100.0).round() as u32 } else { 0 };
+        let secs = m.start.map_or(0, |t| t.elapsed().as_secs());
+        let mut legend = vec![
+            (Kind::Ship, self.t("lgShip")),
+            (Kind::Hit, self.t("lgHit")),
+            (Kind::Sunk, self.t("lgSunk")),
+            (Kind::Miss, self.t("lgMiss")),
+        ];
+        if !missed.is_empty() {
+            legend.push((Kind::Missed, self.t("lgMissed")));
+        }
+        let data = shareimg::Data {
+            size,
+            win: self.s.win,
+            my_name: me.clone(),
+            opp_name: opp.clone(),
+            forfeit: self.s.forfeit,
+            mine,
+            theirs,
+            stats: vec![
+                (self.t("imgShots"), m.shots.to_string()),
+                (self.t("imgAcc"), format!("{acc} %")),
+                (self.t("imgSunk"), format!("{} / {}", self.s.enemy_sunk.len(), lens().len())),
+                (self.t("imgTime"), crate::ui::fmt_time(secs)),
+            ],
+            t_winner: self.tf("imgWinner", &[("name", if self.s.win { me.clone() } else { opp.clone() })]),
+            t_vs: self.t("vs"),
+            t_forfeit: self.t("imgForfeit"),
+            t_fleet_me: self.tf("imgFleet", &[("name", me.clone())]),
+            t_fleet_opp: self.tf("imgFleet", &[("name", opp)]),
+            t_legend: legend,
+            t_stats_of: self.tf("imgStatsOf", &[("name", me)]),
+            t_footer: format!("{} {}", self.t("shareInvite"), WEB_URL.trim_start_matches("https://").trim_end_matches('/')),
+        };
+        let c = crate::theme::pal();
+        let pal = shareimg::Palette {
+            bg: c.bg,
+            card: c.modal,
+            border: c.border2,
+            text: c.text,
+            muted: c.muted,
+            water: c.water,
+            ship: c.ship,
+            hit: c.hit,
+            sunk: c.sunk,
+            miss: c.miss,
+            blk: c.blk,
+            scan: c.scan,
+            yellow: c.yellow,
+            sky: c.sky,
+        };
+        let img = shareimg::render(&data, &pal, &shareimg::Fonts::load());
+        self.share_msg = match self.save_share(&img) {
+            Ok(()) => (self.t("shareSaved"), MsgKind::Ok),
+            Err(_) => (self.t("shareFail"), MsgKind::Err),
+        };
     }
 
-    fn save_share(&mut self, img: &egui::ColorImage) -> Result<(), String> {
-        let [w, h] = img.size;
-        let raw: Vec<u8> = img.pixels.iter().flat_map(|p| p.to_array()).collect();
-        let rgba = image::RgbaImage::from_raw(w as u32, h as u32, raw.clone()).ok_or("image")?;
+    fn save_share(&mut self, rgba: &image::RgbaImage) -> Result<(), String> {
+        let (w, h) = (rgba.width() as usize, rgba.height() as usize);
         let dir = dirs::picture_dir().unwrap_or_else(std::env::temp_dir);
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("c02-naval-resultat.png");
         rgba.save(&path).map_err(|e| e.to_string())?;
-        // copie aussi dans le presse-papiers pour la coller directement dans une conversation
         if let Ok(mut cb) = arboard::Clipboard::new() {
-            let _ = cb.set_image(arboard::ImageData { width: w, height: h, bytes: raw.into() });
+            let _ = cb.set_image(arboard::ImageData { width: w, height: h, bytes: rgba.as_raw().clone().into() });
         }
         Ok(())
     }
@@ -2864,7 +2930,6 @@ impl App {
         }
         self.turn_tick();
         self.place_tick(now);
-        self.share_tick(ctx);
         if self.s.verify == Verify::Pending && self.s.verify_deadline.is_some_and(|d| now >= d) {
             self.finish_verify(Verify::Missing); // grille jamais dévoilée
         }

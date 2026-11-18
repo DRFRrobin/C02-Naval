@@ -2077,8 +2077,7 @@ impl App {
             self.ask_rematch();
         } else if share {
             self.share_msg = Default::default();
-            self.s.end_show = false; // on photographie les grilles, sans la fenêtre
-            self.share_req = 1;
+            self.share_result();
         } else if see {
             self.s.end_show = false;
         }
