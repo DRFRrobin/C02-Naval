@@ -245,6 +245,11 @@ pub fn setup_fonts(ctx: &egui::Context) {
         }
         v
     };
+    // Polices pixel des thèmes rétro (SIL OFL) : Press Start 2P pour les titres et boutons, VT323 pour le texte.
+    fonts.font_data.insert("px".into(), FontData::from_static(include_bytes!("../assets/fonts/PressStart2P-Regular.ttf")));
+    fonts.font_data.insert("vt".into(), FontData::from_static(include_bytes!("../assets/fonts/VT323-Regular.ttf")));
+    fonts.families.insert(FontFamily::Name("px".into()), fam(Some("px")));
+    fonts.families.insert(FontFamily::Name("vt".into()), fam(Some("vt")));
     let p = fam(None);
     let b = fam(bold.then_some("segoe-bold"));
     let s = fam(semi.then_some("segoe-semi"));
@@ -257,16 +262,32 @@ pub fn setup_fonts(ctx: &egui::Context) {
 }
 
 pub fn reg(size: f32) -> FontId {
-    FontId::proportional(size)
+    if pal().retro {
+        FontId::new(size * 1.25, FontFamily::Name("vt".into()))
+    } else {
+        FontId::proportional(size)
+    }
 }
 pub fn bold(size: f32) -> FontId {
-    FontId::new(size, FontFamily::Name("bold".into()))
+    if pal().retro {
+        FontId::new((size * 0.6).max(7.0), FontFamily::Name("px".into()))
+    } else {
+        FontId::new(size, FontFamily::Name("bold".into()))
+    }
 }
 pub fn semi(size: f32) -> FontId {
-    FontId::new(size, FontFamily::Name("semi".into()))
+    if pal().retro {
+        FontId::new((size * 0.6).max(7.0), FontFamily::Name("px".into()))
+    } else {
+        FontId::new(size, FontFamily::Name("semi".into()))
+    }
 }
 pub fn num(size: f32) -> FontId {
-    FontId::new(size, FontFamily::Name("num".into()))
+    if pal().retro {
+        FontId::new((size * 0.6).max(7.0), FontFamily::Name("px".into()))
+    } else {
+        FontId::new(size, FontFamily::Name("num".into()))
+    }
 }
 
 pub fn setup_style(ctx: &egui::Context) {

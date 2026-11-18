@@ -89,3 +89,4 @@ Tests : `cargo test --release` (format BinaryPack, PBKDF2, flotte aléatoire val
 ## Crédits
 
 Les emojis d'avatar sont des images [Twemoji](https://github.com/jdecked/twemoji) (© Twitter, Inc. et contributeurs), sous licence [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Les polices pixel des thèmes rétro sont « Press Start 2P » et « VT323 » (SIL Open Font License 1.1).
