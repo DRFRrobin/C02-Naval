@@ -45,4 +45,4 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
             && gh release upload "$GITHUB_REF_NAME" C02-Naval-windows-x64.exe --clobber \
-            || gh release create "$GITHUB_REF_NAME" C02-Naval-windows-x64.exe --title "C02 Naval ${GITHUB_REF_NAME%-windows}" --generate-notes
+            || gh release create "$GITHUB_REF_NAME" C02-Naval-windows-x64.exe --title "C02 Naval r$(echo "${GITHUB_REF_NAME#[vr]}" | sed "s/-windows$//")" --generate-notes

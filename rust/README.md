@@ -15,7 +15,7 @@ La plus récente en premier :
 
 | Version | Date | Changements |
 |---|---|---|
-| [**r1.2.4**](https://github.com/DRFRrobin/C02-Naval/releases/tag/r1.2.4-windows) (dernière) | 2026-11-18 | Parité avec la version web 1.2.4 : comptes en ligne, règles personnalisables, anti-triche, revanche, reprise après coupure, 7 thèmes dont Rétro, 6 langues, image de partage |
+| [**r1.2.4**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.4-windows) (dernière) | 2026-11-18 | Parité avec la version web 1.2.4 : comptes en ligne, règles personnalisables, anti-triche, revanche, reprise après coupure, 7 thèmes dont Rétro, 6 langues, image de partage |
 | [1.2.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) | 2026-11-15 | Mise à jour obligatoire depuis GitHub à chaque lancement |
 | [1.1.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.1.0-windows) | 2026-11-15 | Première version Windows en Rust |
 
@@ -30,7 +30,7 @@ La plus récente en premier :
 - Pas d'Internet (ou GitHub ne répond pas) : le jeu démarre avec la version actuelle.
 - Si le remplacement échoue (par exemple dans un dossier protégé en écriture comme `Program Files`), un lien vers la page des versions est affiché.
 
-Pour publier une mise à jour : augmenter `version` dans `Cargo.toml`, ajouter une ligne en haut du tableau **Versions**, puis pousser le tag `rX.Y.Z-windows` (les anciennes versions utilisent `v` : les deux sont reconnus) : le workflow `rust-windows` compile, teste et joint `C02-Naval-windows-x64.exe` à la release.
+Pour publier une mise à jour : augmenter `version` dans `Cargo.toml`, ajouter une ligne en haut du tableau **Versions**, puis pousser le tag **`vX.Y.Z-windows`** (le jeu s'affiche « rX.Y.Z », mais le tag garde le `v` : les versions déjà installées ne comprennent que ce préfixe et ne se mettraient pas à jour avec un tag `r…`) : le workflow `rust-windows` compile, teste et joint `C02-Naval-windows-x64.exe` à la release.
 
 ## Fonctionnalités (identiques à la version web 1.2.4)
 
