@@ -15,7 +15,7 @@ La plus récente en premier :
 
 | Version | Date | Changements |
 |---|---|---|
-| [**1.3.0**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.3.0-windows) (dernière) | 2026-11-18 | Parité avec la version web 1.2.4 : comptes en ligne, règles personnalisables, anti-triche, revanche, reprise après coupure, 7 thèmes dont Rétro, 6 langues, image de partage |
+| [**1.2.4**](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.4-windows) (dernière) | 2026-11-18 | Parité avec la version web 1.2.4 : comptes en ligne, règles personnalisables, anti-triche, revanche, reprise après coupure, 7 thèmes dont Rétro, 6 langues, image de partage |
 | [1.2.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.2.0-windows) | 2026-11-15 | Mise à jour obligatoire depuis GitHub à chaque lancement |
 | [1.1.0](https://github.com/DRFRrobin/C02-Naval/releases/tag/v1.1.0-windows) | 2026-11-15 | Première version Windows en Rust |
 

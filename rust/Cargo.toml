@@ -1,6 +1,6 @@
 [package]
 name = "c02-naval"
-version = "1.3.0"
+version = "1.2.4"
 edition = "2021"
 description = "C02 Naval : bataille navale multijoueur pour Windows (Rust, egui, WebRTC compatible PeerJS)"
 publish = false
