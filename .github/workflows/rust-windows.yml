@@ -10,6 +10,10 @@ on:
   pull_request:
     paths: ['rust/**']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag d'une release existante (ex. v1.2.4-windows) : compile la branche choisie et joint l'exécutable à cette release"
+        required: false
 
 permissions:
   contents: write
@@ -38,11 +42,12 @@ jobs:
           name: C02-Naval-windows-x64
           path: rust/C02-Naval-windows-x64.exe
       - name: Joindre à la release
-        if: (startsWith(github.ref, 'refs/tags/r') || startsWith(github.ref, 'refs/tags/v')) && endsWith(github.ref_name, '-windows')
+        if: (startsWith(github.ref, 'refs/tags/r') || startsWith(github.ref, 'refs/tags/v')) && endsWith(github.ref_name, '-windows') || inputs.tag != ''
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            && gh release upload "$GITHUB_REF_NAME" C02-Naval-windows-x64.exe --clobber \
-            || gh release create "$GITHUB_REF_NAME" C02-Naval-windows-x64.exe --title "C02 Naval r$(echo "${GITHUB_REF_NAME#[vr]}" | sed "s/-windows$//")" --generate-notes
+          gh release view "$TAG" >/dev/null 2>&1 \
+            && gh release upload "$TAG" C02-Naval-windows-x64.exe --clobber \
+            || gh release create "$TAG" C02-Naval-windows-x64.exe --title "C02 Naval r$(echo "${TAG#[vr]}" | sed "s/-windows$//")" --generate-notes

@@ -185,9 +185,27 @@ mod tests {
         let (status, body) = (status.to_string(), body.to_string());
         let h = std::thread::spawn(move || {
             let (mut s, _) = l.accept().unwrap();
-            let mut buf = vec![0u8; 8192];
-            let n = s.read(&mut buf).unwrap();
-            let req = String::from_utf8_lossy(&buf[..n]).to_string();
+            // lit toute la requête : sous Windows, l'en-tête et le corps peuvent arriver en paquets séparés
+            let mut data: Vec<u8> = vec![];
+            let mut buf = [0u8; 4096];
+            loop {
+                let n = s.read(&mut buf).unwrap();
+                data.extend_from_slice(&buf[..n]);
+                let text = String::from_utf8_lossy(&data).to_string();
+                if let Some(end) = text.find("\r\n\r\n") {
+                    let len = text[..end]
+                        .lines()
+                        .find_map(|l| l.to_lowercase().strip_prefix("content-length:").and_then(|v| v.trim().parse::<usize>().ok()))
+                        .unwrap_or(0);
+                    if data.len() >= end + 4 + len {
+                        break;
+                    }
+                }
+                if n == 0 {
+                    break;
+                }
+            }
+            let req = String::from_utf8_lossy(&data).to_string();
             let _ = write!(s, "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len());
             req
         });
