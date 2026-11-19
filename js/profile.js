@@ -347,7 +347,7 @@ function renderSettings() {
   const a = me();
   $('sndToggle').className = 'toggle ' + (settings.sound ? 'on' : 'off');
   $('sndToggle').textContent = settings.sound ? 'ON' : 'OFF';
-  $('verNum').textContent = APP_VERSION;
+  $('verNum').textContent = 'w' + APP_VERSION;   // le site s'appelle « w1.2.4 » (le nombre seul sert aux comparaisons)
   $('volRange').value = Math.round((typeof settings.volume === 'number' ? settings.volume : 0.8) * 100);
   $('volRange').disabled = !settings.sound;
   $('acctSettings').style.display = a ? '' : 'none';

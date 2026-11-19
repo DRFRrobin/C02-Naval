@@ -207,7 +207,7 @@ impl App {
                             let (c, bg) = icon_colors("cyan");
                             mode_icon(ui, ic::ANCHOR, c, bg, 64.0);
                             label(ui, "C02 Naval", bold(26.0), pal().text);
-                            label(ui, format!("v{}", crate::update::current_version()), reg(13.0), pal().muted);
+                            label(ui, format!("r{}", crate::update::current_version()), reg(13.0), pal().muted);
                             ui.add_space(12.0);
                             match &st {
                                 UpdState::Checking => {
@@ -231,7 +231,7 @@ impl App {
                                 }
                                 UpdState::Failed { version, .. } => {
                                     label(ui, self.t("updTitle"), bold(20.0), pal().yellow);
-                                    label(ui, format!("v{} → v{}", crate::update::current_version(), version), num(14.0), pal().sky);
+                                    label(ui, format!("r{} → r{}", crate::update::current_version(), version), num(14.0), pal().sky);
                                     ui.add_space(6.0);
                                     wrapped(ui, self.t("updFailed"), reg(14.0), pal().err);
                                     ui.add_space(12.0);
