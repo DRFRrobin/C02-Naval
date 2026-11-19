@@ -3,9 +3,150 @@
 use rand::Rng;
 use serde_json::{json, Value as Json};
 
-pub const N: usize = 10;
-pub const ROWS: &[u8] = b"ABCDEFGHIJ";
-pub const LENS: [usize; 5] = [5, 4, 3, 3, 2];
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+
+/// Taille de grille et flotte de la partie en cours (règles personnalisables, comme sur le web).
+pub const DEFAULT_SIZE: usize = 10;
+pub const DEFAULT_FLEET: [usize; 5] = [5, 4, 3, 3, 2];
+pub const MIN_SIZE: usize = 6;
+pub const MAX_SIZE: usize = 15;
+pub const MAX_LEN: usize = 6;
+pub const MAX_SHIPS: usize = 10;
+pub const ROWS: &[u8] = b"ABCDEFGHIJKLMNO";
+static SIZE: AtomicUsize = AtomicUsize::new(DEFAULT_SIZE);
+static FLEET: Mutex<Vec<usize>> = Mutex::new(Vec::new());
+
+pub fn n() -> usize {
+    SIZE.load(Ordering::Relaxed)
+}
+pub fn lens() -> Vec<usize> {
+    let f = FLEET.lock().unwrap();
+    if f.is_empty() {
+        DEFAULT_FLEET.to_vec()
+    } else {
+        f.clone()
+    }
+}
+pub fn set_board(size: usize, fleet: &[usize]) {
+    SIZE.store(size, Ordering::Relaxed);
+    *FLEET.lock().unwrap() = fleet.to_vec();
+}
+/// Les tests partagent la taille de grille globale : ils passent un par un.
+#[cfg(test)]
+pub static BOARD_LOCK: Mutex<()> = Mutex::new(());
+
+pub const TIMER_CHOICES: [u32; 5] = [0, 15, 30, 60, 90];
+
+/// Règles personnalisables d'une partie (comme l'écran « Règles » de la version web).
+#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RulesCfg {
+    pub size: usize,
+    pub fleet: Vec<usize>,
+    pub radar: bool,
+    pub cross: bool,
+    pub shield: bool,
+    pub timer: u32,
+}
+
+impl Default for RulesCfg {
+    fn default() -> RulesCfg {
+        RulesCfg { size: DEFAULT_SIZE, fleet: DEFAULT_FLEET.to_vec(), radar: true, cross: true, shield: true, timer: 0 }
+    }
+}
+
+impl RulesCfg {
+    /// Règles standard avec un compte à rebours de 20 s par coup (adversaire aléatoire).
+    pub fn match_rules() -> RulesCfg {
+        RulesCfg { timer: 20, ..RulesCfg::default() }
+    }
+
+    /// Règles standard : XP complète.
+    pub fn is_std(&self) -> bool {
+        *self == RulesCfg::default() || *self == RulesCfg::match_rules()
+    }
+
+    /// Valide et normalise (flotte triée du plus grand au plus petit). `None` si invalides.
+    pub fn sanitize(mut self) -> Option<RulesCfg> {
+        if self.size < MIN_SIZE || self.size > MAX_SIZE || self.fleet.is_empty() || self.fleet.len() > MAX_SHIPS {
+            return None;
+        }
+        if self.fleet.iter().any(|&l| l < 1 || l > MAX_LEN) {
+            return None;
+        }
+        self.fleet.sort_unstable_by(|a, b| b.cmp(a));
+        if self.fleet.iter().sum::<usize>() > max_cells(self.size) {
+            return None;
+        }
+        if !TIMER_CHOICES.contains(&self.timer) {
+            self.timer = 0;
+        }
+        Some(self)
+    }
+
+    pub fn from_json(j: &Json) -> Option<RulesCfg> {
+        if !j.is_object() {
+            return None;
+        }
+        RulesCfg {
+            size: j["size"].as_u64()? as usize,
+            fleet: j["fleet"].as_array()?.iter().map(|x| x.as_u64().map(|v| v as usize)).collect::<Option<Vec<_>>>()?,
+            radar: j["radar"].as_bool() != Some(false),
+            cross: j["cross"].as_bool() != Some(false),
+            shield: j["shield"].as_bool() != Some(false),
+            timer: j["timer"].as_u64().unwrap_or(0) as u32,
+        }
+        .sanitize()
+    }
+
+    pub fn to_json(&self) -> Json {
+        json!({"size":self.size,"fleet":self.fleet,"radar":self.radar,"cross":self.cross,"shield":self.shield,"timer":self.timer})
+    }
+
+    pub fn total_cells(&self) -> usize {
+        self.fleet.iter().sum()
+    }
+}
+
+/// Pose au hasard les bateaux manquants autour de ceux déjà placés. `false` : impossible (flotte à refaire).
+pub fn fill_missing(ships: &mut [Ship]) -> bool {
+    let mut rng = rand::thread_rng();
+    for _ in 0..100 {
+        let mut trial: Vec<Ship> = ships.to_vec();
+        let mut ok = true;
+        for i in 0..trial.len() {
+            if trial[i].cells.is_some() {
+                continue;
+            }
+            let mut placed = false;
+            for _ in 0..200 {
+                let occ = occ_of(&trial);
+                let h = rng.gen_bool(0.5);
+                let (r, c) = (rng.gen_range(0..n()) as i32, rng.gen_range(0..n()) as i32);
+                let cells = ship_cells(r, c, trial[i].len, h);
+                if cells.iter().all(|&(a, b)| inside(a, b) && occ[a as usize * n() + b as usize] == -1) {
+                    trial[i].cells = Some(cells.iter().map(|&(a, b)| (a as usize, b as usize)).collect());
+                    placed = true;
+                    break;
+                }
+            }
+            if !placed {
+                ok = false;
+                break;
+            }
+        }
+        if ok {
+            ships.clone_from_slice(&trial);
+            return true;
+        }
+    }
+    false
+}
+
+/// Cases maximales occupées par la flotte (40 % de la grille).
+pub fn max_cells(size: usize) -> usize {
+    size * size * 2 / 5
+}
 pub const ALPHA: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 pub type Cell = (usize, usize);
@@ -14,7 +155,7 @@ pub fn cell_name(r: usize, c: usize) -> String {
     format!("{}{}", ROWS[r] as char, c + 1)
 }
 pub fn inside(r: i32, c: i32) -> bool {
-    r >= 0 && r < N as i32 && c >= 0 && c < N as i32
+    r >= 0 && r < n() as i32 && c >= 0 && c < n() as i32
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -33,7 +174,7 @@ pub struct Ship {
 
 impl Ship {
     pub fn fleet() -> Vec<Ship> {
-        LENS.iter().map(|&len| Ship { len, cells: None, shield: Shield::None }).collect()
+        lens().iter().map(|&len| Ship { len, cells: None, shield: Shield::None }).collect()
     }
 }
 
@@ -48,12 +189,12 @@ pub enum Mark {
     ScanEmpty,
 }
 
-pub fn occ_of(ships: &[Ship]) -> [i32; N * N] {
-    let mut m = [-1i32; N * N];
+pub fn occ_of(ships: &[Ship]) -> Vec<i32> {
+    let mut m = vec![-1i32; n() * n()];
     for (i, s) in ships.iter().enumerate() {
         if let Some(cells) = &s.cells {
             for &(r, c) in cells {
-                m[r * N + c] = i as i32;
+                m[r * n() + c] = i as i32;
             }
         }
     }
@@ -61,7 +202,7 @@ pub fn occ_of(ships: &[Ship]) -> [i32; N * N] {
 }
 
 pub fn sunk_of(s: &Ship, incoming: &[Option<Mark>]) -> bool {
-    s.cells.as_ref().is_some_and(|cells| cells.iter().all(|&(r, c)| incoming[r * N + c] == Some(Mark::Hit)))
+    s.cells.as_ref().is_some_and(|cells| cells.iter().all(|&(r, c)| incoming[r * n() + c] == Some(Mark::Hit)))
 }
 
 pub fn ship_cells(r: i32, c: i32, len: usize, h: bool) -> Vec<(i32, i32)> {
@@ -78,9 +219,9 @@ pub fn random_cells(lens: &[usize]) -> Vec<Vec<Cell>> {
             for _ in 0..3000 {
                 let occ = occ_of(&ships);
                 let h = rng.gen_bool(0.5);
-                let (r, c) = (rng.gen_range(0..N) as i32, rng.gen_range(0..N) as i32);
+                let (r, c) = (rng.gen_range(0..n()) as i32, rng.gen_range(0..n()) as i32);
                 let cells = ship_cells(r, c, ships[i].len, h);
-                if cells.iter().all(|&(a, b)| inside(a, b) && occ[a as usize * N + b as usize] == -1) {
+                if cells.iter().all(|&(a, b)| inside(a, b) && occ[a as usize * n() + b as usize] == -1) {
                     ships[i].cells = Some(cells.iter().map(|&(a, b)| (a as usize, b as usize)).collect());
                     placed = true;
                     break;
@@ -188,7 +329,7 @@ pub fn resolve_on(ships: &mut [Ship], incoming: &mut [Option<Mark>], kind: ActKi
     let occ = occ_of(ships);
     let mut results = vec![];
     for &(r, c) in cells {
-        let k = r * N + c;
+        let k = r * n() + c;
         let i = occ[k];
         let mk = |v: &str| ShotRes { r, c, v: v.into(), ship: None, si: None };
         if kind == ActKind::Radar {
@@ -239,27 +380,29 @@ pub struct Bot {
     pub incoming: Vec<Option<Mark>>,
     know: Vec<Option<Mark>>,
     remaining: Vec<usize>,
+    /// Niveau : 0 facile, 1 moyen, 2 difficile.
+    skill: u8,
 }
 
 impl Bot {
-    pub fn new() -> Bot {
-        let ships = random_cells(&LENS)
+    pub fn new(skill: u8) -> Bot {
+        let ships = random_cells(&lens())
             .into_iter()
-            .zip(LENS)
+            .zip(lens())
             .map(|(cells, len)| Ship { len, cells: Some(cells), shield: Shield::None })
             .collect();
-        Bot { ships, incoming: vec![None; N * N], know: vec![None; N * N], remaining: LENS.to_vec() }
+        Bot { ships, incoming: vec![None; n() * n()], know: vec![None; n() * n()], remaining: lens().to_vec(), skill }
     }
 
     /// Le bot apprend le résultat de son propre tir.
     pub fn learn(&mut self, results: &[ShotRes]) {
         for x in results {
-            let k = x.r * N + x.c;
+            let k = x.r * n() + x.c;
             match x.v.as_str() {
                 "sunk" => {
                     let ship = x.ship.clone().unwrap_or_default();
                     for &(r, c) in &ship {
-                        self.know[r * N + c] = Some(Mark::Sunk);
+                        self.know[r * n() + c] = Some(Mark::Sunk);
                     }
                     if let Some(i) = self.remaining.iter().position(|&l| l == ship.len()) {
                         self.remaining.remove(i);
@@ -273,16 +416,45 @@ impl Bot {
         }
     }
 
+    fn random_unknown(&self) -> Cell {
+        let free: Vec<usize> = (0..n() * n()).filter(|&k| self.know[k].is_none()).collect();
+        let k = free[rand::thread_rng().gen_range(0..free.len().max(1)).min(free.len().saturating_sub(1))];
+        (k / n(), k % n())
+    }
+
     pub fn choose(&self) -> Cell {
         let k_ = &self.know;
+        let mut rng = rand::thread_rng();
+        if self.skill == 0 {
+            // facile : tirs au hasard, avec un peu de bon sens autour d'un touché
+            let mut near = vec![];
+            for k in 0..n() * n() {
+                if k_[k] != Some(Mark::Hit) {
+                    continue;
+                }
+                let (r, c) = ((k / n()) as i32, (k % n()) as i32);
+                for (a, b) in [(r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1)] {
+                    if inside(a, b) && k_[a as usize * n() + b as usize].is_none() {
+                        near.push((a as usize, b as usize));
+                    }
+                }
+            }
+            if !near.is_empty() && rng.gen::<f64>() < 0.6 {
+                return near[rng.gen_range(0..near.len())];
+            }
+            return self.random_unknown();
+        }
+        if self.skill == 1 && rng.gen::<f64>() < 0.3 {
+            return self.random_unknown();
+        }
         if let Some(k) = k_.iter().position(|v| *v == Some(Mark::Blocked)) {
-            return (k / N, k % N); // bouclier : on retire au même endroit
+            return (k / n(), k % n()); // bouclier : on retire au même endroit
         }
         let has_hits = k_.contains(&Some(Mark::Hit));
-        let mut score = vec![0f64; N * N];
+        let mut score = vec![0f64; n() * n()];
         for &len in &self.remaining {
-            for r in 0..N as i32 {
-                for c in 0..N as i32 {
+            for r in 0..n() as i32 {
+                for c in 0..n() as i32 {
                     for h in [true, false] {
                         let mut ok = true;
                         let mut nh = 0;
@@ -292,7 +464,7 @@ impl Bot {
                                 ok = false;
                                 break;
                             }
-                            let k = rr as usize * N + cc as usize;
+                            let k = rr as usize * n() + cc as usize;
                             match k_[k] {
                                 Some(Mark::Miss) | Some(Mark::Sunk) => {
                                     ok = false;
@@ -316,14 +488,13 @@ impl Bot {
                 }
             }
         }
-        let mut rng = rand::thread_rng();
         let mut best = -1.0;
         let mut best_k: Option<usize> = None;
-        for k in 0..N * N {
+        for k in 0..n() * n() {
             if k_[k].is_some() {
                 continue;
             }
-            let parity = if !has_hits && (k / N + k % N) % 2 == 0 { 1.25 } else { 1.0 };
+            let parity = if !has_hits && (k / n() + k % n()) % 2 == 0 { 1.25 } else { 1.0 };
             let v = score[k] * parity + rng.gen::<f64>() * 0.5;
             if v > best {
                 best = v;
@@ -331,7 +502,7 @@ impl Bot {
             }
         }
         let k = best_k.or_else(|| k_.iter().position(|v| v.is_none())).unwrap_or(0);
-        (k / N, k % N)
+        (k / n(), k % n())
     }
 }
 
@@ -340,11 +511,54 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rules_validation_matches_web() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let ok = |size, fleet: Vec<usize>, timer| RulesCfg { size, fleet, radar: true, cross: true, shield: true, timer }.sanitize();
+        assert!(ok(99, vec![2], 0).is_none());
+        assert!(ok(10, vec![], 0).is_none());
+        assert!(ok(6, vec![6, 6, 6, 6], 0).is_none()); // 24 cases > 40 % de 36
+        assert!(ok(10, vec![7], 0).is_none());
+        assert!(ok(10, vec![1; 11], 0).is_none());
+        let r = ok(12, vec![2, 5, 3], 30).unwrap();
+        assert_eq!((r.fleet.clone(), r.timer), (vec![5, 3, 2], 30));
+        assert_eq!(ok(10, vec![3], 7).unwrap().timer, 0);
+        assert!(RulesCfg::default().is_std() && RulesCfg::match_rules().is_std());
+        assert!(!RulesCfg { size: 8, ..RulesCfg::default() }.is_std());
+    }
+
+    #[test]
+    fn random_fleets_for_every_grid_size() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let old = (n(), lens());
+        for size in MIN_SIZE..=MAX_SIZE {
+            let mut fleet = vec![];
+            for l in [6, 5, 5, 4, 4, 3, 3, 2, 2, 1] {
+                if fleet.iter().sum::<usize>() + l <= max_cells(size) {
+                    fleet.push(l);
+                }
+            }
+            set_board(size, &fleet);
+            for _ in 0..30 {
+                let f = random_cells(&fleet);
+                assert_eq!(f.len(), fleet.len());
+                let mut seen = std::collections::HashSet::new();
+                for cells in &f {
+                    for &(r, c) in cells {
+                        assert!(r < size && c < size && seen.insert((r, c)));
+                    }
+                }
+            }
+        }
+        set_board(old.0, &old.1);
+    }
+
+    #[test]
     fn random_fleet_is_valid() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         for _ in 0..50 {
-            let f = random_cells(&LENS);
+            let f = random_cells(&lens());
             let mut seen = std::collections::HashSet::new();
-            for (cells, len) in f.iter().zip(LENS) {
+            for (cells, len) in f.iter().zip(lens()) {
                 assert_eq!(cells.len(), len);
                 for c in cells {
                     assert!(seen.insert(*c));
@@ -355,16 +569,212 @@ mod tests {
 
     #[test]
     fn bot_finishes_a_game() {
-        let mut target = Bot::new();
-        let shooter = &mut Bot::new();
-        for _ in 0..100 {
-            let at = shooter.choose();
-            let (res, over) = resolve_on(&mut target.ships, &mut target.incoming, ActKind::Shot, &[at]);
-            shooter.learn(&res);
-            if over {
-                return;
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        for skill in 0..=2 {
+            let mut target = Bot::new(2);
+            let shooter = &mut Bot::new(skill);
+            let mut done = false;
+            for _ in 0..100 {
+                let at = shooter.choose();
+                let (res, over) = resolve_on(&mut target.ships, &mut target.incoming, ActKind::Shot, &[at]);
+                shooter.learn(&res);
+                if over {
+                    done = true;
+                    break;
+                }
+            }
+            assert!(done, "le bot de niveau {skill} n'a pas fini en 100 tirs");
+        }
+    }
+}
+
+/* =========================================================
+   Anti-triche (même protocole que la version web)
+   Chaque joueur décide seul si un tir l'a touché : un client modifié pourrait mentir. En se déclarant
+   prêt, il envoie donc l'empreinte SHA-256 de sa grille (avec un sel aléatoire). En fin de partie,
+   chacun dévoile sa grille et son sel ; l'autre contrôle l'empreinte, la validité de la flotte et que
+   chaque résultat annoncé correspond bien à cette grille.
+   ========================================================= */
+
+pub fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+pub fn board_hash(salt: &str, ships: &[Vec<Cell>]) -> String {
+    use sha2::{Digest, Sha256};
+    let board = ships
+        .iter()
+        .map(|cells| cells.iter().map(|&(r, c)| (r * n() + c).to_string()).collect::<Vec<_>>().join(","))
+        .collect::<Vec<_>>()
+        .join(";");
+    let lens = lens().iter().map(|l| l.to_string()).collect::<Vec<_>>().join(",");
+    hex(&Sha256::digest(format!("c02-naval-v1|{}|{lens}|{salt}|{board}", n()).as_bytes()))
+}
+
+pub fn new_salt() -> String {
+    let mut b = [0u8; 16];
+    rand::Rng::fill(&mut rand::thread_rng(), &mut b);
+    hex(&b)
+}
+
+pub fn is_hash(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// Contrôle la grille dévoilée par l'adversaire. `true` = honnête.
+pub fn check_reveal(m: &Json, commit: &str, enemy: &[Option<Mark>], blocked_seen: u32, opp_shields: u32) -> bool {
+    let Some(salt) = m["salt"].as_str().filter(|s| s.len() == 32 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))) else {
+        return false;
+    };
+    let Some(raw) = m["ships"].as_array().filter(|a| a.len() == lens().len()) else { return false };
+    let mut occ = vec![false; n() * n()];
+    let mut ships: Vec<Vec<Cell>> = vec![];
+    for (i, rs) in raw.iter().enumerate() {
+        let Some(rs) = rs.as_array().filter(|a| a.len() == lens()[i]) else { return false };
+        let mut cells: Vec<Cell> = vec![];
+        for p in rs {
+            let (Some(r), Some(c)) = (p[0].as_i64(), p[1].as_i64()) else { return false };
+            if !inside(r as i32, c as i32) {
+                return false;
+            }
+            cells.push((r as usize, c as usize));
+        }
+        let horiz = cells.iter().all(|p| p.0 == cells[0].0);
+        let vert = cells.iter().all(|p| p.1 == cells[0].1);
+        if !horiz && !vert {
+            return false;
+        }
+        let mut pos: Vec<usize> = cells.iter().map(|p| if horiz { p.1 } else { p.0 }).collect();
+        pos.sort_unstable();
+        if pos.windows(2).any(|w| w[1] != w[0] + 1) {
+            return false;
+        }
+        for &(r, c) in &cells {
+            if occ[r * n() + c] {
+                return false;
+            }
+            occ[r * n() + c] = true;
+        }
+        ships.push(cells);
+    }
+    if board_hash(salt, &ships) != commit || blocked_seen > opp_shields {
+        return false;
+    }
+    for k in 0..n() * n() {
+        let has = occ[k];
+        match enemy[k] {
+            Some(Mark::Miss) | Some(Mark::ScanEmpty) if has => return false,
+            Some(Mark::Hit) | Some(Mark::Sunk) | Some(Mark::Blocked) | Some(Mark::ScanOcc) if !has => return false,
+            _ => {}
+        }
+    }
+    // un bateau annoncé coulé l'est en entier
+    !ships.iter().any(|cells| {
+        cells.iter().any(|&(r, c)| enemy[r * n() + c] == Some(Mark::Sunk)) && !cells.iter().all(|&(r, c)| enemy[r * n() + c] == Some(Mark::Sunk))
+    })
+}
+
+/* ---------- XP (même formule que js/profile.js et server/app.js) ---------- */
+
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct XpParts {
+    pub base: u64,
+    pub hits: u64,
+    pub sunk: u64,
+    pub acc: u64,
+    pub time: u64,
+}
+
+impl XpParts {
+    pub fn sum(&self) -> u64 {
+        self.base + self.hits + self.sunk + self.acc + self.time
+    }
+}
+
+/// Détail de l'XP et gain : participation/victoire, touchés, bateaux coulés, précision, rapidité (victoire).
+pub fn xp_parts(win: bool, shots: u32, hits: u32, sunk: u32, duration: u64, half: bool) -> (XpParts, u64) {
+    let acc = if shots > 0 { hits as f64 / shots as f64 } else { 0.0 };
+    let p = XpParts {
+        base: if win { 100 } else { 30 },
+        hits: hits as u64 * 5,
+        sunk: sunk as u64 * 20,
+        acc: (acc * if win { 100.0 } else { 30.0 }).round() as u64,
+        time: if win { (60.0 * ((900.0 - duration as f64) / 720.0).clamp(0.0, 1.0)).round() as u64 } else { 0 },
+    };
+    let sum = p.sum();
+    (p, if half { (sum as f64 / 2.0).round() as u64 } else { sum })
+}
+
+#[cfg(test)]
+mod anticheat_tests {
+    use super::*;
+
+    fn fleet() -> Vec<Vec<Cell>> {
+        random_cells(&lens())
+    }
+
+    #[test]
+    fn random_fleets_are_contiguous_and_ascending() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        for _ in 0..200 {
+            let f = fleet();
+            for (i, cells) in f.iter().enumerate() {
+                assert_eq!(cells.len(), lens()[i]);
+                let horiz = cells.iter().all(|c| c.0 == cells[0].0);
+                let key: Vec<usize> = cells.iter().map(|c| if horiz { c.1 } else { c.0 }).collect();
+                assert!(key.windows(2).all(|w| w[1] == w[0] + 1), "{cells:?}");
             }
         }
-        panic!("le bot n'a pas fini en 100 tirs");
+    }
+
+    #[test]
+    fn board_hash_matches_web_vector() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // Vecteur calculé avec la version web (crypto.subtle) : voir tests/game.test.js (« c02-naval-v1 »).
+        let ships: Vec<Vec<Cell>> = vec![
+            (0..5).map(|c| (0, c)).collect(),
+            (0..4).map(|c| (1, c)).collect(),
+            (0..3).map(|c| (2, c)).collect(),
+            (0..3).map(|c| (3, c)).collect(),
+            (0..2).map(|c| (4, c)).collect(),
+        ];
+        let salt = "00112233445566778899aabbccddeeff";
+        let h = board_hash(salt, &ships);
+        assert_eq!(h.len(), 64);
+        assert_eq!(h, include_str!("../testdata/hash_vector.txt").trim());
+    }
+
+    #[test]
+    fn honest_reveal_passes_and_lies_fail() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let ships = fleet();
+        let salt = new_salt();
+        let commit = board_hash(&salt, &ships);
+        let reveal = json!({"t":"reveal","salt":salt,"ships":ships.iter().map(|c| cells_json(c)).collect::<Vec<_>>()});
+        let mut enemy = vec![None; n() * n()];
+        assert!(check_reveal(&reveal, &commit, &enemy, 0, 0));
+        // un « raté » sur une case occupée est un mensonge
+        let (r, c) = ships[0][0];
+        enemy[r * n() + c] = Some(Mark::Miss);
+        assert!(!check_reveal(&reveal, &commit, &enemy, 0, 0));
+        enemy[r * n() + c] = None;
+        // un « bloqué » sans bouclier annoncé aussi
+        assert!(!check_reveal(&reveal, &commit, &enemy, 1, 0));
+        // une grille différente de l'empreinte
+        assert!(!check_reveal(&reveal, &"0".repeat(64), &enemy, 0, 0));
+    }
+
+    #[test]
+    fn xp_formula() {
+        let _g = BOARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // victoire : 100 + 17 touchés × 5 + 5 coulés × 20 + précision 17/40 × 100 + rapidité (10 min : 60 × 300/720)
+        let (p, gain) = xp_parts(true, 40, 17, 5, 600, false);
+        assert_eq!((p.base, p.hits, p.sunk, p.acc, p.time), (100, 85, 100, 43, 25));
+        assert_eq!(gain, 353);
+        let (_, half) = xp_parts(true, 40, 17, 5, 600, true);
+        assert_eq!(half, 177);
+        let (p, gain) = xp_parts(false, 10, 2, 0, 600, false);
+        assert_eq!((p.base, p.hits, p.acc, p.time), (30, 10, 6, 0));
+        assert_eq!(gain, 46);
     }
 }

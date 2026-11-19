@@ -30,6 +30,27 @@ pub struct Settings {
     pub lang: Lang,
     #[serde(default)]
     pub current: Option<String>, // dernier compte connecté ("guest" = invité)
+    #[serde(default)]
+    pub theme: Option<String>, // thème choisi (None = automatique : Rétro Noël en décembre, Océan sinon)
+    #[serde(default = "yes")]
+    pub bot: bool, // adversaire bot autorisé (partie contre le bot et bot de secours du mode aléatoire)
+    #[serde(default = "skill_default")]
+    pub skill: u8, // niveau du bot : 0 facile, 1 moyen, 2 difficile
+    #[serde(default)]
+    pub rules: crate::game::RulesCfg, // règles choisies par le joueur (hôte et bot)
+    #[serde(default)]
+    pub turn_url: String, // relais TURN personnel (facultatif)
+    #[serde(default)]
+    pub turn_user: String,
+    #[serde(default)]
+    pub turn_cred: String,
+}
+
+fn yes() -> bool {
+    true
+}
+fn skill_default() -> u8 {
+    2
 }
 
 impl Settings {
@@ -37,7 +58,7 @@ impl Settings {
         fs::read_to_string(data_dir().join("settings.json"))
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None })
+            .unwrap_or(Settings { sound: true, lang: Lang::detect(), current: None, theme: None, bot: true, skill: 2, rules: crate::game::RulesCfg::default(), turn_url: String::new(), turn_user: String::new(), turn_cred: String::new() })
     }
     pub fn save(&self) {
         let _ = fs::create_dir_all(data_dir());
@@ -83,6 +104,20 @@ pub struct Account {
     pub last_login: String,
     #[serde(default)]
     pub stats: Stats,
+    /// Compte en ligne : `tok` est la session ; `pending` les parties pas encore envoyées au serveur.
+    #[serde(default)]
+    pub cloud: bool,
+    #[serde(default)]
+    pub tok: Option<String>,
+    #[serde(default)]
+    pub pending: Vec<Pending>,
+}
+
+/// Partie à envoyer au serveur : `kind` « r » (résultat) ou « i » (interrompue).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Pending {
+    pub kind: String,
+    pub body: serde_json::Value,
 }
 
 pub fn now_iso() -> String {
@@ -102,6 +137,9 @@ pub fn level_of(xp: u64) -> u64 {
 }
 
 pub fn valid_photo(p: &str) -> bool {
+    if let Some(e) = p.strip_prefix("emoji:") {
+        return crate::emoji::valid(e); // avatar emoji (même liste que la version web)
+    }
     let ok_prefix = ["data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,"];
     p.len() < 90000
         && ok_prefix.iter().any(|pre| {
@@ -177,25 +215,6 @@ fn radix36(mut n: u64) -> String {
     s.iter().rev().collect()
 }
 
-/// Mot de passe : PBKDF2-SHA-256 salé, 120 000 itérations (jamais stocké en clair).
-pub fn hash_pass(pw: &str, salt_b64: Option<&str>, iter: u32) -> PassHash {
-    let salt: Vec<u8> = match salt_b64.and_then(|s| B64.decode(s).ok()) {
-        Some(s) => s,
-        None => {
-            let mut s = [0u8; 16];
-            rand::thread_rng().fill(&mut s);
-            s.to_vec()
-        }
-    };
-    let mut out = [0u8; 32];
-    pbkdf2::pbkdf2_hmac::<sha2::Sha256>(pw.as_bytes(), &salt, iter, &mut out);
-    PassHash { salt: B64.encode(&salt), hash: B64.encode(out), iter }
-}
-
-pub fn check_pass(pw: &str, h: &PassHash) -> bool {
-    hash_pass(pw, Some(&h.salt), h.iter).hash == h.hash
-}
-
 /// Photo : recadrée en carré 160 × 160 et compressée en JPEG (quelques Ko).
 pub fn make_photo(path: &std::path::Path) -> Option<String> {
     let img = image::open(path).ok()?;
@@ -214,6 +233,10 @@ pub fn decode_photo(url: &str) -> Option<(usize, usize, Vec<u8>)> {
     if !valid_photo(url) {
         return None;
     }
+    if let Some(e) = url.strip_prefix("emoji:") {
+        let img = image::load_from_memory(crate::emoji::bytes(e)?).ok()?.to_rgba8();
+        return Some((img.width() as usize, img.height() as usize, img.into_raw()));
+    }
     let b64 = url.split_once(',')?.1;
     let bytes = B64.decode(b64).ok()?;
     let img = image::load_from_memory(&bytes).ok()?.to_rgba8();
@@ -229,12 +252,5 @@ mod tests {
         assert_eq!(level_of(99), 1);
         assert_eq!(level_of(100), 2);
         assert_eq!(level_of(300), 3);
-    }
-    #[test]
-    fn pbkdf2_known_vector() {
-        // Vecteur RFC 7914 (PBKDF2-HMAC-SHA256, "passwd"/"salt", 1 itération).
-        let h = hash_pass("passwd", Some(&B64.encode(b"salt")), 1);
-        let raw = B64.decode(h.hash).unwrap();
-        assert_eq!(&raw[..8], &[0x55, 0xac, 0x04, 0x6e, 0x56, 0xe3, 0x08, 0x9f]);
     }
 }

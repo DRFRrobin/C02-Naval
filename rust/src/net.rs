@@ -39,8 +39,26 @@ const PEERJS_VERSION: &str = "1.5.4";
 const CHUNK_MTU: usize = 16300;
 const PING_SECS: u64 = 5;
 
-/// Relais TURN personnel facultatif (voir README) : (urls, utilisateur, mot de passe).
-const MY_TURN: Option<(&[&str], &str, &str)> = None;
+/// Relais TURN personnel facultatif, saisi dans Paramètres → Avancé : (adresse, utilisateur, mot de passe).
+static USER_TURN: Mutex<Option<(String, String, String)>> = Mutex::new(None);
+
+/// Adresse TURN valide : `turn:hote[:port][?transport=tcp|udp]` (ou `turns:`).
+pub fn valid_turn_url(u: &str) -> bool {
+    let Some(rest) = u.strip_prefix("turns:").or_else(|| u.strip_prefix("turn:")) else { return false };
+    let (host, query) = rest.split_once("?transport=").map_or((rest, None), |(h, q)| (h, Some(q)));
+    if query.is_some_and(|q| q != "tcp" && q != "udp") {
+        return false;
+    }
+    let (name, port) = host.split_once(':').map_or((host, None), |(n, p)| (n, Some(p)));
+    !name.is_empty()
+        && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_')
+        && port.map_or(true, |p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+}
+
+pub fn set_user_turn(url: &str, user: &str, cred: &str) {
+    let v = valid_turn_url(url.trim()).then(|| (url.trim().to_string(), user.to_string(), cred.to_string()));
+    *USER_TURN.lock().unwrap() = v;
+}
 
 pub type PeerId = u64;
 pub type ConnId = u64;
@@ -248,7 +266,8 @@ struct Conn {
 type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn open_ws(id: &str, token: &str) -> Option<Ws> {
-    let url = format!("{SIGNAL_URL}?key={PEERJS_KEY}&id={id}&token={token}&version={PEERJS_VERSION}");
+    let signal = std::env::var("C02NAVAL_SIGNAL").unwrap_or_else(|_| SIGNAL_URL.to_string()); // test : serveur PeerJS local
+    let url = format!("{signal}?key={PEERJS_KEY}&id={id}&token={token}&version={PEERJS_VERSION}");
     match tokio::time::timeout(Duration::from_secs(15), tokio_tungstenite::connect_async(url)).await {
         Ok(Ok((ws, _))) => Some(ws),
         _ => None,
@@ -425,11 +444,11 @@ fn ice_config() -> RTCConfiguration {
             credential_type: RTCIceCredentialType::Password,
         },
     ];
-    if let Some((urls, user, cred)) = MY_TURN {
+    if let Some((url, user, cred)) = USER_TURN.lock().unwrap().clone() {
         servers.push(RTCIceServer {
-            urls: urls.iter().map(|s| s.to_string()).collect(),
-            username: user.into(),
-            credential: cred.into(),
+            urls: vec![url],
+            username: user,
+            credential: cred,
             credential_type: RTCIceCredentialType::Password,
         });
     }
@@ -693,4 +712,19 @@ async fn handle_offer(
     }));
     conns.insert(key, Conn { id: conn, pc, dc: None, remote_set: true, pending: vec![], peer: src, data_count: 1 });
     em.emit(NetEvent::Incoming(pid, conn));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::valid_turn_url;
+
+    #[test]
+    fn turn_urls() {
+        for ok in ["turn:turn.example.com", "turn:turn.example.com:3478", "turns:t.example.com:443?transport=tcp", "turn:1.2.3.4:3478?transport=udp"] {
+            assert!(valid_turn_url(ok), "{ok}");
+        }
+        for bad in ["", "http://x", "turn:", "turn:host:abc", "turn:host?transport=ws", "turn:ho st", "stun:host"] {
+            assert!(!valid_turn_url(bad), "{bad}");
+        }
+    }
 }

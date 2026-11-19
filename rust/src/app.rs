@@ -11,6 +11,7 @@ use serde_json::{json, Value as Json};
 use crate::accounts::{self, level_of, valid_photo, Account, Settings, Store};
 use crate::game::{self, *};
 use crate::i18n::{self, fill, tr, Lang};
+use crate::cloud::{self, CloudEvent};
 use crate::net::{ConnId, Net, NetEvent, PeerErr, PeerId};
 use crate::sound::Sound;
 use crate::theme::MsgKind;
@@ -23,6 +24,12 @@ pub const HEARTBEAT: Duration = Duration::from_secs(2);
 pub const TIMEOUT: Duration = Duration::from_secs(20);
 pub const AWAY_TIMEOUT: Duration = Duration::from_secs(120);
 pub const JOIN_TIMEOUT: Duration = Duration::from_secs(15);
+/// Temps laissé pour placer sa flotte quand un chronomètre de tour est actif.
+pub const PLACE_LIMIT: Duration = Duration::from_secs(90);
+/// Durée maximale d'attente de la grille dévoilée par l'adversaire en fin de partie.
+pub const VERIFY_WAIT: Duration = Duration::from_secs(10);
+/// Durée pendant laquelle on tente de reprendre une partie dont la liaison est coupée.
+pub const RECONNECT: Duration = Duration::from_secs(45);
 pub const WEB_URL: &str = "https://drfrrobin.github.io/C02-Naval/";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -37,6 +44,7 @@ pub enum View {
 pub enum Pane {
     Play,
     Stats,
+    Rules,
     Settings,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -74,6 +82,46 @@ pub enum PeerRole {
     SlotOwner(usize),
     SlotJoiner(usize),
 }
+/// Règles de la partie en cours : améliorations autorisées et chronomètre de tour (0 = sans).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Rules {
+    pub radar: bool,
+    pub cross: bool,
+    pub shield: bool,
+    pub timer: u32,
+}
+impl Default for Rules {
+    fn default() -> Rules {
+        Rules { radar: true, cross: true, shield: true, timer: 0 }
+    }
+}
+impl Rules {
+    pub fn any_upgrade(&self) -> bool {
+        self.radar || self.cross || self.shield
+    }
+    pub fn of(c: &RulesCfg) -> Rules {
+        Rules { radar: c.radar, cross: c.cross, shield: c.shield, timer: c.timer }
+    }
+}
+
+/// Contrôle de la grille adverse en fin de partie.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Verify {
+    None,
+    Pending,
+    Ok,
+    Cheat,
+    Missing,
+}
+
+/// Comment une partie s'est terminée.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EndKind {
+    Normal,
+    Forfeit, // l'adversaire a quitté
+    Cheat,   // l'adversaire a donné des réponses impossibles
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Confirm {
     DeleteAccount,
@@ -82,6 +130,7 @@ pub enum Confirm {
 
 #[derive(Debug)]
 enum Timer {
+    BackToMenu,
     BotEmit(Json),
     BotMove,
     TurnSound,
@@ -148,6 +197,7 @@ pub struct EndInfo {
     pub title: String,
     pub text: String,
     pub xp: Option<(u64, u64, bool, u64, u64)>, // (gain, niveau, monté ?, xp dans le niveau, taille du niveau)
+    pub parts: XpParts,
     pub bot_note: bool,
     pub guest: bool,
 }
@@ -200,6 +250,46 @@ pub struct GameState {
     pub end: Option<EndInfo>,
     pub end_show: bool,
     pub log: (String, bool),
+    // règles et chronomètre
+    pub rules: Rules,
+    pub turn_start: Option<Instant>,
+    pub last_beep: u32,
+    pub place_deadline: Option<Instant>,
+    pub aim: Option<Cell>,
+    // boucliers et anti-triche
+    pub opp_used: u32,
+    pub opp_shields: u32,
+    pub blocked_seen: u32,
+    pub my_commit: Option<(String, Vec<Vec<Cell>>)>, // (sel, bateaux) dont l'empreinte a été envoyée
+    pub opp_commit: Option<String>,
+    pub opp_reveal: Option<Json>,
+    pub revealed: bool,
+    pub verify: Verify,
+    pub verify_deadline: Option<Instant>,
+    pub record_pending: bool,
+    pub win: bool,
+    pub forfeit: bool,
+    // revanche
+    pub rounds: u32,
+    pub rematch_me: bool,
+    pub rematch_opp: bool,
+    pub opp_gone: bool,
+    // reprise après coupure
+    pub sid: Option<String>,     // identifiant de la partie (annoncé par l'hôte)
+    pub host_id: Option<String>, // point de rendez-vous de l'hôte
+    pub txn: u64,
+    pub rxn: u64,
+    pub outbox: Vec<Json>,
+    pub reconnecting: bool,
+    pub recon_deadline: Option<Instant>,
+    pub rpeer: Option<PeerId>,
+    pub gpeer: Option<PeerId>,
+    pub gconn: Option<ConnId>,
+    pub gconn_open: bool,
+    pub g_deadline: Option<Instant>,
+    pub next_ask: Instant,
+    pub next_attempt: Instant,
+    pub resume_conns: Vec<ConnId>,
 }
 
 impl GameState {
@@ -230,8 +320,8 @@ impl GameState {
             my_turn: false,
             waiting: false,
             mode: Mode::Shot,
-            enemy: vec![None; N * N],
-            incoming: vec![None; N * N],
+            enemy: vec![None; n() * n()],
+            incoming: vec![None; n() * n()],
             enemy_sunk: vec![],
             inv: Inv::default(),
             choices: 0,
@@ -252,7 +342,72 @@ impl GameState {
             end: None,
             end_show: false,
             log: (String::new(), false),
+            rules: Rules::default(),
+            turn_start: None,
+            last_beep: 0,
+            place_deadline: None,
+            aim: None,
+            opp_used: 0,
+            opp_shields: 0,
+            blocked_seen: 0,
+            my_commit: None,
+            opp_commit: None,
+            opp_reveal: None,
+            revealed: false,
+            verify: Verify::None,
+            verify_deadline: None,
+            record_pending: false,
+            win: false,
+            forfeit: false,
+            rounds: 0,
+            rematch_me: false,
+            rematch_opp: false,
+            opp_gone: false,
+            sid: None,
+            host_id: None,
+            txn: 0,
+            rxn: 0,
+            outbox: vec![],
+            reconnecting: false,
+            recon_deadline: None,
+            rpeer: None,
+            gpeer: None,
+            gconn: None,
+            gconn_open: false,
+            g_deadline: None,
+            next_ask: now,
+            next_attempt: now,
+            resume_conns: vec![],
         }
+    }
+
+    /// Remet à zéro ce qui est propre à une manche (revanche), en gardant la liaison avec l'adversaire.
+    fn reset_round(&mut self) {
+        let fresh = GameState::new();
+        let keep_bot = self.vs_bot;
+        *self = GameState {
+            kind: self.kind,
+            peer: self.peer,
+            role: self.role,
+            conn: self.conn,
+            connected: self.connected,
+            is_host: self.is_host,
+            code: std::mem::take(&mut self.code),
+            vs_bot: keep_bot,
+            opp: self.opp.take(),
+            rules: self.rules,
+            sid: self.sid.take(),
+            host_id: self.host_id.take(),
+            txn: self.txn,
+            rxn: self.rxn,
+            outbox: std::mem::take(&mut self.outbox),
+            rpeer: self.rpeer,
+            resume_conns: std::mem::take(&mut self.resume_conns),
+            rounds: self.rounds + 1,
+            last_seen: Instant::now(),
+            next_ping: Instant::now() + HEARTBEAT,
+            ..fresh
+        };
     }
 }
 
@@ -265,12 +420,8 @@ pub struct App {
     pub auth_signup: bool,
     pub picked: Option<String>,
     // champs de saisie
-    pub login_pass: String,
     pub su_name: String,
-    pub su_pass: String,
-    pub su_pass2: String,
     pub edit_name: String,
-    pub edit_pass: String,
     pub code_input: String,
     // messages
     pub auth_msg: (String, MsgKind),
@@ -280,6 +431,22 @@ pub struct App {
     pub join_msg: (String, MsgKind),
     pub place_msg: (String, MsgKind),
     pub flash: Option<(String, Instant)>,
+    pub share_msg: (String, MsgKind),
+    // comptes en ligne
+    cloud_tx: std::sync::mpsc::Sender<CloudEvent>,
+    cloud_rx: Receiver<CloudEvent>,
+    pub auth_cloud: bool,
+    pub api_up: Option<bool>,
+    pub cloud_busy: bool,
+    syncing: bool,
+    sync_retry: Option<Instant>,
+    pub c_name: String,
+    pub c_pass: String,
+    pub pw_old: String,
+    pub pw_new: String,
+    pub pw_msg: (String, MsgKind),
+    pub pw_del: String,
+    sync_after_record: bool,
     pub show_join: bool,
     pub confirm: Option<Confirm>,
     pub pending_code: Option<String>,
@@ -291,9 +458,16 @@ pub struct App {
     pub textures: HashMap<String, egui::TextureHandle>,
     was_minimized: bool,
     awake: bool,
-    pub focus_pass: bool,
     pub focus_code: bool,
     pub upd: crate::update::Shared,
+}
+
+/// Indice du thème à afficher : celui du joueur, sinon le thème par défaut du moment.
+pub fn theme_index(s: &Settings) -> usize {
+    s.theme
+        .as_deref()
+        .and_then(|t| crate::theme::THEME_IDS.iter().position(|x| *x == t))
+        .unwrap_or_else(crate::theme::default_theme)
 }
 
 pub fn gen_code() -> String {
@@ -304,10 +478,12 @@ pub fn gen_code() -> String {
 impl App {
     pub fn new(cc: &eframe::CreationContext) -> App {
         crate::theme::setup_fonts(&cc.egui_ctx);
-        crate::theme::setup_style(&cc.egui_ctx);
+        let settings = Settings::load();
+        crate::net::set_user_turn(&settings.turn_url, &settings.turn_user, &settings.turn_cred);
+        crate::theme::apply_theme(&cc.egui_ctx, theme_index(&settings));
+        let (ctx_tx, ctx_rx) = channel();
         let (tx, rx) = channel();
         let net = Net::new(tx, cc.egui_ctx.clone());
-        let settings = Settings::load();
         let mut store = Store::default();
         store.load();
         // Code d'invitation passé en argument (ex. : c02-naval.exe ABC234).
@@ -323,12 +499,8 @@ impl App {
             pane: Pane::Play,
             auth_signup: false,
             picked: None,
-            login_pass: String::new(),
             su_name: String::new(),
-            su_pass: String::new(),
-            su_pass2: String::new(),
             edit_name: String::new(),
-            edit_pass: String::new(),
             code_input: String::new(),
             auth_msg: Default::default(),
             dash_msg: Default::default(),
@@ -337,6 +509,21 @@ impl App {
             join_msg: Default::default(),
             place_msg: Default::default(),
             flash: None,
+            share_msg: Default::default(),
+            cloud_tx: ctx_tx,
+            cloud_rx: ctx_rx,
+            auth_cloud: true,
+            api_up: None,
+            cloud_busy: false,
+            syncing: false,
+            sync_retry: None,
+            c_name: String::new(),
+            c_pass: String::new(),
+            pw_old: String::new(),
+            pw_new: String::new(),
+            pw_msg: Default::default(),
+            pw_del: String::new(),
+            sync_after_record: false,
             show_join: false,
             confirm: None,
             pending_code,
@@ -348,7 +535,6 @@ impl App {
             textures: HashMap::new(),
             was_minimized: false,
             awake: false,
-            focus_pass: false,
             focus_code: false,
             upd: crate::update::start(cc.egui_ctx.clone()),
         };
@@ -376,7 +562,7 @@ impl App {
         fill(tr(self.settings.lang, key), p)
     }
     pub fn ship_name(&self, i: usize) -> String {
-        self.t(&format!("ship{i}"))
+        i18n::ship_name(self.settings.lang, &lens(), i)
     }
     pub fn rank_of(&self, l: u64) -> &'static str {
         let r = i18n::ranks(self.settings.lang);
@@ -409,7 +595,7 @@ impl App {
             None => Opp { name: self.t("guestName"), photo: None, level: 0, bot: false },
         }
     }
-    pub fn occupancy(&self) -> [i32; N * N] {
+    pub fn occupancy(&self) -> Vec<i32> {
         occ_of(&self.s.ships)
     }
     pub fn is_sunk(&self, i: usize) -> bool {
@@ -428,9 +614,34 @@ impl App {
         self.settings.current = None;
         self.settings.save();
     }
+    pub fn set_theme(&mut self, ctx: &egui::Context, id: Option<&str>) {
+        self.settings.theme = id.map(|s| s.to_string());
+        self.settings.save();
+        crate::theme::apply_theme(ctx, theme_index(&self.settings));
+    }
     pub fn set_lang(&mut self, l: Lang) {
         self.settings.lang = l;
         self.settings.save();
+    }
+    pub fn set_rules(&mut self, c: RulesCfg) {
+        if let Some(ok) = c.sanitize() {
+            self.settings.rules = ok;
+            self.settings.save();
+        }
+    }
+    pub fn set_bot_enabled(&mut self, on: bool) {
+        self.settings.bot = on;
+        self.settings.save();
+    }
+    pub fn set_skill(&mut self, s: u8) {
+        self.settings.skill = s.min(2);
+        self.settings.save();
+    }
+    pub fn save_turn(&mut self) {
+        self.settings.turn_url = self.settings.turn_url.trim().to_string();
+        self.settings.save();
+        crate::net::set_user_turn(&self.settings.turn_url, &self.settings.turn_user, &self.settings.turn_cred);
+        self.set_msg = (self.t("turnSaved"), MsgKind::Ok);
     }
     pub fn toggle_sound(&mut self) {
         self.settings.sound = !self.settings.sound;
@@ -442,7 +653,7 @@ impl App {
 
     pub fn open_auth(&mut self, signup: Option<bool>) {
         self.store.load();
-        self.auth_signup = signup.unwrap_or(self.store.accounts.is_empty());
+        self.auth_signup = signup.unwrap_or(false);
         let accs = self.store.sorted();
         if self.picked.as_ref().map_or(true, |p| !self.store.accounts.contains_key(p)) {
             self.picked = accs.first().map(|a| a.id.clone());
@@ -450,75 +661,216 @@ impl App {
         self.view = View::Auth;
     }
 
-    pub fn do_login(&mut self) {
+    /// Entre avec ce pseudo local : le profil existe déjà sur cet ordinateur (repris) ou il est créé.
+    pub fn do_play(&mut self, name: &str) {
         self.store.load();
-        let Some(mut a) = self.picked.as_ref().and_then(|p| self.store.accounts.get(p)).cloned() else {
-            self.auth_msg = (self.t("errPickAcc"), MsgKind::Err);
-            return;
-        };
-        if let Some(h) = &a.pass {
-            if !accounts::check_pass(&self.login_pass, h) {
-                self.play("blocked");
-                self.auth_msg = (self.t("errPassWrong"), MsgKind::Err);
-                return;
-            }
-        }
-        a.last_login = accounts::now_iso();
-        self.store.save(&a);
-        self.login_pass.clear();
-        self.auth_msg = Default::default();
-        self.set_session(Some(a.id.clone()));
-        self.open_dash(Pane::Play);
-        self.dash_msg = if a.pass.is_some() {
-            (self.tf("welcome", &[("name", a.name.clone())]), MsgKind::Ok)
-        } else {
-            (self.t("noPassHint"), MsgKind::Err)
-        };
-    }
-
-    pub fn do_signup(&mut self) {
-        self.store.load();
-        let name = self.su_name.split_whitespace().collect::<Vec<_>>().join(" ");
-        let n = name.chars().count();
-        if !(2..=16).contains(&n) {
+        let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !(2..=16).contains(&name.chars().count()) {
+            self.play("blocked");
             self.auth_msg = (self.t("errPseudoLen"), MsgKind::Err);
             return;
         }
-        if self.store.name_taken(&name, None) {
-            self.auth_msg = (self.t("errPseudoTaken"), MsgKind::Err);
-            return;
-        }
-        if self.su_pass.chars().count() < 4 {
-            self.auth_msg = (self.t("errPassLen"), MsgKind::Err);
-            return;
-        }
-        if self.su_pass != self.su_pass2 {
-            self.auth_msg = (self.t("errPassMatch"), MsgKind::Err);
-            return;
-        }
         let now = accounts::now_iso();
-        let acc = Account {
-            id: accounts::new_id(),
-            name: name.clone(),
-            pass: Some(accounts::hash_pass(&self.su_pass, None, 120_000)),
-            photo: None,
-            xp: 0,
-            created: now.clone(),
-            last_login: now,
-            stats: Default::default(),
+        let existing = self.store.accounts.values().find(|a| !a.cloud && a.name.to_lowercase() == name.to_lowercase()).cloned();
+        let acc = match existing {
+            Some(mut a) => {
+                a.last_login = now;
+                a
+            }
+            None => {
+                let emojis = &crate::emoji::EMOJIS;
+                Account {
+                    id: accounts::new_id(),
+                    name: name.clone(),
+                    pass: None,
+                    photo: Some(format!("emoji:{}", emojis[rand::thread_rng().gen_range(0..emojis.len())].0)),
+                    xp: 0,
+                    created: now.clone(),
+                    last_login: now,
+                    stats: Default::default(),
+                    cloud: false,
+                    tok: None,
+                    pending: vec![],
+                }
+            }
         };
         self.store.save(&acc);
         self.su_name.clear();
-        self.su_pass.clear();
-        self.su_pass2.clear();
         self.auth_msg = Default::default();
         self.set_session(Some(acc.id.clone()));
         self.open_dash(Pane::Play);
         self.dash_msg = if self.store.storage_ok {
-            (self.tf("welcome", &[("name", name)]), MsgKind::Ok)
+            (self.tf("welcome", &[("name", acc.name)]), MsgKind::Ok)
         } else {
             (self.t("errStorage"), MsgKind::Err)
         };
+    }
+
+    /* ---------- Comptes en ligne ---------- */
+
+    pub fn cloud_submit(&mut self, ctx: &egui::Context, register: bool) {
+        let name = self.c_name.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !(2..=16).contains(&name.chars().count()) {
+            self.play("blocked");
+            self.auth_msg = (self.t("errPseudoLen"), MsgKind::Err);
+            return;
+        }
+        if self.c_pass.chars().count() < 8 {
+            self.play("blocked");
+            self.auth_msg = (self.t("e_password_invalid"), MsgKind::Err);
+            return;
+        }
+        self.store.load();
+        // un profil local du même pseudo est repris (borné par le serveur)
+        let import = self
+            .store
+            .accounts
+            .values()
+            .find(|a| !a.cloud && a.name.to_lowercase() == name.to_lowercase())
+            .map(|a| json!({"xp": a.xp, "emoji": a.photo.as_deref().and_then(|p| p.strip_prefix("emoji:")), "stats": a.stats}));
+        self.cloud_busy = true;
+        self.auth_msg = ("…".into(), MsgKind::Info);
+        cloud::auth(&self.cloud_tx, ctx, register, name, self.c_pass.clone(), import);
+    }
+
+    pub fn probe_api(&mut self, ctx: &egui::Context) {
+        if self.api_up.is_none() {
+            self.api_up = Some(true); // en attendant la réponse
+            cloud::health(&self.cloud_tx, ctx);
+        }
+    }
+
+    /// Le profil du serveur fait foi : on le recopie dans le compte local (cache hors ligne).
+    fn apply_cloud(&mut self, p: cloud::Profile, tok: Option<String>) -> Account {
+        self.store.load();
+        let id = format!("c:{}", p.name.to_lowercase());
+        let prev = self.store.accounts.get(&id).cloned();
+        let acc = Account {
+            id: id.clone(),
+            name: p.name,
+            pass: None,
+            photo: p.emoji.filter(|e| crate::emoji::valid(e)).map(|e| format!("emoji:{e}")).or_else(|| prev.as_ref().and_then(|a| a.photo.clone())),
+            xp: p.xp,
+            created: prev.as_ref().map_or_else(accounts::now_iso, |a| a.created.clone()),
+            last_login: accounts::now_iso(),
+            stats: p.stats,
+            cloud: true,
+            tok: tok.or_else(|| prev.as_ref().and_then(|a| a.tok.clone())),
+            pending: prev.map(|a| a.pending).unwrap_or_default(),
+        };
+        self.store.save(&acc);
+        acc
+    }
+
+    /// Envoie les parties en attente puis recharge le profil depuis le serveur.
+    pub fn sync_cloud(&mut self, ctx: &egui::Context) {
+        let Some(a) = self.me().cloned() else { return };
+        let Some(tok) = a.tok.clone().filter(|_| a.cloud && !self.syncing) else { return };
+        self.syncing = true;
+        self.sync_retry = None;
+        let pending = a.pending.iter().map(|p| (p.kind.clone(), p.body.clone())).collect();
+        cloud::sync(&self.cloud_tx, ctx, tok, pending);
+    }
+
+    pub fn change_password(&mut self, ctx: &egui::Context) {
+        let Some(tok) = self.me().and_then(|a| a.tok.clone()) else { return };
+        if self.pw_new.chars().count() < 8 {
+            self.pw_msg = (self.t("e_password_invalid"), MsgKind::Err);
+            return;
+        }
+        cloud::change_password(&self.cloud_tx, ctx, tok, self.pw_old.clone(), self.pw_new.clone());
+    }
+
+    pub fn delete_cloud(&mut self, ctx: &egui::Context, password: String) {
+        if let Some(tok) = self.me().and_then(|a| a.tok.clone()) {
+            cloud::delete(&self.cloud_tx, ctx, tok, password);
+        }
+    }
+
+    fn cloud_err_text(&self, e: &cloud::CloudErr) -> String {
+        if e.code == "locked" {
+            return self.tf("e_locked", &[("min", (e.retry_after.unwrap_or(900).div_ceil(60).max(1)).to_string())]);
+        }
+        self.t(&cloud::err_key(e))
+    }
+
+    fn handle_cloud(&mut self, ctx: &egui::Context, ev: CloudEvent) {
+        match ev {
+            CloudEvent::Auth(res) => {
+                self.cloud_busy = false;
+                match res {
+                    Ok((tok, profile)) => {
+                        let acc = self.apply_cloud(profile, Some(tok));
+                        self.c_name.clear();
+                        self.c_pass.clear();
+                        self.auth_msg = Default::default();
+                        self.set_session(Some(acc.id.clone()));
+                        self.open_dash(Pane::Play);
+                        self.dash_msg = (self.tf("welcome", &[("name", acc.name)]), MsgKind::Ok);
+                    }
+                    Err(e) => {
+                        self.play("blocked");
+                        self.auth_msg = (self.cloud_err_text(&e), MsgKind::Err);
+                    }
+                }
+            }
+            CloudEvent::Synced(done, res) => {
+                self.syncing = false;
+                // les parties envoyées (ou refusées) sortent de la file
+                self.store.load();
+                if let Some(mut a) = self.me().cloned() {
+                    let n = done.min(a.pending.len());
+                    a.pending.drain(..n);
+                    self.store.save(&a);
+                }
+                match res {
+                    Ok(p) => {
+                        self.apply_cloud(p, None);
+                    }
+                    Err(e) if e.status == 401 => {
+                        if let Some(mut a) = self.me().cloned() {
+                            a.tok = None;
+                            self.store.save(&a);
+                        }
+                        self.clear_session();
+                        self.open_auth(Some(false));
+                        self.auth_msg = (self.t("e_session"), MsgKind::Err);
+                    }
+                    Err(e) if e.status == 429 || e.code == "network" => {
+                        self.sync_retry = Some(Instant::now() + Duration::from_secs(20)); // trop vite / hors ligne : on réessaie
+                    }
+                    Err(_) => {}
+                }
+            }
+            CloudEvent::Password(res) => {
+                self.pw_msg = match res {
+                    Ok(()) => {
+                        self.pw_old.clear();
+                        self.pw_new.clear();
+                        (self.t("pwDone"), MsgKind::Ok)
+                    }
+                    Err(e) => (self.cloud_err_text(&e), MsgKind::Err),
+                };
+            }
+            CloudEvent::Deleted(res) => match res {
+                Ok(()) => {
+                    if let Some(id) = self.cur_id.clone() {
+                        self.store.delete(&id);
+                    }
+                    self.clear_session();
+                    self.open_auth(None);
+                }
+                Err(e) => self.pw_msg = (self.cloud_err_text(&e), MsgKind::Err),
+            },
+            CloudEvent::Health(ok) => {
+                self.api_up = Some(ok);
+                if !ok && self.view == View::Auth && self.auth_cloud {
+                    self.auth_cloud = false; // comptes en ligne indisponibles : pseudo local
+                    self.auth_msg = (self.t("apiDown"), MsgKind::Info);
+                }
+            }
+        }
+        let _ = ctx;
     }
 
     pub fn guest(&mut self) {
@@ -548,6 +900,7 @@ impl App {
             self.edit_name = a.name.clone();
         }
         self.view = View::Dash;
+        self.sync_after_record = self.me().is_some_and(|a| a.cloud); // compte en ligne : on se resynchronise
         if let Some(c) = self.pending_code.take() {
             self.open_join(&c);
         }
@@ -576,26 +929,20 @@ impl App {
             self.set_msg = (self.t("errPseudoTaken"), MsgKind::Err);
             return;
         }
-        let pw = self.edit_pass.clone();
-        if !pw.is_empty() && pw.chars().count() < 4 {
-            self.set_msg = (self.t("errPassLen"), MsgKind::Err);
-            return;
-        }
-        if name == a.name && pw.is_empty() {
+        if name == a.name {
             self.set_msg = (self.t("nothingChanged"), MsgKind::Info);
             return;
         }
-        if !pw.is_empty() {
-            a.pass = Some(accounts::hash_pass(&pw, None, 120_000));
-        }
         a.name = name;
         self.store.save(&a);
-        self.edit_pass.clear();
         self.set_msg = (self.t("saved"), MsgKind::Ok);
     }
 
     pub fn delete_account(&mut self) {
         let Some(id) = self.cur_id.clone() else { return };
+        if self.me().is_some_and(|a| a.cloud) {
+            return; // un compte en ligne se supprime avec son mot de passe (delete_cloud)
+        }
         self.store.delete(&id);
         self.clear_session();
         self.open_auth(None);
@@ -619,6 +966,17 @@ impl App {
                 }
             }
             None => self.dash_msg = (self.t("errPhoto"), MsgKind::Err),
+        }
+    }
+
+    pub fn set_emoji(&mut self, e: &str) {
+        self.store.load();
+        if let Some(mut a) = self.me().cloned() {
+            a.photo = Some(format!("emoji:{e}"));
+            if let Some(tok) = a.tok.clone().filter(|_| a.cloud) {
+                cloud::set_emoji(tok, Some(e.to_string()));
+            }
+            self.store.save(&a);
         }
     }
 
@@ -650,17 +1008,11 @@ impl App {
 
     /* ---------- Enregistrement des parties ---------- */
 
-    fn record_game(&mut self, win: bool) -> Option<(u64, u64, bool)> {
+    fn record_game(&mut self, win: bool, forfeit: bool) -> Option<(u64, u64, bool)> {
         self.store.load();
         let mut a = self.me().cloned()?;
         let m = self.s.m;
-        let acc = if m.shots > 0 { m.hits as f64 / m.shots as f64 } else { 0.0 };
-        let mut gain = (if win { 100 } else { 30 }) as f64 + m.hits as f64 * 5.0 + m.sunk as f64 * 20.0
-            + if win { (acc * 50.0).round() } else { 0.0 };
-        if self.s.vs_bot {
-            gain = (gain / 2.0).round();
-        }
-        let gain = gain as u64;
+        let gain = self.xp_parts_now(win).1;
         let before = level_of(a.xp);
         a.xp += gain;
         let s = &mut a.stats;
@@ -682,7 +1034,19 @@ impl App {
             s.streak = 0;
         }
         let lvl = level_of(a.xp);
+        if a.cloud {
+            // le serveur recalcule l'XP lui-même : on lui envoie seulement ce qui s'est passé
+            let dur = m.start.map_or(5, |t| t.elapsed().as_secs()).clamp(5, 7200);
+            let shots = m.shots.min(500);
+            let hits = m.hits.min(shots);
+            a.pending.push(accounts::Pending {
+                kind: "r".into(),
+                body: json!({"win":win,"shots":shots,"hits":hits,"sunk":m.sunk.min(hits).min(12),"upgrades":m.upgrades.min(30),"duration":dur,
+                    "bot":self.s.vs_bot,"std":self.current_cfg().is_std(),"forfeit":win && forfeit}),
+            });
+        }
         self.store.save(&a);
+        self.sync_after_record = a.cloud;
         Some((gain, lvl, lvl > before))
     }
 
@@ -690,11 +1054,20 @@ impl App {
         if self.s.phase != Phase::Game {
             return;
         }
+        self.record_interrupted_force();
+    }
+
+    fn record_interrupted_force(&mut self) {
         self.store.load();
         let Some(mut a) = self.me().cloned() else { return };
         a.stats.interrupted += 1;
-        a.stats.time_played += self.s.m.start.map_or(0, |t| t.elapsed().as_secs_f64().round() as u64);
+        let dur = self.s.m.start.map_or(0, |t| t.elapsed().as_secs_f64().round() as u64);
+        a.stats.time_played += dur;
+        if a.cloud {
+            a.pending.push(accounts::Pending { kind: "i".into(), body: json!({"duration": dur.min(7200)}) });
+        }
         self.store.save(&a);
+        self.sync_after_record = a.cloud;
     }
 
     /* =========================================================
@@ -717,6 +1090,8 @@ impl App {
 
     // Salon privé
     pub fn host_game(&mut self) {
+        let cfg = self.settings.rules.clone();
+        self.apply_cfg(&cfg);
         self.s.kind = Some(Kind::Host);
         self.s.is_host = true;
         self.s.code = gen_code();
@@ -789,6 +1164,7 @@ impl App {
     // et s'il est déjà pris, quelqu'un y attend : on le rejoint. Bot au bout de 45 s.
     pub fn find_random(&mut self) {
         self.s.kind = Some(Kind::Random);
+        self.apply_cfg(&RulesCfg::match_rules());
         self.s.phase = Phase::Lobby;
         self.s.mm_stopped = false;
         self.setup_lobby(false);
@@ -892,6 +1268,14 @@ impl App {
     fn handle_net(&mut self, e: NetEvent) {
         match e {
             NetEvent::PeerOpen(pid) => {
+                if self.s.gpeer == Some(pid) {
+                    if let Some(h) = self.s.host_id.clone() {
+                        let c = self.net.connect(pid, &h);
+                        self.s.gconn = Some(c);
+                        self.s.gconn_open = false;
+                    }
+                    return;
+                }
                 if self.s.peer != Some(pid) {
                     return;
                 }
@@ -924,6 +1308,10 @@ impl App {
                 }
             }
             NetEvent::PeerError(pid, err) => {
+                if self.s.gpeer == Some(pid) {
+                    self.end_attempt();
+                    return;
+                }
                 if self.s.peer != Some(pid) {
                     return;
                 }
@@ -965,12 +1353,34 @@ impl App {
                 }
             }
             NetEvent::PeerDisconnected(pid) => {
+                if self.s.connected && (self.s.rpeer == Some(pid) || self.s.peer == Some(pid)) && self.s.is_host {
+                    // l'hôte reste joignable : on se réenregistre pour la reprise
+                    if self.s.kind != Some(Kind::Random) || self.s.rpeer == Some(pid) {
+                        self.after_ms(1000, Timer::Reconnect(pid));
+                    }
+                    return;
+                }
                 if self.s.peer == Some(pid) && matches!(self.s.role, Some(PeerRole::Host | PeerRole::SlotOwner(_))) {
                     self.keep_peer_alive(pid);
                 }
             }
             NetEvent::Incoming(pid, conn) => {
                 self.net.adopt(pid, conn);
+                let resumable = self.s.connected
+                    && self.s.is_host
+                    && self.s.sid.is_some()
+                    && !self.s.lost
+                    && !self.s.vs_bot
+                    && self.s.phase != Phase::Over
+                    && (self.s.rpeer == Some(pid) || self.s.peer == Some(pid));
+                if resumable {
+                    self.s.resume_conns.push(conn); // première réponse attendue : « resume »
+                    return;
+                }
+                if self.s.rpeer == Some(pid) {
+                    self.net.close_conn(conn);
+                    return;
+                }
                 if self.s.peer != Some(pid) || self.s.mm_stopped && self.s.kind == Some(Kind::Random) {
                     self.net.close_conn(conn);
                     return;
@@ -978,6 +1388,11 @@ impl App {
                 self.accept_conn(conn);
             }
             NetEvent::ConnOpen(conn) => {
+                if self.s.gconn == Some(conn) {
+                    self.s.gconn_open = true;
+                    self.s.next_ask = Instant::now();
+                    return;
+                }
                 if self.s.reject_conns.contains(&conn) {
                     self.net.send(conn, json!({"t":"busy"}));
                     self.after_ms(300, Timer::BusyClose(conn));
@@ -985,21 +1400,55 @@ impl App {
                 }
                 if self.s.conn == Some(conn) {
                     let me = self.my_identity();
-                    self.send(json!({"t":"hello","name":me.name,"photo":me.photo,"level":me.level}));
+                    let mut hello = json!({"t":"hello","name":me.name,"photo":me.photo,"level":me.level});
+                    if let Some(e) = me.photo.as_deref().and_then(|p| p.strip_prefix("emoji:")) {
+                        hello["emoji"] = json!(e); // la version web n'affiche que des emojis
+                        hello["photo"] = Json::Null;
+                    }
+                    if self.s.kind == Some(Kind::Host) {
+                        hello["rules"] = self.current_cfg().to_json(); // l'hôte annonce les règles de la partie
+                    }
+                    if self.s.is_host && self.s.kind != Some(Kind::Join) {
+                        // identifiant de partie et point de reprise après coupure
+                        let sid = self.s.sid.get_or_insert_with(|| gen_code() + &gen_code()).clone();
+                        let rid = self.s.host_id.get_or_insert_with(|| {
+                            if self.s.kind == Some(Kind::Host) { format!("{PREFIX}{}", self.s.code) } else { format!("{PREFIX}{}", gen_code()) }
+                        });
+                        hello["sid"] = json!(sid);
+                        hello["rid"] = json!(rid);
+                    }
+                    self.send(hello);
                 }
             }
             NetEvent::ConnData(conn, m) => {
-                if self.s.conn == Some(conn) {
+                if self.s.resume_conns.contains(&conn) {
+                    self.s.resume_conns.retain(|c| *c != conn);
+                    self.on_resume_request(conn, &m);
+                } else if self.s.gconn == Some(conn) {
+                    if m["t"] == "resume" && m["sid"].as_str() == self.s.sid.as_deref() && self.s.reconnecting {
+                        let rx = m["rx"].as_u64().unwrap_or(0);
+                        self.s.gconn = None;
+                        self.s.gconn_open = false;
+                        self.s.g_deadline = None;
+                        self.s.gpeer = None; // le pair reste en vie (il porte la nouvelle liaison) ; une prochaine coupure en créera un autre
+                        self.adopt_conn(conn, rx);
+                    }
+                } else if self.s.conn == Some(conn) {
                     self.on_data(m);
                 }
             }
             NetEvent::ConnClosed(conn) => {
                 self.s.reject_conns.retain(|c| *c != conn);
+                self.s.resume_conns.retain(|c| *c != conn);
+                if self.s.gconn == Some(conn) {
+                    self.end_attempt();
+                    return;
+                }
                 if self.s.conn != Some(conn) {
                     return;
                 }
                 if self.s.connected {
-                    self.lost();
+                    self.conn_down();
                 } else {
                     self.on_reject(false);
                 }
@@ -1019,17 +1468,131 @@ impl App {
             if let Some(p) = self.s.peer {
                 self.net.disconnect(p);
             }
+            if self.s.is_host && self.s.rpeer.is_none() {
+                if let Some(rid) = self.s.host_id.clone() {
+                    self.s.rpeer = Some(self.net.create_peer(Some(rid)));
+                }
+            }
         }
         self.enter_placement();
     }
 
-    pub fn send(&mut self, m: Json) {
+    pub fn send(&mut self, mut m: Json) {
         if self.s.vs_bot {
             self.bot_receive(&m);
             return;
         }
-        if let Some(c) = self.s.conn {
+        // messages numérotés, renvoyés après une coupure
+        if ["ready", "act", "res", "pass", "quit", "reveal"].contains(&m["t"].as_str().unwrap_or("")) {
+            self.s.txn += 1;
+            m["n"] = json!(self.s.txn);
+            self.s.outbox.push(m.clone());
+        }
+        if let (Some(c), false) = (self.s.conn, self.s.reconnecting) {
             self.net.send(c, m);
+        }
+    }
+
+    /* ---------- Reprise après coupure (45 s) ---------- */
+
+    fn conn_down(&mut self) {
+        if self.s.phase == Phase::Over && self.s.connected && !self.s.lost && !self.s.vs_bot {
+            self.s.opp_gone = true; // il a quitté l'écran de fin
+            return;
+        }
+        if !self.s.connected || self.s.lost || self.s.phase == Phase::Over || self.s.vs_bot || self.s.reconnecting {
+            return;
+        }
+        if self.s.sid.is_none() || (!self.s.is_host && self.s.host_id.is_none()) {
+            self.lost(); // adversaire sans reprise possible (ancienne version)
+            return;
+        }
+        self.s.reconnecting = true;
+        self.s.recon_deadline = Some(Instant::now() + RECONNECT);
+        self.s.next_attempt = Instant::now();
+        if let Some(c) = self.s.conn {
+            self.net.close_conn(c);
+        }
+    }
+
+    /// Adopte une nouvelle liaison avec l'adversaire et renvoie ce qu'il n'a pas reçu.
+    fn adopt_conn(&mut self, conn: ConnId, their_rx: u64) {
+        if let Some(old) = self.s.conn.replace(conn) {
+            if old != conn {
+                self.net.close_conn(old);
+            }
+        }
+        self.s.reconnecting = false;
+        self.s.recon_deadline = None;
+        self.s.last_seen = Instant::now();
+        self.s.opp_away = false;
+        self.s.outbox.retain(|x| x["n"].as_u64().unwrap_or(0) > their_rx);
+        for m in self.s.outbox.clone() {
+            self.net.send(conn, m);
+        }
+    }
+
+    /// Hôte : un invité demande à reprendre la partie.
+    fn on_resume_request(&mut self, conn: ConnId, m: &Json) {
+        let ok = m["t"] == "resume"
+            && self.s.sid.is_some()
+            && m["sid"].as_str() == self.s.sid.as_deref()
+            && self.s.connected
+            && !self.s.lost
+            && self.s.phase != Phase::Over;
+        if !ok {
+            self.net.send(conn, json!({"t":"busy"}));
+            self.after_ms(300, Timer::BusyClose(conn));
+            return;
+        }
+        self.net.send(conn, json!({"t":"resume","sid":self.s.sid,"rx":self.s.rxn}));
+        self.adopt_conn(conn, m["rx"].as_u64().unwrap_or(0));
+    }
+
+    /// Invité : tentative périodique de reprise (nouveau pair, connexion au point de rendez-vous de l'hôte).
+    fn guest_attempt(&mut self) {
+        if self.s.gpeer.is_some() {
+            return;
+        }
+        let pid = self.net.create_peer(None);
+        self.s.gpeer = Some(pid);
+        self.s.g_deadline = Some(Instant::now() + Duration::from_secs(8));
+    }
+
+    fn end_attempt(&mut self) {
+        if let Some(p) = self.s.gpeer.take() {
+            self.net.destroy(p);
+        }
+        self.s.gconn = None;
+        self.s.gconn_open = false;
+        self.s.g_deadline = None;
+    }
+
+    fn recon_tick(&mut self, now: Instant) {
+        if !self.s.reconnecting {
+            return;
+        }
+        if self.s.recon_deadline.is_some_and(|d| now > d) {
+            self.s.reconnecting = false;
+            self.end_attempt();
+            self.lost();
+            return;
+        }
+        if self.s.is_host {
+            return;
+        }
+        if self.s.g_deadline.is_some_and(|d| now > d) {
+            self.end_attempt();
+        }
+        if self.s.gpeer.is_none() && now >= self.s.next_attempt {
+            self.s.next_attempt = now + Duration::from_secs(3);
+            self.guest_attempt();
+        }
+        if let (Some(c), true) = (self.s.gconn, self.s.gconn_open) {
+            if now >= self.s.next_ask {
+                self.s.next_ask = now + Duration::from_millis(1500);
+                self.net.send(c, json!({"t":"resume","sid":self.s.sid,"rx":self.s.rxn}));
+            }
         }
     }
 
@@ -1039,6 +1602,7 @@ impl App {
         }
         self.record_interrupted();
         self.s.lost = true;
+        self.s.reconnecting = false;
         self.s.phase = Phase::Over;
         self.s.show_choice = false;
         self.s.end = Some(EndInfo {
@@ -1046,6 +1610,7 @@ impl App {
             title: self.t("lostTitle"),
             text: self.t("lostText"),
             xp: None,
+            parts: XpParts::default(),
             bot_note: false,
             guest: false,
         });
@@ -1053,18 +1618,47 @@ impl App {
     }
 
     pub fn quit_game(&mut self) {
+        if self.s.connected && !self.s.vs_bot && !self.s.lost && self.s.phase == Phase::Game {
+            self.send(json!({"t":"quit"}));
+        }
         self.record_interrupted();
         self.s.phase = Phase::Over;
         self.reset_to_menu();
     }
 
     /// Équivalent de « recharger la page » : on repart du tableau de bord.
+    /// Règles de la partie en cours (taille de grille, flotte, améliorations, chronomètre).
+    pub fn current_cfg(&self) -> RulesCfg {
+        let r = self.s.rules;
+        RulesCfg { size: n(), fleet: lens(), radar: r.radar, cross: r.cross, shield: r.shield, timer: r.timer }
+    }
+
+    /// Applique des règles : taille de grille, flotte vierge, grilles vides.
+    pub fn apply_cfg(&mut self, c: &RulesCfg) {
+        set_board(c.size, &c.fleet);
+        self.s.rules = Rules::of(c);
+        self.s.ships = Ship::fleet();
+        self.s.enemy = vec![None; n() * n()];
+        self.s.incoming = vec![None; n() * n()];
+        self.s.enemy_sunk.clear();
+        self.s.sel = 0;
+        self.s.preview = None;
+    }
+
     pub fn reset_to_menu(&mut self) {
+        self.flush_pending_loss();
+        if self.s.connected && !self.s.vs_bot && !self.s.lost && self.s.phase == Phase::Over {
+            self.send(json!({"t":"bye"})); // il ne pourra plus proposer de revanche
+        }
+        if self.s.connected && !self.s.vs_bot && !self.s.lost {
+            std::thread::sleep(Duration::from_millis(120)); // laisse partir le dernier message avant de fermer
+        }
         if let Some(c) = self.s.conn {
             self.net.close_conn(c);
         }
         self.net.destroy_all();
         self.timers.clear();
+        set_board(DEFAULT_SIZE, &DEFAULT_FLEET);
         self.s = GameState::new();
         self.flash = None;
         self.place_msg = Default::default();
@@ -1125,12 +1719,41 @@ impl App {
         if !m.is_object() || self.s.lost {
             return;
         }
+        if let Some(n) = m["n"].as_u64() {
+            // message numéroté : on ignore les doublons (renvoi après coupure)
+            if n <= self.s.rxn {
+                return;
+            }
+            self.s.rxn = n;
+        }
         match m["t"].as_str().unwrap_or("") {
+            "ping" => {
+                if let Some(a) = m["a"].as_u64() {
+                    self.s.outbox.retain(|x| x["n"].as_u64().unwrap_or(0) > a);
+                }
+            }
             "hello" => {
                 let name: String = m["name"].as_str().unwrap_or("?").chars().take(16).collect();
-                let photo = m["photo"].as_str().filter(|p| valid_photo(p)).map(|s| s.to_string());
+                let photo = m["emoji"]
+                    .as_str()
+                    .filter(|e| crate::emoji::valid(e))
+                    .map(|e| format!("emoji:{e}"))
+                    .or_else(|| m["photo"].as_str().filter(|p| valid_photo(p) && !p.starts_with("emoji:")).map(|s| s.to_string()));
                 let level = m["level"].as_u64().or_else(|| m["level"].as_f64().map(|f| f as u64)).unwrap_or(0).min(999);
                 let bot = m["bot"].as_bool().unwrap_or(false) && self.s.vs_bot;
+                if !self.s.connected && self.s.kind == Some(Kind::Join) {
+                    // règles de l'hôte (règles standard si absentes ou invalides, comme sur le web)
+                    let cfg = RulesCfg::from_json(&m["rules"]).unwrap_or_default();
+                    self.apply_cfg(&cfg);
+                }
+                if !self.s.connected && !self.s.is_host && !self.s.vs_bot {
+                    if let (Some(sid), Some(rid)) = (m["sid"].as_str(), m["rid"].as_str()) {
+                        if sid.len() <= 40 && rid.len() <= 60 {
+                            self.s.sid = Some(sid.to_string());
+                            self.s.host_id = Some(rid.to_string());
+                        }
+                    }
+                }
                 self.s.opp = Some(Opp { name, photo, level, bot });
                 if !self.s.connected {
                     self.on_connected();
@@ -1150,12 +1773,34 @@ impl App {
                 self.show_away();
             }
             "ready" => {
+                // empreinte de sa grille (absente : ancienne version, non vérifiée)
+                self.s.opp_commit = m["h"].as_str().filter(|h| is_hash(h)).map(|h| h.to_string());
                 self.s.opp_ready = true;
                 self.maybe_start();
             }
             "act" => self.on_act(&m),
             "res" => self.on_res(&m),
             "pass" => self.on_pass(),
+            "reveal" => {
+                self.s.opp_reveal = Some(m);
+                if self.s.phase == Phase::Over && self.s.verify == Verify::Pending {
+                    self.run_verify();
+                }
+            }
+            "rematch" => {
+                self.s.rematch_opp = true;
+                if self.s.phase == Phase::Over && self.s.rematch_me {
+                    self.start_rematch();
+                }
+            }
+            "bye" => self.s.opp_gone = true,
+            "quit" => {
+                if self.s.phase == Phase::Game {
+                    self.end_game(true, EndKind::Forfeit);
+                } else {
+                    self.lost();
+                }
+            }
             _ => {}
         }
     }
@@ -1165,10 +1810,17 @@ impl App {
        ========================================================= */
 
     pub fn start_bot(&mut self) {
+        if !self.settings.bot {
+            self.dash_msg = (self.t("botOff"), MsgKind::Err);
+            return;
+        }
+        // bot de secours du mode aléatoire : mêmes règles que le mode aléatoire ; sinon règles du joueur
+        let cfg = if self.s.kind == Some(Kind::Random) { RulesCfg::match_rules() } else { self.settings.rules.clone() };
+        self.apply_cfg(&cfg);
         self.s.kind = Some(Kind::Bot);
         self.s.vs_bot = true;
         self.s.is_host = true;
-        self.s.bot = Some(Bot::new());
+        self.s.bot = Some(Bot::new(self.settings.skill.min(2)));
         self.s.connected = true;
         self.s.opp = Some(Opp { name: self.t("botName"), photo: None, level: self.my_identity().level.max(1), bot: true });
         self.enter_placement();
@@ -1216,6 +1868,7 @@ impl App {
         self.s.phase = Phase::Place;
         self.s.sel = 0;
         self.s.preview = None;
+        self.s.place_deadline = (self.s.rules.timer > 0).then(|| Instant::now() + PLACE_LIMIT);
         self.view = View::Place;
         self.place_msg = Default::default();
         if !self.s.vs_bot {
@@ -1243,7 +1896,7 @@ impl App {
                 valid = false;
                 continue;
             }
-            if occ[rr as usize * N + cc as usize] != -1 {
+            if occ[rr as usize * n() + cc as usize] != -1 {
                 valid = false;
             }
             cells.push((rr as usize, cc as usize));
@@ -1326,7 +1979,7 @@ impl App {
                 return;
             }
         }
-        let idx = self.occupancy()[r * N + c];
+        let idx = self.occupancy()[r * n() + c];
         if idx >= 0 {
             self.select_ship(idx as usize);
             return;
@@ -1359,9 +2012,9 @@ impl App {
                 // s'il sort de la grille en pivotant, on le recale à l'intérieur
                 let len = self.s.ships[self.s.sel as usize].len as i32;
                 if p.h {
-                    p.c = p.c.min(N as i32 - len);
+                    p.c = p.c.min(n() as i32 - len);
                 } else {
-                    p.r = p.r.min(N as i32 - len);
+                    p.r = p.r.min(n() as i32 - len);
                 }
                 self.s.preview = Some(p);
             }
@@ -1403,7 +2056,7 @@ impl App {
         }
         self.s.lifted = None;
         self.s.preview = None;
-        for (i, cells) in random_cells(&LENS).into_iter().enumerate() {
+        for (i, cells) in random_cells(&lens()).into_iter().enumerate() {
             self.s.ships[i].cells = Some(cells);
         }
         self.s.sel = -1;
@@ -1419,7 +2072,16 @@ impl App {
         self.s.me_ready = true;
         self.s.sel = -1;
         self.s.preview = None;
-        self.send(json!({"t":"ready"}));
+        if self.s.vs_bot {
+            self.send(json!({"t":"ready"}));
+        } else {
+            // On s'engage sur sa grille : empreinte SHA-256 avec un sel, dévoilée en fin de partie.
+            let salt = new_salt();
+            let ships: Vec<Vec<Cell>> = self.s.ships.iter().map(|x| x.cells.clone().unwrap_or_default()).collect();
+            let h = board_hash(&salt, &ships);
+            self.s.my_commit = Some((salt, ships));
+            self.send(json!({"t":"ready","h":h}));
+        }
         self.play("click");
         self.maybe_start();
     }
@@ -1430,7 +2092,7 @@ impl App {
             return;
         }
         let on_preview = self.preview_info().is_some_and(|(cells, _)| cells.contains(&(r, c)));
-        let idx = self.occupancy()[r * N + c];
+        let idx = self.occupancy()[r * n() + c];
         let mut d = Drag { r, c, moved: false, ship: false, was_selected: on_preview, off: (0, 0) };
         if idx >= 0 && !on_preview {
             self.select_ship(idx as usize); // soulève le bateau touché
@@ -1497,12 +2159,17 @@ impl App {
             return;
         }
         self.s.phase = Phase::Game;
-        self.s.my_turn = self.s.is_host;
+        // le premier tir alterne d'une manche à l'autre
+        self.s.my_turn = self.s.is_host != (self.s.rounds % 2 == 1);
+        self.s.turn_start = Some(Instant::now());
         self.s.m.start = Some(Instant::now());
         self.view = View::Game;
         let t = self.t(if self.s.is_host { "startHost" } else { "startGuest" });
         self.set_log(t, false);
         self.play(if self.s.my_turn { "turn" } else { "start" });
+        if self.s.vs_bot && !self.s.my_turn {
+            self.after_ms(900, Timer::BotMove); // revanche : le bot ouvre le feu
+        }
     }
 
     /* =========================================================
@@ -1533,7 +2200,7 @@ impl App {
                 return;
             }
             Mode::Shot => {
-                if !self.targetable(r * N + c) {
+                if !self.targetable(r * n() + c) {
                     let t = self.t("fAlready");
                     self.flash_hint(t);
                     return;
@@ -1543,12 +2210,17 @@ impl App {
             Mode::Radar => {
                 let v: Vec<Cell> = [(ri, ci), (ri, ci + 1), (ri + 1, ci), (ri + 1, ci + 1)]
                     .into_iter()
-                    .filter(|&(a, b)| inside(a, b) && self.s.enemy[a as usize * N + b as usize].is_none())
+                    .filter(|&(a, b)| inside(a, b) && self.s.enemy[a as usize * n() + b as usize].is_none())
                     .map(|(a, b)| (a as usize, b as usize))
                     .collect();
                 if v.is_empty() {
                     let t = self.t("fNoUnknown");
                     self.flash_hint(t);
+                    return;
+                }
+                if self.s.aim != Some((r, c)) {
+                    self.s.aim = Some((r, c)); // un premier appui vise, un second sur la même case confirme
+                    self.play("click");
                     return;
                 }
                 self.s.inv.radar -= 1;
@@ -1558,12 +2230,17 @@ impl App {
             Mode::Cross => {
                 let v: Vec<Cell> = [(ri, ci), (ri - 1, ci), (ri + 1, ci), (ri, ci - 1), (ri, ci + 1)]
                     .into_iter()
-                    .filter(|&(a, b)| inside(a, b) && self.targetable(a as usize * N + b as usize))
+                    .filter(|&(a, b)| inside(a, b) && self.targetable(a as usize * n() + b as usize))
                     .map(|(a, b)| (a as usize, b as usize))
                     .collect();
                 if v.is_empty() {
                     let t = self.t("fAllKnown");
                     self.flash_hint(t);
+                    return;
+                }
+                if self.s.aim != Some((r, c)) {
+                    self.s.aim = Some((r, c));
+                    self.play("click");
                     return;
                 }
                 self.s.inv.cross -= 1;
@@ -1576,6 +2253,7 @@ impl App {
             Mode::Cross => ActKind::Cross,
             _ => ActKind::Shot,
         };
+        self.s.aim = None;
         self.s.pending_act = Some((kind, (r, c)));
         self.play(if kind == ActKind::Radar { "radar" } else { "shot" });
         self.send(json!({"t":"act","kind":kind.as_str(),"at":[r,c],"cells":cells_json(&cells)}));
@@ -1583,11 +2261,25 @@ impl App {
         self.s.mode = Mode::Shot;
     }
 
+    /// Cases visées par un radar (carré 2 × 2, cases inconnues) ou une frappe en croix (5 cases).
+    pub fn aim_cells(&self, mode: Mode, r: usize, c: usize) -> Vec<Cell> {
+        let (ri, ci) = (r as i32, c as i32);
+        let list: Vec<(i32, i32)> = match mode {
+            Mode::Radar => vec![(ri, ci), (ri, ci + 1), (ri + 1, ci), (ri + 1, ci + 1)],
+            Mode::Cross => vec![(ri, ci), (ri - 1, ci), (ri + 1, ci), (ri, ci - 1), (ri, ci + 1)],
+            _ => vec![(ri, ci)],
+        };
+        list.into_iter()
+            .filter(|&(a, b)| inside(a, b) && if mode == Mode::Radar { self.s.enemy[a as usize * n() + b as usize].is_none() } else { self.targetable(a as usize * n() + b as usize) })
+            .map(|(a, b)| (a as usize, b as usize))
+            .collect()
+    }
+
     pub fn on_my_tap(&mut self, r: usize, c: usize) {
         if self.s.phase != Phase::Game || self.s.mode != Mode::Shield || !self.s.my_turn || self.s.waiting {
             return;
         }
-        let idx = self.occupancy()[r * N + c];
+        let idx = self.occupancy()[r * n() + c];
         if idx < 0 {
             let t = self.t("fTouchShip");
             self.flash_hint(t);
@@ -1629,6 +2321,7 @@ impl App {
             return;
         }
         self.s.mode = if self.s.mode == m { Mode::Shot } else { m };
+        self.s.aim = None;
         self.play("click");
     }
 
@@ -1681,7 +2374,7 @@ impl App {
         let (results, over) = resolve_on(&mut self.s.ships, &mut self.s.incoming, kind, &cells);
         self.send(json!({"t":"res","kind":kind.as_str(),"at":m["at"],"results":results.iter().map(ShotRes::to_json).collect::<Vec<_>>(),"over":over}));
         let at = sanitize_cells(&json!([m["at"]])).first().copied().or(cells.first().copied()).unwrap_or((0, 0));
-        self.s.last_in = if kind == ActKind::Radar { vec![] } else { cells.iter().map(|&(r, c)| r * N + c).collect() };
+        self.s.last_in = if kind == ActKind::Radar { vec![] } else { cells.iter().map(|&(r, c)| r * n() + c).collect() };
         let name = self.s.opp.as_ref().map_or("?".to_string(), |o| o.name.clone());
         let t = self.tf("oppPrefix", &[("name", name)]) + &self.summarize(kind, at, &results);
         self.set_log(t, true);
@@ -1691,11 +2384,12 @@ impl App {
             self.play_result_sound(&results);
         }
         if over {
-            self.end_game(false);
+            self.end_game(false, EndKind::Normal);
             return;
         }
         self.s.my_turn = true;
         self.s.waiting = false;
+        self.s.turn_start = Some(Instant::now());
         self.after_ms(500, Timer::TurnSound);
     }
 
@@ -1712,7 +2406,7 @@ impl App {
         for x in &results {
             if x.v == "sunk" {
                 for &(r, c) in x.ship.as_deref().unwrap_or(&[(x.r, x.c)]) {
-                    self.s.enemy[r * N + c] = Some(Mark::Sunk);
+                    self.s.enemy[r * n() + c] = Some(Mark::Sunk);
                 }
                 if let Some(si) = x.si {
                     if !self.s.enemy_sunk.contains(&si) {
@@ -1730,10 +2424,11 @@ impl App {
                     _ => None,
                 };
                 if st.is_some() {
-                    self.s.enemy[x.r * N + x.c] = st;
+                    self.s.enemy[x.r * n() + x.c] = st;
                 }
             }
         }
+        self.s.blocked_seen += results.iter().filter(|x| x.v == "blocked").count() as u32;
         if act.0 != ActKind::Radar {
             self.s.m.shots += results.len() as u32;
             self.s.m.hits += results.iter().filter(|x| x.v == "hit" || x.v == "sunk").count() as u32;
@@ -1745,11 +2440,17 @@ impl App {
         self.s.waiting = false;
         self.s.pending_act = None;
         if m["over"].as_bool().unwrap_or(false) {
-            self.end_game(true);
+            self.end_game(true, EndKind::Normal);
+            return;
+        }
+        if !self.s.vs_bot && self.opp_answers_impossible() {
+            self.end_game(true, EndKind::Cheat); // l'adversaire ment : la partie ne finirait jamais
             return;
         }
         self.s.my_turn = false;
-        self.s.choices += sunk;
+        if self.s.rules.any_upgrade() {
+            self.s.choices += sunk;
+        }
         if self.s.choices > 0 {
             self.after_ms(500, Timer::OpenChoice);
         }
@@ -1759,7 +2460,14 @@ impl App {
         if self.s.phase != Phase::Game || self.s.my_turn || self.s.waiting {
             return;
         }
+        let sunk = (0..self.s.ships.len()).filter(|&i| self.is_sunk(i)).count() as u32;
+        if !self.s.rules.shield || self.s.opp_used >= sunk {
+            return; // bouclier non gagné ou désactivé : ignoré
+        }
+        self.s.opp_used += 1;
+        self.s.opp_shields += 1;
         self.s.my_turn = true;
+        self.s.turn_start = Some(Instant::now());
         self.s.last_in.clear();
         let name = self.s.opp.as_ref().map_or("?".to_string(), |o| o.name.clone());
         let t = self.tf("oppShield", &[("name", name)]);
@@ -1779,33 +2487,382 @@ impl App {
         self.s.show_choice = self.s.phase == Phase::Game && self.s.choices > 0;
     }
 
-    fn end_game(&mut self, win: bool) {
+    /// Réponses adverses impossibles, détectables sans attendre la fin : plus de « bouclier » que de boucliers
+    /// posés, ou plus assez de cases inconnues pour loger les morceaux de bateaux pas encore touchés.
+    fn opp_answers_impossible(&self) -> bool {
+        if self.s.blocked_seen > self.s.opp_shields {
+            return true;
+        }
+        let (mut touched, mut open) = (0, 0);
+        for v in &self.s.enemy {
+            match v {
+                Some(Mark::Hit) | Some(Mark::Sunk) => touched += 1,
+                None | Some(Mark::ScanOcc) | Some(Mark::Blocked) => open += 1,
+                _ => {}
+            }
+        }
+        open < lens().iter().sum::<usize>() - touched
+    }
+
+    fn end_game(&mut self, win: bool, kind: EndKind) {
         self.s.phase = Phase::Over;
         self.s.my_turn = false;
         self.s.waiting = false;
+        self.s.aim = None;
+        self.s.win = win;
+        self.s.forfeit = kind == EndKind::Forfeit;
         self.cancel(|t| matches!(t, Timer::BotEmit(_) | Timer::BotMove));
         self.s.show_choice = false;
         let shots = self.s.m.shots;
         let acc = if shots > 0 { (self.s.m.hits as f64 / shots as f64 * 100.0).round() as u32 } else { 0 };
-        let text = format!("{} {}", self.t(if win { "winText" } else { "loseText" }), i18n::end_stats(self.lang(), shots as usize, acc));
-        let rec = self.record_game(win);
+        let key = match (win, kind) {
+            (true, EndKind::Cheat) => "winCheat",
+            (true, EndKind::Forfeit) => "winForfeit",
+            (true, _) => "winText",
+            (false, _) => "loseText",
+        };
+        let text = format!("{} {}", self.t(key), i18n::end_stats(self.lang(), shots as usize, acc));
+        // Anti-triche : on dévoile sa grille, et on vérifie celle de l'adversaire s'il s'y était engagé.
+        if !self.s.vs_bot && kind == EndKind::Normal {
+            self.send_reveal();
+        }
+        self.s.verify = if kind == EndKind::Cheat {
+            Verify::Cheat
+        } else if !self.s.vs_bot && kind == EndKind::Normal && self.s.opp_commit.is_some() {
+            Verify::Pending
+        } else {
+            Verify::None
+        };
+        self.s.end = Some(EndInfo {
+            icon: if win { "🏆" } else { "🌊" },
+            title: self.t(if win { "win" } else { "lose" }),
+            text,
+            guest: false,
+            xp: None,
+            parts: XpParts::default(),
+            bot_note: self.s.vs_bot,
+        });
+        if self.s.verify == Verify::Pending {
+            self.s.verify_deadline = Some(Instant::now() + VERIFY_WAIT);
+            // défaite : comptée seulement si la grille adverse est honnête
+            self.s.record_pending = !win;
+            if self.s.opp_reveal.is_some() {
+                self.run_verify();
+            }
+        }
+        if !self.s.record_pending {
+            self.show_xp(win, kind == EndKind::Forfeit || kind == EndKind::Cheat);
+        }
+        self.after_ms(600, Timer::EndSound(win));
+        self.after_ms(700, Timer::EndShow);
+        self.set_awake(false);
+    }
+
+    /// Enregistre la partie et prépare l'affichage de l'XP gagnée.
+    fn show_xp(&mut self, win: bool, forfeit: bool) {
+        let rec = self.record_game(win, forfeit);
         let xp = rec.and_then(|(gain, lvl, up)| {
             let a = self.me()?;
             let lo = accounts::xp_for(lvl);
             let hi = accounts::xp_for(lvl + 1);
             Some((gain, lvl, up, a.xp - lo, hi - lo))
         });
-        self.s.end = Some(EndInfo {
-            icon: if win { "🏆" } else { "🌊" },
-            title: self.t(if win { "win" } else { "lose" }),
-            text,
-            guest: xp.is_none(),
-            xp,
-            bot_note: self.s.vs_bot,
-        });
-        self.after_ms(600, Timer::EndSound(win));
-        self.after_ms(700, Timer::EndShow);
-        self.set_awake(false);
+        let parts = self.xp_parts_now(win).0;
+        if let Some(e) = self.s.end.as_mut() {
+            e.guest = xp.is_none();
+            e.xp = xp;
+            e.parts = parts;
+        }
+    }
+
+    fn xp_parts_now(&self, win: bool) -> (XpParts, u64) {
+        let m = self.s.m;
+        let shots = m.shots.min(500);
+        let hits = m.hits.min(shots);
+        let sunk = m.sunk.min(hits).min(12);
+        let dur = m.start.map_or(5, |t| t.elapsed().as_secs()).clamp(5, 7200);
+        // XP complète en partie standard (règles par défaut, ou 20 s par coup en mode aléatoire) ; moitié contre le bot
+        xp_parts(win, shots, hits, sunk, dur, self.s.vs_bot || !self.current_cfg().is_std())
+    }
+
+    fn send_reveal(&mut self) {
+        if self.s.revealed {
+            return;
+        }
+        if let Some((salt, ships)) = self.s.my_commit.clone() {
+            self.s.revealed = true;
+            self.send(json!({"t":"reveal","salt":salt,"ships":ships.iter().map(|c| cells_json(c)).collect::<Vec<_>>()}));
+        }
+    }
+
+    fn run_verify(&mut self) {
+        let ok = match (&self.s.opp_reveal, &self.s.opp_commit) {
+            (Some(m), Some(h)) => check_reveal(m, h, &self.s.enemy, self.s.blocked_seen, self.s.opp_shields),
+            _ => false,
+        };
+        self.finish_verify(if ok { Verify::Ok } else { Verify::Cheat });
+    }
+
+    fn finish_verify(&mut self, res: Verify) {
+        if self.s.verify != Verify::Pending {
+            return;
+        }
+        self.s.verify = res;
+        self.s.verify_deadline = None;
+        if self.s.record_pending {
+            self.s.record_pending = false;
+            if res == Verify::Ok {
+                self.show_xp(false, false);
+            } else {
+                self.record_interrupted_force();
+            }
+        }
+    }
+
+    /// Bateaux adverses connus en fin de partie : ceux du bot, ou la grille dévoilée et vérifiée d'un joueur.
+    pub fn opp_ship_cells(&self) -> Vec<usize> {
+        if self.s.phase != Phase::Over {
+            return vec![];
+        }
+        let mut v = vec![];
+        if self.s.vs_bot {
+            if let Some(b) = &self.s.bot {
+                for s in &b.ships {
+                    for &(r, c) in s.cells.iter().flatten() {
+                        v.push(r * n() + c);
+                    }
+                }
+            }
+        } else if self.s.verify == Verify::Ok {
+            if let Some(m) = &self.s.opp_reveal {
+                for c in sanitize_cells(&json!(m["ships"].as_array().map(|a| a.iter().flat_map(|x| x.as_array().cloned().unwrap_or_default()).collect::<Vec<_>>()))) {
+                    v.push(c.0 * n() + c.1);
+                }
+            }
+        }
+        v
+    }
+
+    /* ---------- Revanche ---------- */
+
+    pub fn ask_rematch(&mut self) {
+        if self.s.phase != Phase::Over || self.s.lost || self.s.opp_gone || self.s.rematch_me {
+            return;
+        }
+        if self.s.vs_bot {
+            self.start_rematch();
+            return;
+        }
+        self.s.rematch_me = true;
+        self.send(json!({"t":"rematch"}));
+        self.play("click");
+        if self.s.rematch_opp {
+            self.start_rematch();
+        }
+    }
+
+    fn start_rematch(&mut self) {
+        if self.s.phase != Phase::Over || self.s.lost {
+            return;
+        }
+        self.flush_pending_loss();
+        self.timers.clear();
+        self.s.reset_round();
+        if self.s.vs_bot {
+            self.s.bot = Some(Bot::new(self.settings.skill.min(2)));
+        }
+        self.enter_placement();
+        if self.s.vs_bot {
+            let ready = 900 + rand::thread_rng().gen_range(0..900);
+            self.after_ms(ready, Timer::BotEmit(json!({"t":"ready"})));
+        }
+    }
+
+    /// Une défaite en attente de vérification est comptée si on quitte avant la réponse de l'adversaire.
+    fn flush_pending_loss(&mut self) {
+        if self.s.record_pending {
+            self.s.record_pending = false;
+            self.s.verify = Verify::Missing;
+            self.record_interrupted_force();
+        }
+    }
+
+    /* ---------- Chronomètre de tour ---------- */
+
+    pub fn turn_left(&self) -> Option<u32> {
+        let t = self.s.rules.timer;
+        if t == 0 || self.s.phase != Phase::Game || !self.s.my_turn || self.s.waiting {
+            return None;
+        }
+        let used = self.s.turn_start?.elapsed().as_secs_f32();
+        Some(((t as f32 - used).ceil().max(0.0)) as u32)
+    }
+
+    /// Temps de placement écoulé : les bateaux restants sont posés au hasard, puis on se déclare prêt.
+    fn place_tick(&mut self, now: Instant) {
+        if self.s.phase != Phase::Place || self.s.me_ready || self.s.reconnecting || !self.s.place_deadline.is_some_and(|d| now > d) {
+            return;
+        }
+        self.s.place_deadline = None;
+        if let Some(l) = self.s.lifted.take() {
+            self.s.ships[l.idx].cells = Some(l.cells); // le bateau soulevé retourne à sa place
+        }
+        self.s.preview = None;
+        if !fill_missing(&mut self.s.ships) {
+            for (i, cells) in random_cells(&lens()).into_iter().enumerate() {
+                self.s.ships[i].cells = Some(cells);
+            }
+        }
+        self.set_ready();
+    }
+
+    fn turn_tick(&mut self) {
+        let t = self.s.rules.timer;
+        if t == 0 || self.s.phase != Phase::Game {
+            return;
+        }
+        // pas notre tour, tir en cours ou choix d'amélioration ouvert : le chronomètre repart de zéro
+        if !self.s.my_turn || self.s.waiting || self.s.show_choice || self.s.choices > 0 || self.s.reconnecting {
+            self.s.turn_start = if self.s.my_turn { Some(Instant::now()) } else { None };
+            return;
+        }
+        let start = *self.s.turn_start.get_or_insert_with(Instant::now);
+        let left = self.turn_left().unwrap_or(0);
+        if start.elapsed().as_secs_f32() >= t as f32 {
+            self.auto_shot();
+        } else if left <= 5 && left > 0 && self.s.last_beep != left {
+            self.s.last_beep = left;
+            self.play("click"); // tic des 5 dernières secondes
+        }
+    }
+
+    /* ---------- Partage du résultat ---------- */
+
+    /// Image du résultat (même mise en page que la version web), enregistrée dans « Images » et copiée
+    /// dans le presse-papiers pour la coller directement dans une conversation.
+    pub fn share_result(&mut self) {
+        use crate::shareimg::{self, Kind};
+        if self.s.phase != Phase::Over || self.s.lost {
+            return;
+        }
+        self.play("click");
+        let size = n();
+        let occ = self.occupancy();
+        let mine: Vec<Kind> = (0..size * size)
+            .map(|k| {
+                let i = occ[k];
+                if i >= 0 && self.is_sunk(i as usize) {
+                    return Kind::Sunk;
+                }
+                match self.s.incoming[k] {
+                    Some(Mark::Hit) => Kind::Hit,
+                    Some(Mark::Blocked) => Kind::Blocked,
+                    Some(Mark::Miss) => Kind::Miss,
+                    _ if i >= 0 => Kind::Ship,
+                    _ => Kind::Empty,
+                }
+            })
+            .collect();
+        let missed = self.opp_ship_cells();
+        let theirs: Vec<Kind> = (0..size * size)
+            .map(|k| match self.s.enemy[k] {
+                Some(Mark::Sunk) => Kind::Sunk,
+                Some(Mark::Hit) => Kind::Hit,
+                Some(Mark::Miss) => Kind::Miss,
+                Some(Mark::Blocked) => Kind::Blocked,
+                _ if missed.contains(&k) => Kind::Missed,
+                Some(Mark::ScanOcc) => Kind::Scan,
+                _ => Kind::Empty,
+            })
+            .collect();
+        let me = self.my_identity().name;
+        let opp = self.s.opp.as_ref().map_or("?".to_string(), |o| o.name.clone());
+        let m = self.s.m;
+        let acc = if m.shots > 0 { (m.hits as f64 / m.shots as f64 * 100.0).round() as u32 } else { 0 };
+        let secs = m.start.map_or(0, |t| t.elapsed().as_secs());
+        let mut legend = vec![
+            (Kind::Ship, self.t("lgShip")),
+            (Kind::Hit, self.t("lgHit")),
+            (Kind::Sunk, self.t("lgSunk")),
+            (Kind::Miss, self.t("lgMiss")),
+        ];
+        if !missed.is_empty() {
+            legend.push((Kind::Missed, self.t("lgMissed")));
+        }
+        let data = shareimg::Data {
+            size,
+            win: self.s.win,
+            my_name: me.clone(),
+            opp_name: opp.clone(),
+            forfeit: self.s.forfeit,
+            mine,
+            theirs,
+            stats: vec![
+                (self.t("imgShots"), m.shots.to_string()),
+                (self.t("imgAcc"), format!("{acc} %")),
+                (self.t("imgSunk"), format!("{} / {}", self.s.enemy_sunk.len(), lens().len())),
+                (self.t("imgTime"), crate::ui::fmt_time(secs)),
+            ],
+            t_winner: self.tf("imgWinner", &[("name", if self.s.win { me.clone() } else { opp.clone() })]),
+            t_vs: self.t("vs"),
+            t_forfeit: self.t("imgForfeit"),
+            t_fleet_me: self.tf("imgFleet", &[("name", me.clone())]),
+            t_fleet_opp: self.tf("imgFleet", &[("name", opp)]),
+            t_legend: legend,
+            t_stats_of: self.tf("imgStatsOf", &[("name", me)]),
+            t_footer: format!("{} {}", self.t("shareInvite"), WEB_URL.trim_start_matches("https://").trim_end_matches('/')),
+        };
+        let c = crate::theme::pal();
+        let pal = shareimg::Palette {
+            bg: c.bg,
+            card: c.modal,
+            border: c.border2,
+            text: c.text,
+            muted: c.muted,
+            water: c.water,
+            ship: c.ship,
+            hit: c.hit,
+            sunk: c.sunk,
+            miss: c.miss,
+            blk: c.blk,
+            scan: c.scan,
+            yellow: c.yellow,
+            sky: c.sky,
+        };
+        let img = shareimg::render(&data, &pal, &shareimg::Fonts::load());
+        self.share_msg = match self.save_share(&img) {
+            Ok(()) => (self.t("shareSaved"), MsgKind::Ok),
+            Err(_) => (self.t("shareFail"), MsgKind::Err),
+        };
+    }
+
+    fn save_share(&mut self, rgba: &image::RgbaImage) -> Result<(), String> {
+        let (w, h) = (rgba.width() as usize, rgba.height() as usize);
+        let dir = dirs::picture_dir().unwrap_or_else(std::env::temp_dir);
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("c02-naval-resultat.png");
+        rgba.save(&path).map_err(|e| e.to_string())?;
+        if let Ok(mut cb) = arboard::Clipboard::new() {
+            let _ = cb.set_image(arboard::ImageData { width: w, height: h, bytes: rgba.as_raw().clone().into() });
+        }
+        Ok(())
+    }
+
+    /// Temps écoulé : tir au hasard sur une case encore inconnue (sinon une case scannée par le radar).
+    fn auto_shot(&mut self) {
+        let mut free: Vec<usize> = (0..n() * n()).filter(|&k| self.s.enemy[k].is_none()).collect();
+        if free.is_empty() {
+            free = (0..n() * n()).filter(|&k| self.targetable(k)).collect();
+        }
+        if free.is_empty() {
+            return;
+        }
+        let k = free[rand::thread_rng().gen_range(0..free.len())];
+        self.s.mode = Mode::Shot;
+        self.s.aim = None;
+        let t = self.t("autoShot");
+        self.flash_hint(t);
+        self.on_enemy_tap(k / n(), k % n());
     }
 
     /* =========================================================
@@ -1815,6 +2872,15 @@ impl App {
     pub fn tick(&mut self, ctx: &egui::Context) {
         while let Ok(e) = self.ev_rx.try_recv() {
             self.handle_net(e);
+        }
+        if std::mem::take(&mut self.sync_after_record) {
+            self.sync_cloud(ctx);
+        }
+        while let Ok(ev) = self.cloud_rx.try_recv() {
+            self.handle_cloud(ctx, ev);
+        }
+        if self.sync_retry.is_some_and(|t| Instant::now() >= t) {
+            self.sync_cloud(ctx);
         }
         let now = Instant::now();
         // Minuteurs arrivés à échéance.
@@ -1836,20 +2902,36 @@ impl App {
                 self.s.mm_deadline = None;
             } else if now >= d {
                 self.stop_search();
-                self.lobby_msg = (self.t("noOneFound"), MsgKind::Ok);
-                self.after_ms(1000, Timer::StartBot);
+                if self.settings.bot {
+                    self.lobby_msg = (self.t("noOneFound"), MsgKind::Ok);
+                    self.after_ms(1000, Timer::StartBot);
+                } else {
+                    // bot désactivé : personne n'est venu, retour au tableau de bord
+                    self.lobby_msg = (self.t("noBotMsg"), MsgKind::Err);
+                    self.after_ms(2500, Timer::BackToMenu);
+                }
             }
         }
         // Liaison : ping régulier et détection de coupure.
         if self.s.connected && !self.s.vs_bot && !self.s.lost && self.s.phase != Phase::Over {
             if now >= self.s.next_ping {
                 self.s.next_ping = now + HEARTBEAT;
-                self.send(json!({"t":"ping"}));
+                let a = self.s.rxn;
+                self.send(json!({"t":"ping","a":a}));
             }
-            let limit = if self.s.opp_away { AWAY_TIMEOUT } else { TIMEOUT };
-            if now.duration_since(self.s.last_seen) > limit {
-                self.lost();
+            if self.s.reconnecting {
+                self.recon_tick(now);
+            } else {
+                let limit = if self.s.opp_away { AWAY_TIMEOUT } else { TIMEOUT };
+                if now.duration_since(self.s.last_seen) > limit {
+                    self.conn_down();
+                }
             }
+        }
+        self.turn_tick();
+        self.place_tick(now);
+        if self.s.verify == Verify::Pending && self.s.verify_deadline.is_some_and(|d| now >= d) {
+            self.finish_verify(Verify::Missing); // grille jamais dévoilée
         }
         // Fenêtre réduite = « l'appli est en arrière-plan ».
         let minimized = ctx.input(|i| i.viewport().minimized.unwrap_or(false));
@@ -1867,7 +2949,7 @@ impl App {
         if let Some(t) = self.timers.iter().map(|(t, _)| *t).min() {
             next = next.min(t.saturating_duration_since(now));
         }
-        if self.s.mm_deadline.is_some() {
+        if self.s.reconnecting || self.s.place_deadline.is_some() || self.s.mm_deadline.is_some() || (self.s.rules.timer > 0 && self.s.phase == Phase::Game) {
             next = next.min(Duration::from_millis(250));
         }
         ctx.request_repaint_after(next);
@@ -1893,6 +2975,11 @@ impl App {
             Timer::OpenChoice => self.s.show_choice = self.s.phase == Phase::Game && self.s.choices > 0,
             Timer::EndSound(win) => self.play(if win { "win" } else { "lose" }),
             Timer::EndShow => self.s.end_show = true,
+            Timer::BackToMenu => {
+                if !self.s.connected {
+                    self.reset_to_menu();
+                }
+            }
             Timer::StartBot => {
                 if !self.s.connected {
                     self.start_bot();
@@ -1911,7 +2998,7 @@ impl App {
             }
             Timer::TrySlot(k) => self.try_slot(k),
             Timer::Reconnect(pid) => {
-                if !self.s.connected && self.s.peer == Some(pid) {
+                if (!self.s.connected && self.s.peer == Some(pid)) || (self.s.connected && (self.s.rpeer == Some(pid) || self.s.peer == Some(pid))) {
                     self.net.reconnect(pid);
                 }
             }

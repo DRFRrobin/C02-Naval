@@ -944,7 +944,7 @@ test('paramètres : le numéro de version s\'affiche et la recherche de mise à 
   const ctx = await newContext(); const pg = await newPage(ctx, { width: 1000, height: 800 });
   const v = await pg.evaluate(() => APP_VERSION);
   await pg.evaluate(() => { pane = 'settings'; renderDash(); });
-  assert.equal(await pg.textContent('#verNum'), v);
+  assert.equal(await pg.textContent('#verNum'), 'w' + v);   // affiché « w1.2.4 »
   await pg.click('#btnVer');
   await pg.waitForFunction(() => /dernière version|latest/.test($('verMsg').textContent), null, { timeout: 5000 });
   assert.equal(await pg.isVisible('#updBar'), false, 'rien à signaler : pas de bandeau');

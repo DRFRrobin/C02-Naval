@@ -45,7 +45,7 @@ async function checkUpdate() {
 }
 function showUpdateBar() {
   if (!newVersion) { $('updBar').style.display = 'none'; return; }
-  $('updTxt').textContent = t('updNew', { v: newVersion });
+  $('updTxt').textContent = t('updNew', { v: 'w' + newVersion });
   $('updBar').style.display = '';
 }
 async function applyUpdate() {
@@ -65,7 +65,7 @@ async function manualCheck() {
   const say = (txt, color) => { const e = $('verMsg'); e.textContent = txt; e.style.color = color || ''; };
   say(t('verChecking'));
   const r = await checkUpdate();
-  if (r === 'new') { showUpdateBar(); say(t('updNew', { v: newVersion }), 'var(--yellow)'); }
+  if (r === 'new') { showUpdateBar(); say(t('updNew', { v: 'w' + newVersion }), 'var(--yellow)'); }
   else say(t(r === 'ok' ? 'verOk' : 'verErr'), r === 'ok' ? 'var(--green)' : 'var(--err)');
 }
 $('btnUpd').onclick = applyUpdate;

@@ -6,11 +6,15 @@
 
 mod accounts;
 mod app;
+mod cloud;
 mod binarypack;
+mod emoji;
 mod game;
 mod i18n;
+mod i18n_data;
 mod icon;
 mod net;
+mod shareimg;
 mod sound;
 mod theme;
 mod ui;

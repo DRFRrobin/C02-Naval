@@ -1,6 +1,6 @@
 [package]
 name = "c02-naval"
-version = "1.2.0"
+version = "1.2.4"
 edition = "2021"
 description = "C02 Naval : bataille navale multijoueur pour Windows (Rust, egui, WebRTC compatible PeerJS)"
 publish = false
@@ -19,13 +19,12 @@ log = "0.4"
 ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
 native-tls = "0.2"
 rand = "0.8"
-pbkdf2 = "0.12"
 sha2 = "0.10"
-hmac = "0.12"
 base64 = "0.22"
+ab_glyph = "0.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 rfd = "0.14"
-arboard = { version = "3", default-features = false }
+arboard = { version = "3", default-features = false, features = ["image-data"] }
 cpal = "0.15"
 dirs = "5"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
@@ -36,6 +35,6 @@ winresource = "0.1"
 
 [profile.release]
 opt-level = 3
-lto = "thin"
-codegen-units = 4
+lto = "fat"
+codegen-units = 1
 strip = true

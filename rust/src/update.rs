@@ -29,9 +29,9 @@ pub fn current_version() -> String {
     std::env::var("C02NAVAL_FAKE_VERSION").unwrap_or_else(|_| env!("CARGO_PKG_VERSION").to_string())
 }
 
-/// « v1.2.0-windows » -> [1, 2, 0]
+/// « r1.2.4-windows » ou « v1.2.0-windows » -> [1, 2, 4] / [1, 2, 0]
 pub fn parse_version(tag: &str) -> Vec<u32> {
-    let core = tag.trim_start_matches(['v', 'V']).split(['-', '+']).next().unwrap_or("");
+    let core = tag.trim_start_matches(['r', 'R', 'v', 'V']).split(['-', '+']).next().unwrap_or("");
     core.split('.').map(|p| p.parse().unwrap_or(0)).collect()
 }
 
@@ -183,5 +183,10 @@ mod tests {
         assert!(is_newer("v1.10.0-windows", "1.9.3"));
         assert!(!is_newer("v1.2.0-windows", "1.2.0"));
         assert!(!is_newer("v1.1.0-windows", "1.2.0"));
+        // nouveau format de tag : « r » devant le numéro, comparable aux anciens « v »
+        assert_eq!(parse_version("r1.2.4-windows"), vec![1, 2, 4]);
+        assert!(is_newer("r1.2.4-windows", "1.2.0"));
+        assert!(is_newer("r1.2.5-windows", "1.2.4"));
+        assert!(!is_newer("r1.2.4-windows", "1.2.4"));
     }
 }
